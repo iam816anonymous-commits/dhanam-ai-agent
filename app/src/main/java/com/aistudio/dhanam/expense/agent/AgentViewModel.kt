@@ -205,9 +205,31 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun clearChat() {
+        if (_state.value.busy) return
+        _state.value = AgentState(
+            messages = listOf(
+                AgentChatMessage(
+                    role = "assistant",
+                    text = "Hi, I'm Dhanam. I can prepare expenses, category budgets, and matched Khata repayments. I'll show a preview and ask before saving."
+                )
+            ),
+            pendingAction = null,
+            busy = false,
+            activity = "idle",
+            status = "Conversation cleared. Financial records were not changed."
+        )
+    }
+
     fun dismissStatus() { _state.value = _state.value.copy(status = null, activity = if (_state.value.pendingAction != null) "awaiting_confirmation" else "idle") }
 
     private fun appendAssistant(text: String) {
-        _state.value = _state.value.copy(messages = _state.value.messages + AgentChatMessage(role = "assistant", text = text))
+        val messages = (_state.value.messages + AgentChatMessage(role = "assistant", text = text))
+            .takeLast(MAX_CHAT_MESSAGES)
+        _state.value = _state.value.copy(messages = messages)
+    }
+
+    private companion object {
+        const val MAX_CHAT_MESSAGES = 100
     }
 }

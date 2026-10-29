@@ -2,15 +2,51 @@ package com.aistudio.dhanam.expense.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Emerald950 = Color(0xFF071C18)
-val Emerald900 = Color(0xFF0B2922)
-val Emerald800 = Color(0xFF103B31)
-val Emerald700 = Color(0xFF165445)
-val Emerald400 = Color(0xFF4DB69A)
-val Gold400 = Color(0xFFE5B85C)
-val Gold300 = Color(0xFFF2D18A)
-val Ivory = Color(0xFFF5F2E9)
-val MutedText = Color(0xFFB4C4BE)
-val CardGreen = Color(0xFF103129)
-val OutlineGreen = Color(0xFF2A4D43)
-val Danger = Color(0xFFFF8B80)
+// Keep the signature Dhanam palette aligned with the original app.
+val EmeraldPrimaryLight = Color(0xFF0F766E)
+val OnEmeraldPrimaryLight = Color(0xFFFFFFFF)
+val EmeraldPrimaryContainerLight = Color(0xFFCCFBF1)
+val OnEmeraldPrimaryContainerLight = Color(0xFF115E59)
+val AmberSecondaryLight = Color(0xFFD97706)
+val OnAmberSecondaryLight = Color(0xFFFFFFFF)
+val AmberSecondaryContainerLight = Color(0xFFFEF3C7)
+val OnAmberSecondaryContainerLight = Color(0xFF92400E)
+val IndigoTertiaryLight = Color(0xFF4F46E5)
+val SurfaceLight = Color(0xFFF8FAFC)
+val OnSurfaceLight = Color(0xFF0F172A)
+val SurfaceVariantLight = Color(0xFFF1F5F9)
+val OnSurfaceVariantLight = Color(0xFF475569)
+val OutlineLight = Color(0xFFCBD5E1)
+
+val EmeraldPrimaryDark = Color(0xFF2DD4BF)
+val OnEmeraldPrimaryDark = Color(0xFF042F2C)
+val EmeraldPrimaryContainerDark = Color(0xFF134E4A)
+val OnEmeraldPrimaryContainerDark = Color(0xFF99F6E4)
+val AmberSecondaryDark = Color(0xFFFBBF24)
+val OnAmberSecondaryDark = Color(0xFF451A03)
+val AmberSecondaryContainerDark = Color(0xFF78350F)
+val OnAmberSecondaryContainerDark = Color(0xFFFDE68A)
+val IndigoTertiaryDark = Color(0xFF818CF8)
+val SurfaceDark = Color(0xFF0F172A)
+val OnSurfaceDark = Color(0xFFF1F5F9)
+val SurfaceVariantDark = Color(0xFF1E293B)
+val OnSurfaceVariantDark = Color(0xFF94A3B8)
+val OutlineDark = Color(0xFF334155)
+
+val AlertRed = Color(0xFFEF4444)
+val WarningOrange = Color(0xFFF97316)
+val SuccessGreen = Color(0xFF10B981)
+
+// Compatibility aliases for existing Dhanam AI components.
+val Emerald950 = SurfaceDark
+val Emerald900 = SurfaceVariantDark
+val Emerald800 = EmeraldPrimaryContainerDark
+val Emerald700 = EmeraldPrimaryContainerDark
+val Emerald400 = EmeraldPrimaryDark
+val Gold400 = AmberSecondaryDark
+val Gold300 = AmberSecondaryContainerDark
+val Ivory = OnSurfaceDark
+val MutedText = OnSurfaceVariantDark
+val CardGreen = SurfaceVariantDark
+val OutlineGreen = OutlineDark
+val Danger = AlertRed

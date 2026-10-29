@@ -4,25 +4,29 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.material3.Typography
+import androidx.compose.ui.graphics.Color
 
 private val DhanamDarkColors = darkColorScheme(
-    primary = Gold400,
-    onPrimary = Emerald950,
-    primaryContainer = Emerald700,
-    onPrimaryContainer = Ivory,
-    secondary = Emerald400,
-    onSecondary = Emerald950,
-    secondaryContainer = Emerald800,
-    onSecondaryContainer = Ivory,
-    background = Emerald950,
-    onBackground = Ivory,
-    surface = Emerald900,
-    onSurface = Ivory,
-    surfaceVariant = CardGreen,
-    onSurfaceVariant = MutedText,
-    outline = OutlineGreen,
-    error = Danger,
-    onError = Emerald950
+    primary = EmeraldPrimaryDark,
+    onPrimary = OnEmeraldPrimaryDark,
+    primaryContainer = EmeraldPrimaryContainerDark,
+    onPrimaryContainer = OnEmeraldPrimaryContainerDark,
+    secondary = AmberSecondaryDark,
+    onSecondary = OnAmberSecondaryDark,
+    secondaryContainer = AmberSecondaryContainerDark,
+    onSecondaryContainer = OnAmberSecondaryContainerDark,
+    tertiary = IndigoTertiaryDark,
+    background = SurfaceDark,
+    onBackground = OnSurfaceDark,
+    surface = SurfaceDark,
+    onSurface = OnSurfaceDark,
+    surfaceVariant = SurfaceVariantDark,
+    onSurfaceVariant = OnSurfaceVariantDark,
+    outline = OutlineDark,
+    error = AlertRed,
+    errorContainer = Color(0xFF7F1D1D),
+    onError = Color.White,
+    onErrorContainer = Color(0xFFFEE2E2)
 )
 
 @Composable
