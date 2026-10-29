@@ -47,35 +47,51 @@ fun OfflineVoiceInput(
     var recognizer by remember { mutableStateOf<SpeechRecognizer?>(null) }
 
     val startListening: () -> Unit = {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-            status = "Offline voice input requires Android 12+ with an on-device speech recognizer. You can type instead."
-        } else if (!SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
-            status = "No on-device speech recognizer is available. Audio was not sent to an online recognizer."
-        } else {
-            try {
-                recognizer?.destroy()
-                val instance = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+        try {
+            recognizer?.cancel()
+            recognizer?.destroy()
+            val onDeviceApiAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+            if (onDeviceApiAvailable && !SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
+                status = "No dedicated on-device recognizer is available. Install an offline speech pack or type your request."
+            } else {
+                // Android 12+ has a dedicated on-device recognizer API. Android 8–11 do not:
+                // use the platform recognizer with EXTRA_PREFER_OFFLINE for devices that have
+                // downloaded an offline language pack. On those OS versions this flag is a
+                // preference, not a guarantee; the status explicitly tells the user this.
+                val instance = if (onDeviceApiAvailable) {
+                    SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+                } else {
+                    SpeechRecognizer.createSpeechRecognizer(context)
+                }
                 recognizer = instance
                 instance.setRecognitionListener(object : RecognitionListener {
-                    override fun onReadyForSpeech(params: Bundle?) { status = "Listening offline…" }
-                    override fun onBeginningOfSpeech() { status = "Listening offline…" }
+                    override fun onReadyForSpeech(params: Bundle?) {
+                        status = if (onDeviceApiAvailable) "Listening offline…" else "Listening with offline preference…"
+                    }
+                    override fun onBeginningOfSpeech() {
+                        status = if (onDeviceApiAvailable) "Listening offline…" else "Listening with offline preference…"
+                    }
                     override fun onRmsChanged(rmsdB: Float) = Unit
                     override fun onBufferReceived(buffer: ByteArray?) = Unit
-                    override fun onEndOfSpeech() { status = "Processing speech on-device…" }
+                    override fun onEndOfSpeech() { status = "Processing speech…" }
                     override fun onError(error: Int) {
                         status = when (error) {
-                            SpeechRecognizer.ERROR_NO_MATCH -> "No speech was recognized. Try again or type your request."
+                            SpeechRecognizer.ERROR_NO_MATCH -> "No speech was recognized. Check that an offline language pack is installed, then try again."
                             SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech detected. Try again."
-                            SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED -> "This on-device recognizer does not support the selected language."
-                            SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> "The selected offline language pack is unavailable."
-                            else -> "Offline speech recognition failed (code $error). You can type instead."
+                            SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED -> "This speech engine does not support the selected language."
+                            SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> "The selected language pack is unavailable offline."
+                            else -> "Speech recognition failed (code $error). Check the installed language pack or type instead."
                         }
                     }
                     override fun onResults(results: Bundle?) {
                         val spoken = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim().orEmpty()
                         if (spoken.isNotBlank()) {
                             latestOnRecognized(spoken)
-                            status = "Speech captured locally. Review the text before sending."
+                            status = if (onDeviceApiAvailable) {
+                                "Speech captured on-device. Review the text before sending."
+                            } else {
+                                "Speech captured. Android 8–11 only request offline recognition; the system speech service may ignore that preference. Review the text before sending."
+                            }
                         } else {
                             status = "No speech was recognized. Try again or type your request."
                         }
@@ -90,12 +106,16 @@ fun OfflineVoiceInput(
                     putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
                 }
                 instance.startListening(intent)
-                status = "Starting on-device speech recognition…"
-            } catch (error: Exception) {
-                status = "Could not start offline voice input. You can type instead."
-                recognizer?.destroy()
-                recognizer = null
+                status = if (onDeviceApiAvailable) {
+                    "Starting on-device speech recognition…"
+                } else {
+                    "Starting Android system speech recognition with offline preference. Offline mode depends on the installed speech engine and language pack."
+                }
             }
+        } catch (error: Exception) {
+            status = "Could not start speech recognition. Check the installed speech engine or type instead."
+            try { recognizer?.destroy() } catch (_: Exception) { }
+            recognizer = null
         }
     }
 
