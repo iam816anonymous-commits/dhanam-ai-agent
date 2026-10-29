@@ -28,7 +28,7 @@
 
 ## Acceptance status
 - CI and APK artifact verification: pending for this commit.
-- Catalog pinning, file-integrity and prompt-validation unit tests added; CI pending.
+- Catalog pinning, file-integrity and prompt-validation unit tests added; a device-only inference smoke test is also compiled into the Android test APK. CI pending.
 - Download cancellation/retry, corrupted response and low-storage behavior: physical-device verification pending.
 - Physical-device benchmark and inference smoke test: pending. Runtime code is implemented and enabled after model verification/resource checks, but successful generation on the target phone is not claimed until installed and tested there.
 - The resource gate is intentionally conservative. If it rejects the device, the app offers no download action; do not bypass the gate just to test the model.
@@ -45,3 +45,15 @@
 - LiteRT-LM 0.17.0/0.17.1/0.18.0/0.18.1 carry Kotlin metadata 2.4.0 and require Kotlin 2.3 or newer; 0.16.1 carries metadata 2.3.0 and builds with Kotlin 2.2 or newer. This repository uses AGP 8.7.3 and Gradle 8.9, so it uses LiteRT-LM 0.16.1, Kotlin 2.2.21, and KSP 2.2.21-2.0.5 to limit unrelated build-stack changes.
 - Backend: CPU only for initial qualification. GPU requires optional native-library declarations and device qualification; NPU is not enabled.
 - Runtime state is in-memory only. The test chat does not query Room, read expense/Khata records, execute tools, or write prompt history.
+
+
+## Running the on-device inference smoke test
+1. Install the debug APK on the target phone.
+2. Open **Settings → Local AI model**, tap **Download model**, wait for size/SHA-256 verification, then tap **Set preferred**.
+3. Wait for the runtime resource check to pass and tap **Load verified model**.
+4. Send a short prompt in the local inference chat and confirm a response appears. This is the direct UI smoke test.
+5. For the instrumented test, install the `app-debug-androidTest.apk` from the same CI artifact and run:
+   `adb shell am instrument -w -e class com.aistudio.dhanam.expense.model.LocalInferenceDeviceSmokeTest com.aistudio.dhanam.expense.test/androidx.test.runner.AndroidJUnitRunner`
+   The test intentionally skips if the reviewed model is absent/invalid or the device does not meet the runtime resource gate. It never downloads the model itself.
+
+The CI pipeline compiles the instrumented-test APK but does not run it on a physical device. Successful target-phone inference remains unverified until the above steps complete.

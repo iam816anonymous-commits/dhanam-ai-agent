@@ -38,18 +38,22 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Run unit tests, lint and assemble
-        run: ./gradlew --no-daemon clean :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+        run: ./gradlew --no-daemon clean :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
 
       - name: Verify APK exists
         shell: bash
         run: |
           test -s app/build/outputs/apk/debug/app-debug.apk
+          test -s app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           echo "Debug APK exists: $(stat -c '%s bytes' app/build/outputs/apk/debug/app-debug.apk)"
+          echo "Instrumented-test APK exists: $(stat -c '%s bytes' app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk)"
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: dhanam-ai-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           if-no-files-found: error
           retention-days: 14

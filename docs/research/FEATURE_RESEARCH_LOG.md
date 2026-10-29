@@ -105,5 +105,5 @@ See 2026-10-29-initial-source-review.md for exact commits, inspected paths, lice
 - Compatibility decision: LiteRT-LM 0.17.x–0.18.x require Kotlin 2.3+ due Kotlin 2.4 metadata; 0.16.1 supports Kotlin 2.2+. This project stays on AGP 8.7.3 / Gradle 8.9 and upgrades Kotlin/Compose plugin to 2.2.21 with matching KSP 2.2.21-2.0.5.
 - Runtime uses CPU only for the first target qualification. A dedicated single-thread executor owns engine/conversation operations; initialization is off-main-thread; the model path is re-verified before loading; prompts are capped at 4,000 chars; stop, new-chat, and unload are wired.
 - The smoke-test chat is not connected to the finance database or write tools, and prompts/replies are not persisted or uploaded.
-- Automated validation: prompt validator unit tests and full Android CI to be recorded after the new commit.
+- Automated validation: prompt validator unit tests; Android test APK includes a model-loaded/generation smoke test that runs only when the reviewed model is installed and the device passes the resource gate. CI result for the current source revision is recorded after this build.
 - Physical-device inference, thermal/memory profiling, cancellation behavior and model artifact load success remain unverified until installed on the target phone.
