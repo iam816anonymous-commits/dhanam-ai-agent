@@ -22,7 +22,7 @@
 - Explicit foreground download action; no automatic downloads, model bundling, cloud inference, or background model fetching.
 - Download is written to app-private storage, has progress/cancel/retry behavior, bounds bytes, rejects size/hash mismatches, deletes partial files on failure/cancel, checks HTTPS after redirects, and atomically finalizes verified files.
 - A model may be marked preferred only after re-verifying the full file. Preferred selection is separate from runtime state.
-- Added LiteRT-LM CPU runtime with a single-thread executor, background initialization, verified-path recheck, local streaming chat, stop/reset/unload actions and resource cleanup. Model loading requires an explicit preferred-model choice and a fresh runtime resource gate.
+- Added LiteRT-LM CPU runtime with a single-thread executor, background initialization, verified-path recheck, local streaming chat, stop/reset/unload actions and resource cleanup. After cancellation, the conversation is closed and recreated rather than reused, because LiteRT-LM documents conversation reuse after CancelProcess as unsupported. Model loading is cancelled when its ViewModel is cleared. Model loading requires an explicit preferred-model choice and a fresh runtime resource gate.
 - Runtime smoke-test prompts are capped at 4,000 characters and are not written to the database or sent to a network service. The local test chat is not connected to finance records or write tools.
 - Model files can be removed from app-private storage.
 

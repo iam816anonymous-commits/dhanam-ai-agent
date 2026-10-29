@@ -12,6 +12,9 @@ import java.util.concurrent.Executors
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
@@ -47,6 +50,8 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private var engine: Engine? = null
     private var conversation: Conversation? = null
+    @Volatile private var loadJob: Job? = null
+    private var stopRequested = false
 
     private val _state = MutableStateFlow(LocalInferenceState())
     val state: StateFlow<LocalInferenceState> = _state.asStateFlow()
@@ -64,7 +69,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
 
     fun loadModel() {
         if (_state.value.isLoading || _state.value.isReady) return
-        scope.launch {
+        loadJob = scope.launch {
             _state.update { it.copy(isLoading = true, error = null, status = "Checking model integrity and device resources…") }
             try {
                 check(preferences.getString("preferred_model_id", null) == model.id) {
@@ -91,6 +96,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                 // LiteRT-LM forbids closing an Engine whose initialize() call throws.
                 candidate.initialize()
                 engine = candidate
+                currentCoroutineContext().ensureActive()
                 try {
                     conversation = candidate.createConversation(createConversationConfig())
                 } catch (error: Exception) {
@@ -132,6 +138,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
         if (!_state.value.isReady || _state.value.isLoading || _state.value.isGenerating) return
         scope.launch {
             if (!_state.value.isReady || _state.value.isGenerating) return@launch
+            stopRequested = false
             _state.update { it.copy(isGenerating = true, reply = "", error = null, status = "Generating on-device…") }
             try {
                 checkNotNull(conversation) { "The local conversation is not available. Reload the model." }
@@ -139,12 +146,38 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                     .collect { chunk ->
                         _state.update { it.copy(reply = it.reply + chunk.toString()) }
                     }
-                _state.update { it.copy(status = "Response complete. Generated locally; no cloud API was used.") }
+                if (!stopRequested) {
+                    _state.update { it.copy(status = "Response complete. Generated locally; no cloud API was used.") }
+                }
             } catch (cancelled: CancellationException) {
-                throw cancelled
+                if (!stopRequested) throw cancelled
             } catch (error: Exception) {
                 _state.update { it.copy(status = "Local inference failed.", error = error.message ?: error.javaClass.simpleName) }
             } finally {
+                if (stopRequested) {
+                    // LiteRT-LM does not support reusing a Conversation after cancelProcess().
+                    // Wait for the streaming flow to end, then replace that conversation.
+                    try {
+                        val oldConversation = conversation
+                        conversation = null
+                        oldConversation?.close()
+                        conversation = checkNotNull(engine).createConversation(createConversationConfig())
+                        _state.update { it.copy(status = "Generation stopped. A fresh local conversation is ready.", error = null) }
+                    } catch (error: Exception) {
+                        conversation = null
+                        try { engine?.close() } catch (_: Exception) { }
+                        engine = null
+                        _state.update {
+                            it.copy(
+                                isReady = false,
+                                status = "Conversation reset failed. Reload the model before continuing.",
+                                error = error.message ?: error.javaClass.simpleName
+                            )
+                        }
+                    } finally {
+                        stopRequested = false
+                    }
+                }
                 _state.update { it.copy(isGenerating = false) }
             }
         }
@@ -153,6 +186,8 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
     fun stopGeneration() {
         scope.launch {
             if (_state.value.isGenerating) {
+                stopRequested = true
+                _state.update { it.copy(status = "Stopping generation…") }
                 try {
                     conversation?.cancelProcess()
                 } catch (error: Exception) {
@@ -166,16 +201,22 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
         if (!_state.value.isReady || _state.value.isGenerating) return
         scope.launch {
             try {
-                conversation?.close()
+                val oldConversation = conversation
+                conversation = null
+                oldConversation?.close()
                 conversation = checkNotNull(engine).createConversation(createConversationConfig())
                 _state.update { it.copy(reply = "", error = null, status = "New local conversation started.") }
             } catch (error: Exception) {
-                _state.update { it.copy(error = error.message ?: "Could not reset the conversation.") }
+                conversation = null
+                try { engine?.close() } catch (_: Exception) { }
+                engine = null
+                _state.update { it.copy(isReady = false, error = error.message ?: "Could not reset the conversation.", status = "Conversation reset failed. Reload the model before continuing.") }
             }
         }
     }
 
     fun unloadModel() {
+        if (_state.value.isLoading) loadJob?.cancel()
         scope.launch { releaseLoadedModel() }
     }
 
@@ -213,6 +254,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
     }
 
     override fun onCleared() {
+        loadJob?.cancel()
         scope.launch {
             releaseLoadedModel()
             dispatcher.close()

@@ -88,7 +88,7 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
                     }
                 }
                 Text(
-                    "LiteRT-LM CPU inference is available below. GPU/NPU acceleration is not enabled until separately qualified.",
+                    "After the model is downloaded and verified, local CPU inference is available below. GPU/NPU acceleration is not enabled until separately qualified.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
