@@ -45,7 +45,7 @@ class KhataViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun recordRepayment(loanId: Long, amount: String, date: String, note: String) {
+    fun recordRepayment(loanId: Long, amount: String, date: String, note: String, requestId: String = UUID.randomUUID().toString()) {
         viewModelScope.launch {
             try {
                 val paise = MoneyParser.parseRupeesToPaise(amount)
@@ -53,7 +53,7 @@ class KhataViewModel(application: Application) : AndroidViewModel(application) {
                 val now = System.currentTimeMillis()
                 val inserted = dao.recordRepayment(RepaymentEntity(
                     loanId = loanId, amountPaise = paise, paidOnEpochDay = paidDate.toEpochDay(),
-                    note = note.trim().take(1000), requestId = UUID.randomUUID().toString(), createdAtEpochMillis = now
+                    note = note.trim().take(1000), requestId = requestId, createdAtEpochMillis = now
                 ))
                 _message.value = if (inserted) "Repayment recorded." else "This repayment request was already recorded."
             } catch (e: CancellationException) { throw e }

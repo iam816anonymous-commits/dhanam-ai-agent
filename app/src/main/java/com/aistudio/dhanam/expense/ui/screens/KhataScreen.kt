@@ -32,6 +32,7 @@ import com.aistudio.dhanam.expense.domain.KhataValidator
 import com.aistudio.dhanam.expense.domain.MoneyParser
 import com.aistudio.dhanam.expense.ui.KhataViewModel
 import java.time.LocalDate
+import java.util.UUID
 
 @Composable
 fun KhataScreen(viewModel: KhataViewModel = viewModel()) {
@@ -48,6 +49,7 @@ fun KhataScreen(viewModel: KhataViewModel = viewModel()) {
     var repaymentAmount by remember { mutableStateOf("") }
     var repaymentDate by remember { mutableStateOf(LocalDate.now().toString()) }
     var repaymentNote by remember { mutableStateOf("") }
+    var repaymentRequestId by remember { mutableStateOf(UUID.randomUUID().toString()) }
     var deleteFor by remember { mutableStateOf<KhataLoanEntity?>(null)}
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -109,7 +111,7 @@ fun KhataScreen(viewModel: KhataViewModel = viewModel()) {
                 }
             },
             confirmButton = { TextButton(onClick = {
-                viewModel.recordRepayment(loan.id, repaymentAmount, repaymentDate, repaymentNote)
+                viewModel.recordRepayment(loan.id, repaymentAmount, repaymentDate, repaymentNote, repaymentRequestId)
                 repaymentFor = null
             }) { Text("Save repayment") } },
             dismissButton = { TextButton(onClick = { repaymentFor = null }) { Text("Cancel") } }

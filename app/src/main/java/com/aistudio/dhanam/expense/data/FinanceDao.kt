@@ -30,6 +30,9 @@ interface FinanceDao {
     @Query("SELECT * FROM budgets WHERE category = :category AND month_epoch_day = :monthEpochDay LIMIT 1")
     suspend fun findBudget(category: String, monthEpochDay: Long): BudgetEntity?
 
+    @Query("SELECT * FROM budgets ORDER BY month_epoch_day, category")
+    suspend fun allBudgets(): List<BudgetEntity>
+
     @Insert suspend fun insertBudget(budget: BudgetEntity): Long
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertBudgetIfMissing(budget: BudgetEntity): Long
     @Update suspend fun updateBudget(budget: BudgetEntity): Int

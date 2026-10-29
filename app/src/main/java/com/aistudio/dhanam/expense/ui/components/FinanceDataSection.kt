@@ -25,7 +25,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import com.aistudio.dhanam.expense.data.FinanceCsvTransfer
 import com.aistudio.dhanam.expense.data.FinanceDatabase
 import com.aistudio.dhanam.expense.data.FinanceLedgerCsvExporter
-import java.time.YearMonth
 import kotlinx.coroutines.flow.first
 import com.aistudio.dhanam.expense.data.CsvImportPreview
 import kotlinx.coroutines.CancellationException
@@ -59,11 +58,11 @@ fun FinanceDataSection() {
                 val text = withContext(Dispatchers.IO) {
                     val loans = db.financeDao().observeLoans().first()
                     val repayments = db.financeDao().allRepayments()
-                    val budgets = db.financeDao().observeBudgetsForMonth(YearMonth.now().atDay(1).toEpochDay()).first()
+                    val budgets = db.financeDao().allBudgets()
                     FinanceLedgerCsvExporter.export(loans, repayments, budgets)
                 }
                 withContext(Dispatchers.IO) { FinanceCsvTransfer.writeText(context.contentResolver, uri, text) }
-                message = "Khata, repayment and current-month budget ledger exported."
+                message = "Khata, repayment and budget history exported."
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { message = e.message ?: "Ledger export failed." }
         }

@@ -144,6 +144,16 @@ fun InsightsScreen() {
                     } catch (e: Exception) { message = e.message ?: "Enter a valid category budget." }
                 }, modifier = Modifier.fillMaxWidth()) { Text("Save category budget") }
                 if (message != null) Text(message.orEmpty(), color = MaterialTheme.colorScheme.primary)
+                budgets.firstOrNull { it.category == FinanceCalculations.OVERALL_BUDGET_CATEGORY }?.let { overallBudget ->
+                    TextButton(onClick = {
+                        scope.launch {
+                            try {
+                                db.financeDao().deleteBudgetById(overallBudget.id)
+                                message = "Overall budget removed for $month."
+                            } catch (e: Exception) { message = e.message ?: "Could not remove overall budget." }
+                        }
+                    }) { Text("Remove overall budget") }
+                }
                 Button(onClick = { pdfLauncher.launch("dhanam-report-$month.pdf") }, modifier = Modifier.fillMaxWidth()) {
                     Text("Export monthly report as PDF")
                 }
