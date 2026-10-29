@@ -56,3 +56,22 @@
    The test intentionally skips if the reviewed model is absent/invalid or the device does not meet the runtime resource gate. It never downloads the model itself.
 
 The CI pipeline compiles the instrumented-test APK but does not run it on a physical device. Successful target-phone inference remains unverified until the above steps complete.
+
+## Expanded model tiers — 2026-10-29
+
+The catalog now contains three fixed, revision-pinned LiteRT-LM artifacts. The runtime was upgraded to LiteRT-LM 0.18.0 / Kotlin 2.3.0 / AGP 8.13.2 / Gradle 8.13 to support the larger Qwen3 bundles; model compatibility must still be verified on physical devices.
+
+| Model | Artifact size | Context | Download gate | Peak RSS guard |
+|---|---:|---:|---|---:|
+| Qwen3 0.6B INT4 No-Think | 331.1 MiB | 1,280 tokens | 3.5 GiB total RAM, 1.5 GiB available RAM, 1.25 GiB free storage | 2 GiB |
+| Qwen3 1.7B INT4 | 931.8 MiB | 4,096 tokens | 8 GiB total RAM, 4 GiB available RAM, 3 GiB free storage | 3.5 GiB |
+| Qwen3 4B Mixed INT4 | 2.5 GiB | 2,048 tokens | 12 GiB total RAM, 7 GiB available RAM, 7 GiB free storage | 6 GiB |
+
+Artifact sources and licenses:
+- Qwen3 0.6B INT4 No-Think: https://huggingface.co/litert-community/Qwen3-0.6B-int4 (Apache-2.0; pinned revision 6aa2daf).
+- Qwen3 1.7B INT4: https://huggingface.co/litert-community/Qwen3-1.7B (Apache-2.0; pinned revision d9b8a91; SHA-256 2eeffef7b51bc3e1225ea69fe7aa5f417397934b56a5b6c20cc068d6fd2c918b).
+- Qwen3 4B Mixed INT4: https://huggingface.co/litert-community/Qwen3-4B (Apache-2.0; pinned revision 2f7415b4e3a149c16b929659d146a6eaf6d99a34; SHA-256 569fe029f51e55b6377f98ebd7f6d26431bc73e1d632034f5389f2fd720da701).
+
+These gates are deliberately conservative product safeguards, not a promise that every phone meeting the thresholds will run without thermal throttling or memory pressure. The app displays the models but disables download when current device checks fail. Dynamic RAM is not treated as physical RAM. Only one model is loaded at a time, and switching catalog entries is disabled while inference is loaded or running.
+
+The 1.7B and 4B models are newly catalogued and have not yet been qualified on the user's target phone. CI can validate code, metadata, lint, and APK packaging; it cannot establish physical-device inference stability. The 4B CPU runtime is especially memory-intensive, so its 12 GiB physical-RAM / 7 GiB currently-available-RAM / 6 GiB process-peak gate must not be relaxed without measured device tests.

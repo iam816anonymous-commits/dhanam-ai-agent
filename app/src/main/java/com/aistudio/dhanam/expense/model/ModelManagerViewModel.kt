@@ -20,14 +20,20 @@ data class ModelManagerState(
     val totalBytes: Long = 0L,
     val isVerified: Boolean = false,
     val preferredModelId: String? = null,
+    val selectedModelId: String = ModelCatalog.models.first().id,
     val message: String? = null
 )
 
 class ModelManagerViewModel(application: Application) : AndroidViewModel(application) {
-    private val model = ModelCatalog.models.first()
     private val downloader = ModelDownloader(application)
     private val preferences = application.getSharedPreferences("model_manager", 0)
-    private val _state = MutableStateFlow(ModelManagerState(preferredModelId = preferences.getString(KEY_PREFERRED, null)))
+    private val initialModelId = preferences.getString(KEY_PREFERRED, null)
+        ?.takeIf { id -> ModelCatalog.models.any { it.id == id } } ?: ModelCatalog.models.first().id
+    private val _state = MutableStateFlow(
+        ModelManagerState(preferredModelId = preferences.getString(KEY_PREFERRED, null), selectedModelId = initialModelId)
+    )
+    private val model: ModelSpec
+        get() = ModelCatalog.models.first { it.id == _state.value.selectedModelId }
     val state: StateFlow<ModelManagerState> = _state.asStateFlow()
     private var downloadJob: Job? = null
 
@@ -36,21 +42,37 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
         refresh()
     }
 
+    fun selectModel(modelId: String) {
+        if (downloadJob?.isActive == true) return
+        if (ModelCatalog.models.none { it.id == modelId }) return
+        _state.value = _state.value.copy(
+            selectedModelId = modelId,
+            eligibility = null,
+            isVerified = false,
+            progress = 0f,
+            downloadedBytes = 0L,
+            totalBytes = 0L,
+            message = null
+        )
+        refresh()
+    }
+
     fun refresh() {
+        val selected = model
         viewModelScope.launch {
-            val eligibility = withContext(Dispatchers.IO) { ModelCatalog.eligibility(getApplication(), model) }
-            val file = ModelCatalog.modelFile(getApplication(), model)
+            val eligibility = withContext(Dispatchers.IO) { ModelCatalog.eligibility(getApplication(), selected) }
+            val file = ModelCatalog.modelFile(getApplication(), selected)
             val verified = withContext(Dispatchers.IO) {
-                file.isFile && file.length() == model.expectedBytes &&
-                    ModelFileVerifier.isValid(file, model.expectedBytes, model.sha256)
+                file.isFile && file.length() == selected.expectedBytes &&
+                    ModelFileVerifier.isValid(file, selected.expectedBytes, selected.sha256)
             }
-            if (!verified && _state.value.preferredModelId == model.id) {
-                preferences.edit().remove(KEY_PREFERRED).apply()
-            }
+            if (_state.value.selectedModelId != selected.id) return@launch
+            val preferred = preferences.getString(KEY_PREFERRED, null)
+            if (!verified && preferred == selected.id) preferences.edit().remove(KEY_PREFERRED).apply()
             _state.value = _state.value.copy(
                 eligibility = eligibility,
                 isVerified = verified,
-                preferredModelId = if (verified) preferences.getString(KEY_PREFERRED, null) else null,
+                preferredModelId = preferred,
                 message = if (verified) "Model file is present and SHA-256 verified." else _state.value.message
             )
         }
@@ -58,6 +80,7 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
 
     fun download() {
         if (downloadJob?.isActive == true) return
+        val selected = model
         val eligibility = _state.value.eligibility ?: return
         if (!eligibility.allowed) {
             _state.value = _state.value.copy(message = "Download blocked because this device does not meet the resource checks.")
@@ -66,10 +89,10 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
         downloadJob = viewModelScope.launch {
             _state.value = _state.value.copy(
                 isDownloading = true, progress = 0f, downloadedBytes = 0L,
-                totalBytes = model.expectedBytes, message = "Downloading from the pinned HTTPS source…"
+                totalBytes = selected.expectedBytes, message = "Downloading from the pinned HTTPS source…"
             )
             try {
-                val file = downloader.download(model) { received, total ->
+                val file = downloader.download(selected) { received, total ->
                     _state.value = _state.value.copy(
                         downloadedBytes = received,
                         totalBytes = total,
@@ -77,7 +100,7 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
                     )
                 }
                 val verified = withContext(Dispatchers.IO) {
-                    ModelFileVerifier.isValid(file, model.expectedBytes, model.sha256)
+                    ModelFileVerifier.isValid(file, selected.expectedBytes, selected.sha256)
                 }
                 check(verified) { "Final model verification failed." }
                 _state.value = _state.value.copy(
@@ -104,17 +127,18 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
 
     fun setPreferred() {
         viewModelScope.launch {
-            val file = ModelCatalog.modelFile(getApplication(), model)
+            val selected = model
+            val file = ModelCatalog.modelFile(getApplication(), selected)
             val verified = withContext(Dispatchers.IO) {
-                ModelFileVerifier.isValid(file, model.expectedBytes, model.sha256)
+                ModelFileVerifier.isValid(file, selected.expectedBytes, selected.sha256)
             }
             if (!verified) {
                 _state.value = _state.value.copy(isVerified = false, message = "Model verification failed; it cannot be selected.")
                 return@launch
             }
-            preferences.edit().putString(KEY_PREFERRED, model.id).apply()
+            preferences.edit().putString(KEY_PREFERRED, selected.id).apply()
             _state.value = _state.value.copy(
-                preferredModelId = model.id,
+                preferredModelId = selected.id,
                 message = "Preferred model saved. Load it below to run a local inference test."
             )
         }
@@ -123,10 +147,12 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
     fun deleteModel() {
         if (downloadJob?.isActive == true) return
         viewModelScope.launch {
-            downloader.delete(model)
-            preferences.edit().remove(KEY_PREFERRED).apply()
+            val selected = model
+            downloader.delete(selected)
+            if (preferences.getString(KEY_PREFERRED, null) == selected.id) preferences.edit().remove(KEY_PREFERRED).apply()
             _state.value = _state.value.copy(
-                isVerified = false, preferredModelId = null, progress = 0f,
+                isVerified = false,
+                preferredModelId = preferences.getString(KEY_PREFERRED, null), progress = 0f,
                 downloadedBytes = 0L, totalBytes = 0L, message = "Model file removed from app storage."
             )
             refresh()

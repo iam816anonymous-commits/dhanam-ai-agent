@@ -41,8 +41,10 @@ data class LocalInferenceState(
  * this ViewModel does not read financial records, persist prompts, or use network APIs.
  */
 class LocalInferenceViewModel(application: Application) : AndroidViewModel(application) {
-    private val model = ModelCatalog.models.first()
     private val preferences = application.getSharedPreferences("model_manager", 0)
+    private val model: ModelSpec
+        get() = ModelCatalog.models.firstOrNull { it.id == preferences.getString("preferred_model_id", null) }
+            ?: ModelCatalog.models.first()
     private val executor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "Dhanam-LiteRT-LM").apply { isDaemon = true }
     }
@@ -104,8 +106,8 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                     check(peakBytes != null) {
                         "Cannot verify this process's peak memory. Model loading is blocked for safety."
                     }
-                    check(peakBytes < ModelCatalog.MAX_PROCESS_PEAK_BYTES) {
-                        "The app process has reached the 2 GiB peak-memory budget. Unload other apps and try again."
+                    check(peakBytes < model.maxProcessPeakBytes) {
+                        "The app process has reached this model's peak-memory budget. Unload other apps and try again."
                     }
                     conversation = candidate.createConversation(createConversationConfig())
                 } catch (error: OutOfMemoryError) {
@@ -176,9 +178,9 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
         var outputTooLong = false
         try {
             val peakBefore = ProcessMemoryBudget.readPeakResidentBytes()
-            check(peakBefore != null && peakBefore < ModelCatalog.MAX_PROCESS_PEAK_BYTES) {
+            check(peakBefore != null && peakBefore < model.maxProcessPeakBytes) {
                 shouldUnload = true
-                "The process is already at the 2 GiB peak-memory limit; the model will be unloaded."
+                "The process is already at this model's peak-memory limit; the model will be unloaded."
             }
             val agentConversation = activeEngine.createConversation(
                 ConversationConfig(
@@ -197,7 +199,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
             var chunksSinceUiUpdate = 0
             agentConversation.sendMessageAsync(prompt).collect { chunk ->
                 val peakBytes = ProcessMemoryBudget.readPeakResidentBytes()
-                if (peakBytes == null || peakBytes >= ModelCatalog.MAX_PROCESS_PEAK_BYTES) {
+                if (peakBytes == null || peakBytes >= model.maxProcessPeakBytes) {
                     shouldUnload = true
                     try { agentConversation.cancelProcess() } catch (_: Exception) { }
                     throw IllegalStateException("The 2 GiB process peak-memory limit was reached or could not be measured.")
@@ -272,12 +274,12 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                     .sendMessageAsync(prompt)
                     .collect { chunk ->
                         val peakBytes = ProcessMemoryBudget.readPeakResidentBytes()
-                        if (peakBytes == null || peakBytes >= ModelCatalog.MAX_PROCESS_PEAK_BYTES) {
+                        if (peakBytes == null || peakBytes >= model.maxProcessPeakBytes) {
                             memoryBudgetExceeded = true
                             stopRequested = true
                             _state.update {
                                 it.copy(
-                                    status = "The 2 GiB process peak-memory budget was reached or could not be measured. Stopping and unloading the model.",
+                                    status = "This model's process peak-memory budget was reached or could not be measured. Stopping and unloading the model.",
                                     error = null
                                 )
                             }

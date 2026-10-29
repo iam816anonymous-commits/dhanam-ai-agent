@@ -27,9 +27,10 @@ import java.util.Locale
 @Composable
 fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenceViewModel: LocalInferenceViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
-    val model = ModelCatalog.models.first()
-    val eligibility = state.eligibility
     val inferenceState by inferenceViewModel.state.collectAsState()
+    val model = ModelCatalog.models.first { it.id == state.selectedModelId }
+    val canSwitchModel = !state.isDownloading && !inferenceState.isReady && !inferenceState.isLoading && !inferenceState.isGenerating
+    val eligibility = state.eligibility
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Local AI model", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -38,16 +39,37 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        Text("Choose a model", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        ModelCatalog.models.forEach { candidate ->
+            if (candidate.id == model.id) {
+                Button(
+                    onClick = { viewModel.selectModel(candidate.id) },
+                    enabled = canSwitchModel,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Selected · ${candidate.displayName}") }
+            } else {
+                OutlinedButton(
+                    onClick = { viewModel.selectModel(candidate.id) },
+                    enabled = canSwitchModel,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text(candidate.displayName) }
+            }
+        }
+        Text(
+            "A model switch is disabled while inference is loaded or running. Dynamic RAM is not counted as physical RAM.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(model.displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("331.14 MiB · Apache-2.0 · 1,280-token KV cache · No-thinking mode", style = MaterialTheme.typography.bodySmall)
+                Text("${formatBytes(model.expectedBytes)} · ${model.license} · ${model.contextTokens}-token context", style = MaterialTheme.typography.bodySmall)
                 Text("Pinned Hugging Face artifact revision; exact byte size and SHA-256 are verified after download.", style = MaterialTheme.typography.bodySmall)
                 Text(
-                    "Safety gate: at least 3,500 MiB total RAM, 1,536 MiB currently available RAM, and 1,280 MiB free app storage. The app process is unloaded if its measured peak RSS reaches 2 GiB.",
+                    "Safety gate: ${formatBytes(model.minTotalRamBytes)} total RAM, ${formatBytes(model.minAvailableRamBytes)} currently available RAM, and ${formatBytes(model.minFreeStorageBytes)} free app storage. Peak process budget: ${formatBytes(model.maxProcessPeakBytes)}. ${model.runtimeRequirement}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -70,6 +92,7 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
                 if (state.isVerified) {
                     Text("Verified model file is installed.", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
                     if (state.preferredModelId == model.id) Text("Saved as preferred model.", style = MaterialTheme.typography.bodySmall)
+                    else Text("Set this model as preferred to use it for inference.", style = MaterialTheme.typography.bodySmall)
                 }
                 state.message?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -100,5 +123,10 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
 
 private fun formatBytes(bytes: Long): String {
     if (bytes <= 0L) return "0 MiB"
-    return String.format(Locale.US, "%.1f MiB", bytes / (1024.0 * 1024.0))
+    val gib = 1024.0 * 1024.0 * 1024.0
+    return if (bytes >= gib) {
+        String.format(Locale.US, "%.1f GiB", bytes / gib)
+    } else {
+        String.format(Locale.US, "%.1f MiB", bytes / (1024.0 * 1024.0))
+    }
 }
