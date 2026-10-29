@@ -84,7 +84,7 @@ This is the approved-work proposal for the new repository. Each phase is one coh
 **Acceptance:**
 - No critical finance-integrity or privacy defect remains open.
 - All matrix features have passing evidence or an explicit user-approved exception.
-- CI proves lint/tests/build/APK artifact; physical device testing separately proves model/runtime and OEM behavior.
+- CI proves lint/tests/build/APK artifact; physical-device testing separately proves model/runtime and OEM behavior.
 - Signing continuity and real legacy-data migration are verified before claiming upgrade safety.
 - Final report lists what was tested, where, results, limitations and known issues.
 
@@ -135,10 +135,15 @@ The legacy project uses AGP 9.1.1/Kotlin 2.2.10, while its and nextgen's version
 - API 27 and current API launch/navigation, UI state and accessibility tests.
 - APK exists, package metadata correct, and CI does not pass when build/test/artifact steps fail.
 
+## Open-source research gate — mandatory for every feature
+
+Before implementing any F01–F30 feature, follow [the open-source research protocol](../research/OPEN_SOURCE_RESEARCH_PROTOCOL.md) and add an evidence entry to [the feature research log](../research/FEATURE_RESEARCH_LOG.md). Inspect current source code, tests, release/activity status, license, dependency tree, and official platform documentation; record exact commits/tags and source paths. For critical paths, compare multiple credible implementations where available. Candidate repositories are not pre-approved dependencies, and README claims alone are not implementation evidence.
+
+Every implementation batch must include the chosen pattern, alternatives rejected and why, Dhanam-specific changes, tests and actual results, CI evidence, and physical-device checks where needed. If source research conflicts with an existing ADR, update the ADR and explain the impact before implementation. A feature is not complete until both the feature parity matrix acceptance evidence and its research record are satisfied.
+
 ## Execution and change control
 
-- Work in a dedicated branch per phase and open a reviewable PR; do not force-push or rewrite the user's main branch.
-- A phase is a coherent batch of related changes, with tests and documentation updated in the same batch.
+- Work in coherent phase batches and update tests and documentation together.
 - Report exact commands and actual results. Never claim physical-device validation from CI alone.
 - Stop at phase acceptance gates and ask for approval before starting the next phase.
 - If source audit contradicts this plan, update the ADR/matrix and explain the impact before implementation.
