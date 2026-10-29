@@ -16,26 +16,31 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.aistudio.dhanam.expense.ui.components.ModelManagerSection
 import com.aistudio.dhanam.expense.ui.theme.MutedText
 
 @Composable
 fun SettingsScreen() {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
         Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("Privacy and application status", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Privacy, application status and on-device AI", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         SettingsInfoCard(
-            title = "Network access",
-            detail = "The Phase 1 manifest does not request INTERNET permission. Explicit model downloads are a later phase and require a separate privacy review."
+            title = "Financial privacy",
+            detail = "Financial records remain in local app storage. The app does not upload transactions, balances, prompts, or account data."
         )
+        ModelManagerSection()
         SettingsInfoCard(
-            title = "On-device AI",
-            detail = "No model is bundled, downloaded, or run by this foundation. Model selection and resource eligibility belong to Phase 3."
+            title = "Runtime status",
+            detail = "A verified model file and saved model preference do not mean inference is active. Runtime integration is blocked until dependency compatibility and memory/stability are tested on the target phone."
         )
         SettingsInfoCard(
             title = "Security",
-            detail = "PIN, biometrics, auto-lock and data export controls will be implemented only after the legacy security behavior is audited."
+            detail = "PIN, biometrics, auto-lock and legacy-data migration remain separate audited work; no unreviewed security control is implied."
         )
-        SettingsInfoCard(title = "Version", detail = "Dhanam AI 0.1.0 · Phase 1 foundation")
+        SettingsInfoCard(title = "Version", detail = "Dhanam AI 0.3.0 · Phase 3 model manager foundation")
     }
 }
 

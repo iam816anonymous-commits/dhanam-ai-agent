@@ -1,6 +1,6 @@
 # Implementation phases, dependencies and acceptance gates
 
-Each phase is delivered as coherent, reviewable batches. No later phase begins automatically.
+Each phase is delivered as coherent, reviewable batches. Later phases are started only when explicitly requested.
 
 ## Phase 0 — Audit/specification
 Repository findings, feature matrix, architecture/tool contract, privacy/threat model, dependency/runtime plan and acceptance tests.
@@ -42,7 +42,10 @@ WorkManager reminders, settings persistence, researched security controls, and e
 Phase 2 acceptance: every F01–F20 and F26–F30 feature has implementation evidence or an approved exception, exact money tests pass, migration fixtures prove preservation, and core finance workflows work offline. Phase 2A alone does not claim full parity.
 
 ## Phase 3 — Model catalog, download and runtime
-Verified explicit model downloads and runtime selection only after license/source review and target-device measurements. No cloud fallback.
+- Phase 3 first slice: pinned model catalog, conservative resource gate, explicit foreground download, SHA-256/size verification and app-private file management.
+- Runtime dependency and inference remain gated on toolchain compatibility plus target-device memory/stability measurements.
+- No cloud fallback; a saved preferred model does not imply the runtime is loaded.
+- Acceptance: CI/lint/tests/APK verification pass; corruption, cancellation, retry and low-resource cases are tested; device download and inference smoke tests are recorded separately.
 
 ## Phase 4 — Agent brain and read-only tools
 Context builder, deterministic fallback, structured planner, typed tool registry and read-only tools.
