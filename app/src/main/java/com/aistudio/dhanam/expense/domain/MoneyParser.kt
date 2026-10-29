@@ -32,8 +32,8 @@ object MoneyParser {
         val grouped = if (digits.length <= 3) digits else {
             val lastThree = digits.takeLast(3)
             val prefix = digits.dropLast(3)
-            prefix.reversed().chunked(2).joinToString(",") { it.reversed() }
-                .reversed().let { "$it,$lastThree" }
+            prefix.reversed().chunked(2).map { it.reversed() }.reversed()
+                .joinToString(",").let { "$it,$lastThree" }
         }
         return "₹$grouped.%02d".format(java.util.Locale.ROOT, paise)
     }
