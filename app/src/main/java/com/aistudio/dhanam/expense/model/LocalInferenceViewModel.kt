@@ -160,6 +160,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
         var temporary: Conversation? = null
         var shouldUnload = false
         var output = ""
+        var outputTooLong = false
         try {
             val peakBefore = ProcessMemoryBudget.readPeakResidentBytes()
             check(peakBefore != null && peakBefore < ModelCatalog.MAX_PROCESS_PEAK_BYTES) {
@@ -179,6 +180,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
             )
             activeAgentConversation = temporary
             val builder = StringBuilder()
+            var chunksSinceUiUpdate = 0
             temporary.sendMessageAsync(prompt).collect { chunk ->
                 val peakBytes = ProcessMemoryBudget.readPeakResidentBytes()
                 if (peakBytes == null || peakBytes >= ModelCatalog.MAX_PROCESS_PEAK_BYTES) {
@@ -188,15 +190,24 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                 }
                 val text = chunk.toString()
                 if (builder.length + text.length > MAX_AGENT_OUTPUT_CHARS) {
-                    shouldUnload = true
+                    outputTooLong = true
                     try { temporary?.cancelProcess() } catch (_: Exception) { }
-                    throw IllegalStateException("The local model returned an unexpectedly long result. It will be unloaded for safety.")
+                } else if (!outputTooLong) {
+                    builder.append(text)
+                    chunksSinceUiUpdate++
+                    if (chunksSinceUiUpdate >= UI_UPDATE_CHUNK_INTERVAL) {
+                        _state.update { it.copy(reply = builder.toString()) }
+                        chunksSinceUiUpdate = 0
+                    }
                 }
-                builder.append(text)
-                _state.update { it.copy(reply = builder.toString()) }
             }
+            check(!outputTooLong) { "The local model returned an unexpectedly long result. No financial change was made." }
             output = builder.toString()
+            _state.update { it.copy(reply = output) }
             output
+        } catch (error: OutOfMemoryError) {
+            shouldUnload = true
+            throw IllegalStateException("Local inference ran out of memory. Dhanam is unloading the model; close other apps before trying again.", error)
         } finally {
             try { temporary?.close() } catch (_: Exception) { }
             if (activeAgentConversation === temporary) activeAgentConversation = null
@@ -237,9 +248,12 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
         scope.launch {
             if (!_state.value.isReady || _state.value.isGenerating) return@launch
             stopRequested = false
+            memoryBudgetExceeded = false
             _state.update { it.copy(isGenerating = true, reply = "", error = null, status = "Generating on-device…") }
+            val builder = StringBuilder()
+            var chunksSinceUiUpdate = 0
+            var outputLimitReached = false
             try {
-                val builder = StringBuilder()
                 checkNotNull(conversation) { "The local conversation is not available. Reload the model." }
                     .sendMessageAsync(prompt)
                     .collect { chunk ->
@@ -253,24 +267,35 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                                     error = null
                                 )
                             }
-                            conversation?.cancelProcess()
-                        } else {
+                            try { conversation?.cancelProcess() } catch (_: Exception) { }
+                        } else if (!stopRequested) {
                             val piece = chunk.toString()
                             if (builder.length + piece.length > MAX_CHAT_OUTPUT_CHARS) {
+                                outputLimitReached = true
                                 stopRequested = true
-                                _state.update { it.copy(status = "Response limit reached. Stopping to keep memory use bounded.", error = null) }
-                                conversation?.cancelProcess()
+                                _state.update { it.copy(status = "Response reached the 4,000-character safety limit. Stopping generation…") }
+                                try { conversation?.cancelProcess() } catch (_: Exception) { }
                             } else {
                                 builder.append(piece)
-                                _state.update { it.copy(reply = builder.toString()) }
+                                chunksSinceUiUpdate++
+                                if (chunksSinceUiUpdate >= UI_UPDATE_CHUNK_INTERVAL) {
+                                    _state.update { it.copy(reply = builder.toString()) }
+                                    chunksSinceUiUpdate = 0
+                                }
                             }
                         }
                     }
+                _state.update { it.copy(reply = builder.toString()) }
                 if (!stopRequested) {
                     _state.update { it.copy(status = "Response complete. Generated locally; no cloud API was used.") }
                 }
             } catch (cancelled: CancellationException) {
                 if (!stopRequested) throw cancelled
+            } catch (error: OutOfMemoryError) {
+                memoryBudgetExceeded = true
+                stopRequested = true
+                try { conversation?.cancelProcess() } catch (_: Exception) { }
+                _state.update { it.copy(status = "Local inference ran out of memory. Unloading the model for safety.", error = null) }
             } catch (error: Exception) {
                 _state.update { it.copy(status = "Local inference failed.", error = error.message ?: error.javaClass.simpleName) }
             } finally {
@@ -282,20 +307,29 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                     _state.update {
                         it.copy(
                             isReady = false,
-                            status = "Model unloaded because the 2 GiB process peak-memory budget was reached.",
+                            status = "Model unloaded after a memory-safety stop. Close other apps before reloading.",
                             error = null
                         )
                     }
                     memoryBudgetExceeded = false
                 } else if (stopRequested) {
                     // LiteRT-LM does not support reusing a Conversation after cancelProcess().
-                    // Wait for the streaming flow to end, then replace that conversation.
+                    // Wait for the stream to end, then replace that conversation.
                     try {
                         val oldConversation = conversation
                         conversation = null
                         oldConversation?.close()
                         conversation = checkNotNull(engine).createConversation(createConversationConfig())
-                        _state.update { it.copy(status = "Generation stopped. A fresh local conversation is ready.", error = null) }
+                        _state.update {
+                            it.copy(
+                                status = if (outputLimitReached) {
+                                    "Response capped at 4,000 characters. A fresh local conversation is ready."
+                                } else {
+                                    "Generation stopped. A fresh local conversation is ready."
+                                },
+                                error = null
+                            )
+                        }
                     } catch (error: Exception) {
                         conversation = null
                         try { engine?.close() } catch (_: Exception) { }
@@ -396,8 +430,9 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
     }
 
     private companion object {
-        const val MAX_CHAT_OUTPUT_CHARS = 8_000
+        const val MAX_CHAT_OUTPUT_CHARS = 4_000
         const val MAX_AGENT_OUTPUT_CHARS = 2_000
+        const val UI_UPDATE_CHUNK_INTERVAL = 6
     }
 
     private fun createConversationConfig() = ConversationConfig(
