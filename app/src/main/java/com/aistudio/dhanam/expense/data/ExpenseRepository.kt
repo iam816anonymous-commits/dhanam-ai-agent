@@ -22,7 +22,7 @@ class RoomExpenseRepository(private val dao: ExpenseDao) : ExpenseRepository {
     }
 
     override suspend fun deleteById(id: Long) {
-        val expense = dao.findById(id) ?: return
+        val expense = dao.findById(id) ?: error("This expense no longer exists. Refresh the list and try again.")
         check(dao.delete(expense) == 1) {
             "This expense changed before it could be deleted. Refresh and try again."
         }

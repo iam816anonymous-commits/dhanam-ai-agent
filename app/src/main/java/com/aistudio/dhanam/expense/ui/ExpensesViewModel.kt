@@ -3,6 +3,7 @@ package com.aistudio.dhanam.expense.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import com.aistudio.dhanam.expense.data.ExpenseEntity
 import com.aistudio.dhanam.expense.data.FinanceDatabase
 import com.aistudio.dhanam.expense.data.RoomExpenseRepository
@@ -46,6 +47,8 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
                 )
                 if (existing == null) repository.add(entity) else repository.update(entity)
                 _message.value = if (existing == null) "Expense saved on this device." else "Expense updated."
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _message.value = e.message ?: "Could not save this expense."
             }
@@ -57,6 +60,8 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
             try {
                 repository.deleteById(id)
                 _message.value = "Expense deleted."
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _message.value = e.message ?: "Could not delete this expense."
             }
