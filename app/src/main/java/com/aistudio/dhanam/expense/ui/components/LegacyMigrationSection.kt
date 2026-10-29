@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.aistudio.dhanam.expense.data.FinanceDatabase
 import com.aistudio.dhanam.expense.data.LegacyFinanceMigration
 import com.aistudio.dhanam.expense.data.LegacyFinancePreview
+import com.aistudio.dhanam.expense.domain.MoneyParser
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -75,7 +76,9 @@ fun LegacyMigrationSection() {
                     Text("Source: previous Dhanam database")
                     Text("Expenses: ${data.expenses.size}")
                     Text("Khata loans: ${data.loans.size}")
-                    Text("Category budgets: ${data.budgets.size} (mapped to the current month)")
+                    Text("Budgets: ${data.budgets.size} (legacy overall budget preference may be the old default; category budgets are mapped to the current month)")
+                    data.budgets.take(8).forEach { Text("${it.category}: ${MoneyParser.formatPaise(it.amountPaise)}", style = MaterialTheme.typography.bodySmall) }
+                    if (data.budgets.size > 8) Text("Showing first 8 budgets.")
                     Text("Legacy Double amounts are converted to paise using decimal HALF_UP rounding.")
                     if (data.errors.isNotEmpty()) {
                         Text("${data.errors.size} invalid row(s) found. No data can be imported until these rows are resolved.",
@@ -98,7 +101,7 @@ fun LegacyMigrationSection() {
                                 }
                                 prefs.edit().putBoolean("legacy_finance_imported", true).apply()
                                 alreadyImported = true
-                                message = "Imported ${counts.expenses} expenses, ${counts.loans} loans and ${counts.budgets} budgets. Existing duplicates were skipped; the old database was kept."
+                                message = "Imported ${counts.expenses} expenses, ${counts.loans} loans and ${counts.budgets} budgets. Previously imported source rows were skipped; different source IDs were preserved, and the old database was kept."
                             } catch (e: CancellationException) { throw e }
                             catch (e: Exception) { message = e.message ?: "Legacy import failed; transaction rolled back." }
                         }

@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "khata_loans",
-    indices = [Index(value = ["person_name"]), Index(value = ["due_on_epoch_day"])]
+    indices = [Index(value = ["person_name"]), Index(value = ["due_on_epoch_day"]), Index(value = ["legacy_source_id"], unique = true, name = "index_khata_loans_legacy_source_id")]
 )
 data class KhataLoanEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -22,7 +22,8 @@ data class KhataLoanEntity(
     @ColumnInfo(name = "created_at_epoch_millis") val createdAtEpochMillis: Long,
     @ColumnInfo(name = "updated_at_epoch_millis") val updatedAtEpochMillis: Long,
     @ColumnInfo(name = "phone_number", defaultValue = "''") val phoneNumber: String = "",
-    @ColumnInfo(name = "is_settled", defaultValue = "0") val isSettled: Boolean = false
+    @ColumnInfo(name = "is_settled", defaultValue = "0") val isSettled: Boolean = false,
+    @ColumnInfo(name = "legacy_source_id") val legacySourceId: String? = null
 ) {
     val outstandingPaise: Long get() = if (isSettled) 0L else (principalPaise - paidPaise).coerceAtLeast(0L)
 }

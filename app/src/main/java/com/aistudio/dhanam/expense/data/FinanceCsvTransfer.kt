@@ -3,48 +3,58 @@ package com.aistudio.dhanam.expense.data
 import android.content.ContentResolver
 import android.net.Uri
 import com.aistudio.dhanam.expense.domain.ExpenseInputValidator
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.nio.charset.StandardCharsets
 import java.time.LocalDate
+import java.security.MessageDigest
 
 data class CsvImportPreview(val expenses: List<ExpenseEntity>, val errors: List<String>)
 
 object FinanceCsvTransfer {
     private const val MAX_BYTES = 10 * 1024 * 1024
     private const val MAX_ROWS = 50_000
-    private val header = listOf("description", "amount_rupees", "category", "date", "note")
+    private val header = listOf("description", "amount_rupees", "category", "date", "note", "payment_mode", "detected_language")
+    private val legacyHeader = header.take(5)
 
     fun exportCsv(expenses: List<ExpenseEntity>): String = buildString {
         append(header.joinToString(",")).append("\r\n")
         expenses.forEach { expense ->
             val amount = "%d.%02d".format(java.util.Locale.ROOT, expense.amountPaise / 100, expense.amountPaise % 100)
             val values = listOf(expense.title, amount, expense.category,
-                LocalDate.ofEpochDay(expense.occurredOnEpochDay).toString(), expense.note)
+                LocalDate.ofEpochDay(expense.occurredOnEpochDay).toString(), expense.note,
+                expense.paymentMode, expense.detectedLanguage)
             append(values.joinToString(",") { escape(it) }).append("\r\n")
         }
     }
 
     fun parseCsv(text: String, nowMillis: Long = System.currentTimeMillis()): CsvImportPreview {
         require(text.toByteArray(StandardCharsets.UTF_8).size <= MAX_BYTES) { "CSV is larger than the 10 MB import limit." }
-        val rows = parseRows(text)
+        val normalizedText = text.removePrefix("\uFEFF")
+        val rows = parseRows(normalizedText)
         require(rows.isNotEmpty()) { "CSV file is empty." }
-        require(rows.first().map { it.trim().lowercase() } == header) {
-            "CSV headers must be: ${header.joinToString(", ")}."
+        val normalizedHeader = rows.first().map { it.trim().lowercase() }
+        require(normalizedHeader == header || normalizedHeader == legacyHeader) {
+            "CSV headers must be: ${header.joinToString(", ")} (older five-column Dhanam expense CSVs are also supported)."
         }
+        val hasMetadata = normalizedHeader == header
+        val expectedColumns = normalizedHeader.size
         require(rows.size - 1 <= MAX_ROWS) { "CSV contains too many rows. Limit: ${MAX_ROWS}." }
         val parsed = mutableListOf<ExpenseEntity>()
         val errors = mutableListOf<String>()
+        val sourceHash = MessageDigest.getInstance("SHA-256")
+            .digest(normalizedText.toByteArray(StandardCharsets.UTF_8)).joinToString("") { "%02x".format(it) }
         rows.drop(1).forEachIndexed { index, row ->
-            if (row.size != header.size) {
-                errors += "Row ${index + 2}: expected 5 columns."
+            if (row.size != expectedColumns) {
+                errors += "Row ${index + 2}: expected $expectedColumns columns."
             } else {
                 try {
                     val valid = ExpenseInputValidator.validate(row[0], row[1], row[2], row[3], row[4])
                     parsed += ExpenseEntity(
                         title = valid.title, amountPaise = valid.amountPaise, category = valid.category,
                         occurredOnEpochDay = valid.occurredOn.toEpochDay(), note = valid.note,
-                        createdAtEpochMillis = nowMillis, updatedAtEpochMillis = nowMillis
+                        createdAtEpochMillis = nowMillis, updatedAtEpochMillis = nowMillis,
+                        paymentMode = if (hasMetadata) row[5].trim().ifBlank { "Unknown" } else "Unknown",
+                        detectedLanguage = if (hasMetadata) row[6].trim().ifBlank { "en" } else "en",
+                        sourceRecordKey = "csv:$sourceHash:${index + 2}"
                     )
                 } catch (e: Exception) {
                     errors += "Row ${index + 2}: ${e.message ?: "invalid record"}"
@@ -75,9 +85,12 @@ object FinanceCsvTransfer {
             ?: error("Could not write the selected file.")
     }
 
-    private fun escape(value: String): String =
-        if (value.any { it == ',' || it == '"' || it == '\n' || it == '\r' }) "\"" + value.replace("\"", "\"\"") + "\""
-        else value
+    private fun escape(value: String): String {
+        val safe = if (value.startsWith("=") || value.startsWith("+") || value.startsWith("-") ||
+            value.startsWith("@") || value.startsWith("\t") || value.startsWith("\r")) "'$value" else value
+        return if (safe.any { it == ',' || it == '"' || it == '\n' || it == '\r' }) "\"" + safe.replace("\"", "\"\"") + "\""
+        else safe
+    }
 
     /** RFC-4180-style quoted field reader; embedded commas, quotes and line breaks are retained. */
     internal fun parseRows(text: String): List<List<String>> {

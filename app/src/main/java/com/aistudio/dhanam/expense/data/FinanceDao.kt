@@ -17,6 +17,9 @@ interface FinanceDao {
     @Query("SELECT * FROM expenses WHERE id = :id LIMIT 1")
     suspend fun findExpense(id: Long): ExpenseEntity?
 
+    @Query("SELECT * FROM expenses WHERE source_record_key = :sourceId LIMIT 1")
+    suspend fun findExpenseBySourceRecordKey(sourceId: String): ExpenseEntity?
+
     @Insert suspend fun insertExpense(expense: ExpenseEntity): Long
     @Update suspend fun updateExpense(expense: ExpenseEntity): Int
     @Delete suspend fun deleteExpense(expense: ExpenseEntity): Int
@@ -56,6 +59,9 @@ interface FinanceDao {
     suspend fun findLoan(id: Long): KhataLoanEntity?
 
     @Insert suspend fun insertLoan(loan: KhataLoanEntity): Long
+
+    @Query("SELECT * FROM khata_loans WHERE legacy_source_id = :sourceId LIMIT 1")
+    suspend fun findLoanByLegacySourceId(sourceId: String): KhataLoanEntity?
     @Update suspend fun updateLoan(loan: KhataLoanEntity): Int
 
     @Query("""SELECT * FROM khata_loans
@@ -109,9 +115,10 @@ interface FinanceDao {
     suspend fun importExpensesSkippingExactDuplicates(expenses: List<ExpenseEntity>): Int {
         var insertedCount = 0
         for (expense in expenses) {
-            val existing = findExactExpense(expense.title, expense.amountPaise, expense.category,
-                expense.occurredOnEpochDay, expense.note)
-            if (existing == null) {
+            val alreadyImported = expense.sourceRecordKey?.let { findExpenseBySourceRecordKey(it) != null }
+                ?: (findExactExpense(expense.title, expense.amountPaise, expense.category,
+                    expense.occurredOnEpochDay, expense.note) != null)
+            if (!alreadyImported) {
                 insertExpense(expense)
                 insertedCount++
             }
@@ -129,15 +136,19 @@ interface FinanceDao {
         var loanCount = 0
         var budgetCount = 0
         for (expense in expenses) {
-            if (findExactExpense(expense.title, expense.amountPaise, expense.category,
-                    expense.occurredOnEpochDay, expense.note) == null) {
+            val alreadyImported = expense.sourceRecordKey?.let { findExpenseBySourceRecordKey(it) != null }
+                ?: (findExactExpense(expense.title, expense.amountPaise, expense.category,
+                    expense.occurredOnEpochDay, expense.note) != null)
+            if (!alreadyImported) {
                 insertExpense(expense)
                 expenseCount++
             }
         }
         for (loan in loans) {
-            if (findMatchingLoan(loan.personName, loan.direction, loan.principalPaise, loan.paidPaise,
-                    loan.openedOnEpochDay, loan.dueOnEpochDay, loan.note, loan.phoneNumber, loan.isSettled) == null) {
+            val alreadyImported = loan.legacySourceId?.let { findLoanByLegacySourceId(it) != null }
+                ?: (findMatchingLoan(loan.personName, loan.direction, loan.principalPaise, loan.paidPaise,
+                    loan.openedOnEpochDay, loan.dueOnEpochDay, loan.note, loan.phoneNumber, loan.isSettled) != null)
+            if (!alreadyImported) {
                 insertLoan(loan)
                 loanCount++
             }

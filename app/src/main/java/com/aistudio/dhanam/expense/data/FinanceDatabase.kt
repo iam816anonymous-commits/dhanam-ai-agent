@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [ExpenseEntity::class, BudgetEntity::class, KhataLoanEntity::class, RepaymentEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class FinanceDatabase : RoomDatabase() {
@@ -69,6 +69,16 @@ abstract class FinanceDatabase : RoomDatabase() {
             }
         }
 
+        /** Idempotent source IDs prevent same-day identical transactions from being mistaken for duplicates. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE expenses ADD COLUMN source_record_key TEXT")
+                db.execSQL("ALTER TABLE khata_loans ADD COLUMN legacy_source_id TEXT")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_expenses_source_record_key ON expenses(source_record_key)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_khata_loans_legacy_source_id ON khata_loans(legacy_source_id)")
+            }
+        }
+
         @Volatile private var instance: FinanceDatabase? = null
 
         fun getInstance(context: Context): FinanceDatabase =
@@ -77,7 +87,7 @@ abstract class FinanceDatabase : RoomDatabase() {
                     context.applicationContext,
                     FinanceDatabase::class.java,
                     DATABASE_NAME
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
             }
     }
 }

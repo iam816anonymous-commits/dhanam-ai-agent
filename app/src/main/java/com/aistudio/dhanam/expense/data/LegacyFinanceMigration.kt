@@ -55,7 +55,7 @@ object LegacyFinanceMigration {
                             val note = cursor.getString(5).orEmpty().takeIf { it.length <= 1000 }
                                 ?: error("note exceeds 1,000 characters")
                             expenses += ExpenseEntity(
-                                title = title, amountPaise = amount, category = category,
+                                title = title, amountPaise = amount, category = category, sourceRecordKey = "legacy_expense:${cursor.getLong(0)}",
                                 occurredOnEpochDay = date.toEpochDay(), note = note,
                                 createdAtEpochMillis = timestamp, updatedAtEpochMillis = nowMillis,
                                 paymentMode = cursor.getString(6).orEmpty().ifBlank { "Unknown" }.take(60),
@@ -88,7 +88,8 @@ object LegacyFinanceMigration {
                                 note = cursor.getString(6).orEmpty().take(1000),
                                 createdAtEpochMillis = openedMillis, updatedAtEpochMillis = nowMillis,
                                 phoneNumber = cursor.getString(7).orEmpty().take(40),
-                                isSettled = cursor.getInt(8) != 0
+                                isSettled = cursor.getInt(8) != 0,
+                                legacySourceId = "legacy_loan:${cursor.getLong(0)}"
                             )
                         } catch (e: Exception) {
                             errors += "Legacy Khata row $rowNumber: ${e.message ?: "invalid record"}."
@@ -115,7 +116,27 @@ object LegacyFinanceMigration {
                 }
             }
         }
-        return LegacyFinancePreview(file.absolutePath, expenses, loans, budgets, errors)
+        val legacyPrefs = context.getSharedPreferences("dhanam_prefs", Context.MODE_PRIVATE)
+        val storedOverallBudget = when (val value = legacyPrefs.all["overall_budget"]) {
+            is String -> value.toDoubleOrNull()
+            is Number -> value.toDouble()
+            else -> null
+        }
+        if (storedOverallBudget != null && storedOverallBudget.isFinite() && storedOverallBudget > 0.0) {
+            try {
+                budgets += BudgetEntity(
+                    category = "Overall", monthEpochDay = monthStart,
+                    amountPaise = LegacyMoneyConverter.toPaise(storedOverallBudget),
+                    createdAtEpochMillis = nowMillis, updatedAtEpochMillis = nowMillis
+                )
+            } catch (e: Exception) {
+                errors += "Legacy overall budget preference: ${e.message ?: "invalid amount"}."
+            }
+        }
+        val aggregatedBudgets = budgets.groupBy { it.category }.map { (_, entries) ->
+            entries.first().copy(amountPaise = entries.fold(0L) { total, item -> Math.addExact(total, item.amountPaise) })
+        }.sortedBy { it.category }
+        return LegacyFinancePreview(file.absolutePath, expenses, loans, aggregatedBudgets, errors)
     }
 
     private fun tableExists(db: SQLiteDatabase, table: String): Boolean =

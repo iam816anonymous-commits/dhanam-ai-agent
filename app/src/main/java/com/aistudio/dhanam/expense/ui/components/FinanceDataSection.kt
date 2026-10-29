@@ -107,7 +107,7 @@ fun FinanceDataSection() {
             title = { Text("Review CSV import") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("${result.expenses.size} valid row(s) ready. Existing exact duplicates will be skipped.")
+                    Text("${result.expenses.size} valid row(s) ready. A repeat import of the same CSV file is idempotent; identical rows within the file are preserved as separate transactions.")
                     if (result.errors.isNotEmpty()) {
                         Text("${result.errors.size} row error(s):", color = MaterialTheme.colorScheme.error)
                         result.errors.take(8).forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
@@ -127,7 +127,7 @@ fun FinanceDataSection() {
                                 val count = withContext(Dispatchers.IO) {
                                     db.financeDao().importExpensesSkippingExactDuplicates(ready.expenses)
                                 }
-                                message = "Imported ${count} new record(s); exact duplicates were skipped."
+                                message = "Imported ${count} new record(s); rows already imported from this same CSV source were skipped."
                             } catch (e: CancellationException) { throw e }
                             catch (e: Exception) { message = e.message ?: "Import failed; no partial import was committed." }
                         }
