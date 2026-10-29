@@ -58,12 +58,12 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             if (correction != null) {
                 _state.value = _state.value.copy(
                     messages = _state.value.messages + AgentChatMessage(role = "assistant", text = correction.message),
-                    pendingAction = correction.action,
-                    activity = if (correction.action != null) "awaiting_confirmation" else "idle"
+                    pendingAction = correction.action ?: previousPending,
+                    activity = if (correction.action != null || correction.needsClarification) "awaiting_confirmation" else "idle"
                 )
                 return
             }
-            if (Regex("""(?i)^(actually|change that|correct that|instead|make it|set it|change the amount|change the category)\b""").containsMatchIn(input)) {
+            if (Regex("""(?i)^(actually|change that|correct that|instead|make it|set it|change the amount|change the category|change the description|change description|change title|change item)\b""").containsMatchIn(input)) {
                 appendAssistant("I couldn't apply that correction safely. Please say, for example, “actually change that to 300”, “change category to transport”, or “change description to taxi”. The current draft has not been saved.")
                 _state.value = _state.value.copy(pendingAction = previousPending, activity = "awaiting_confirmation")
                 return
