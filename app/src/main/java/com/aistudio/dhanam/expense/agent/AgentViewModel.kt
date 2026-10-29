@@ -76,6 +76,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
         val repayment = Regex("""(?i)^record repayment\s+([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s+from\s+(.+)$""").matchEntire(input)
         if (repayment != null) {
+            _state.value = _state.value.copy(busy = true)
             viewModelScope.launch {
                 try {
                     val amountPaise = MoneyParser.parseRupeesToPaise(repayment.groupValues[1])
@@ -86,19 +87,19 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     if (matches.size != 1) {
                         appendAssistant(if (matches.isEmpty()) "I couldn't find an open loan for “$person” that you lent them. Check the name and Khata records; no change was made." else "More than one open Khata record matches “$person”. Open Khata and resolve the exact record first; no change was made.")
-                        _state.value = _state.value.copy(activity = "idle")
+                        _state.value = _state.value.copy(activity = "idle", busy = false)
                     } else {
                         val loan = matches.single()
                         require(amountPaise <= loan.outstandingPaise) { "Repayment exceeds the outstanding amount of ${MoneyParser.formatPaise(loan.outstandingPaise)}." }
                         val action = PlannedFinanceAction.RecordRepayment(person, amountPaise, loan.id, LocalDate.now(), UUID.randomUUID().toString())
                         _state.value = _state.value.copy(
                             messages = _state.value.messages + AgentChatMessage(role = "assistant", text = "I found one matching open Khata record. Review it below; nothing is saved yet."),
-                            pendingAction = action, activity = "awaiting_confirmation"
+                            pendingAction = action, activity = "awaiting_confirmation", busy = false
                         )
                     }
                 } catch (e: Exception) {
                     appendAssistant(e.message ?: "I couldn't prepare that repayment.")
-                    _state.value = _state.value.copy(activity = "idle")
+                    _state.value = _state.value.copy(activity = "idle", busy = false)
                 }
             }
             return
@@ -116,6 +117,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
         val inference = localInference
         if (inference?.state?.value?.isReady == true) {
+            _state.value = _state.value.copy(busy = true)
             viewModelScope.launch {
                 try {
                     val proposalText = inference.generateForAgent(AgentActionPlanner.modelPrompt(input))
@@ -123,11 +125,12 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                     _state.value = _state.value.copy(
                         messages = _state.value.messages + AgentChatMessage(role = "assistant", text = proposal.message),
                         pendingAction = proposal.action,
-                        activity = if (proposal.action != null) "awaiting_confirmation" else "idle"
+                        activity = if (proposal.action != null) "awaiting_confirmation" else "idle",
+                        busy = false
                     )
                 } catch (error: Exception) {
                     appendAssistant("I couldn't safely interpret that with the local model. No changes were made. Try a specific command or clarify the amount/category. ${error.message ?: ""}".trim())
-                    _state.value = _state.value.copy(pendingAction = null, activity = "idle")
+                    _state.value = _state.value.copy(pendingAction = null, activity = "idle", busy = false)
                 }
             }
         } else {

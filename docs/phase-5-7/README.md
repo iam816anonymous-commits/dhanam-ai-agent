@@ -35,7 +35,7 @@ Remaining limitations:
 
 ## Phase 7 — Verification and release readiness
 
-Automated tests cover action parsing, model-proposal allowlisting, amount/category mapping, staged corrections, Telugu starter commands, required clarification and rejecting unsupported repayment intents. Existing repository tests cover exact paise conversion, expense validation, Khata validation, repayment idempotency/overpayment checks, and migration/data-transfer logic.
+Automated tests cover action parsing, model-proposal allowlisting, amount/category mapping, staged corrections, Telugu starter commands, required clarification and rejecting unsupported repayment intents. Android instrumentation tests exercise Room expense read-back, budget upsert, repayment idempotency and overpayment rejection on an emulator. The optional model smoke test skips unless the exact verified artifact is already present; CI never downloads it. Existing repository tests cover exact paise conversion, expense validation, Khata validation, repayment idempotency/overpayment checks, and migration/data-transfer logic.
 
 Release gates still required:
 - GitHub Actions must pass for the commit containing this implementation.
