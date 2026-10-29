@@ -203,9 +203,9 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                     throw IllegalStateException("The 2 GiB process peak-memory limit was reached or could not be measured.")
                 }
                 val text = chunk.toString()
-                if (builder.length + text.length > MAX_AGENT_OUTPUT_CHARS) {
+                if (!outputTooLong && builder.length + text.length > MAX_AGENT_OUTPUT_CHARS) {
                     outputTooLong = true
-                    try { temporary?.cancelProcess() } catch (_: Exception) { }
+                    try { agentConversation.cancelProcess() } catch (_: Exception) { }
                 } else if (!outputTooLong) {
                     builder.append(text)
                     chunksSinceUiUpdate++
