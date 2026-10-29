@@ -50,6 +50,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private var engine: Engine? = null
     private var conversation: Conversation? = null
+    @Volatile private var activeAgentConversation: Conversation? = null
     @Volatile private var loadJob: Job? = null
     private var stopRequested = false
     private var memoryBudgetExceeded = false
@@ -163,6 +164,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                     )
                 )
             )
+            activeAgentConversation = temporary
             val output = StringBuilder()
             temporary.sendMessageAsync(prompt).collect { chunk ->
                 val peakBytes = ProcessMemoryBudget.readPeakResidentBytes()
@@ -176,6 +178,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
             output.toString()
         } finally {
             try { temporary?.close() } catch (_: Exception) { }
+            if (activeAgentConversation === temporary) activeAgentConversation = null
             if (shouldUnload) {
                 try { conversation?.close() } catch (_: Exception) { }
                 conversation = null
@@ -276,7 +279,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                 stopRequested = true
                 _state.update { it.copy(status = "Stopping generation…") }
                 try {
-                    conversation?.cancelProcess()
+                    (activeAgentConversation ?: conversation)?.cancelProcess()
                 } catch (error: Exception) {
                     _state.update { it.copy(error = error.message ?: "Could not stop generation.") }
                 }
@@ -311,7 +314,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
         if (_state.value.isGenerating) {
             _state.update { it.copy(status = "Stopping generation before releasing model…") }
             while (_state.value.isGenerating) {
-                try { conversation?.cancelProcess() } catch (_: Exception) { }
+                try { (activeAgentConversation ?: conversation)?.cancelProcess() } catch (_: Exception) { }
                 delay(100)
             }
         }
