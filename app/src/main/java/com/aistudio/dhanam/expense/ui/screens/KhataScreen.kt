@@ -43,6 +43,7 @@ fun KhataScreen(viewModel: KhataViewModel = viewModel()) {
     var opened by remember { mutableStateOf(LocalDate.now().toString()) }
     var due by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
+    var phoneNumber by remember { mutableStateOf("") }
     var repaymentFor by remember { mutableStateOf<KhataLoanEntity?>(null) }
     var repaymentAmount by remember { mutableStateOf("") }
     var repaymentDate by remember { mutableStateOf(LocalDate.now().toString()) }
@@ -65,8 +66,9 @@ fun KhataScreen(viewModel: KhataViewModel = viewModel()) {
                 OutlinedTextField(amount, { amount = it }, label = { Text("Principal amount (₹)") }, placeholder = { Text("1000.00") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(opened, { opened = it }, label = { Text("Start date (YYYY-MM-DD)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(due, { due = it }, label = { Text("Due date (optional, YYYY-MM-DD)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(phoneNumber, { phoneNumber = it }, label = { Text("Phone (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(note, { note = it }, label = { Text("Note (optional)") }, modifier = Modifier.fillMaxWidth())
-                Button(onClick = { viewModel.addLoan(person, direction, amount, opened, due, note) }, modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = { viewModel.addLoan(person, direction, amount, opened, due, note, phoneNumber) }, modifier = Modifier.fillMaxWidth()) {
                     Text("Save Khata record")
                 }
             }

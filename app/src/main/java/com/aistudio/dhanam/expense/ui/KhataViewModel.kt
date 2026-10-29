@@ -27,16 +27,17 @@ class KhataViewModel(application: Application) : AndroidViewModel(application) {
     fun clearMessage() { _message.value = null }
     fun repaymentsFor(loanId: Long): Flow<List<RepaymentEntity>> = dao.observeRepayments(loanId)
 
-    fun addLoan(person: String, direction: String, amount: String, opened: String, due: String, note: String) {
+    fun addLoan(person: String, direction: String, amount: String, opened: String, due: String, note: String, phoneNumber: String = "") {
         viewModelScope.launch {
             try {
-                val input = KhataValidator.validate(person, direction, amount, opened, due, note)
+                val input = KhataValidator.validate(person, direction, amount, opened, due, note, phoneNumber)
                 val now = System.currentTimeMillis()
                 dao.insertLoan(KhataLoanEntity(
                     personName = input.personName, direction = input.direction,
                     principalPaise = input.principalPaise, paidPaise = 0,
                     openedOnEpochDay = input.openedOn.toEpochDay(), dueOnEpochDay = input.dueOn?.toEpochDay(),
-                    note = input.note, createdAtEpochMillis = now, updatedAtEpochMillis = now
+                    note = input.note, createdAtEpochMillis = now, updatedAtEpochMillis = now,
+                    phoneNumber = input.phoneNumber
                 ))
                 _message.value = "Khata record saved."
             } catch (e: CancellationException) { throw e }

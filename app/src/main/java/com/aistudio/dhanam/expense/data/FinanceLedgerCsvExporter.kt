@@ -10,7 +10,7 @@ object FinanceLedgerCsvExporter {
         budgets: List<BudgetEntity>
     ): String = buildString {
         val header = listOf(
-            "record_type", "id", "person", "direction", "principal_rupees", "paid_rupees",
+            "record_type", "id", "loan_id", "person", "direction", "principal_rupees", "paid_rupees",
             "outstanding_rupees", "opened_on", "due_on", "phone", "note",
             "repayment_date", "repayment_amount_rupees", "repayment_note",
             "budget_category", "budget_month", "budget_amount_rupees"
@@ -20,7 +20,7 @@ object FinanceLedgerCsvExporter {
         fun row(values: List<String>) { append(values.joinToString(",") { escape(it) }).append("\r\n") }
         loans.forEach { loan ->
             row(listOf(
-                "LOAN", loan.id.toString(), loan.personName, loan.direction,
+                "LOAN", loan.id.toString(), "", loan.personName, loan.direction,
                 money(loan.principalPaise), money(loan.paidPaise), money(loan.outstandingPaise),
                 LocalDate.ofEpochDay(loan.openedOnEpochDay).toString(),
                 loan.dueOnEpochDay?.let { LocalDate.ofEpochDay(it).toString() }.orEmpty(),
@@ -29,14 +29,14 @@ object FinanceLedgerCsvExporter {
         }
         repayments.forEach { repayment ->
             row(listOf(
-                "REPAYMENT", repayment.id.toString(), "", "", "", "", "", "", "", "", "",
+                "REPAYMENT", repayment.id.toString(), repayment.loanId.toString(), "", "", "", "", "", "", "", "", "",
                 LocalDate.ofEpochDay(repayment.paidOnEpochDay).toString(),
                 money(repayment.amountPaise), repayment.note, "", "", ""
             ))
         }
         budgets.forEach { budget ->
             row(listOf(
-                "BUDGET", budget.id.toString(), "", "", "", "", "", "", "", "", "", "", "", "",
+                "BUDGET", budget.id.toString(), "", "", "", "", "", "", "", "", "", "", "", "", "",
                 budget.category, LocalDate.ofEpochDay(budget.monthEpochDay).toString(), money(budget.amountPaise)
             ))
         }

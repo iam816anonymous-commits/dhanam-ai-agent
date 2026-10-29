@@ -78,7 +78,7 @@ See 2026-10-29-initial-source-review.md for exact commits, inspected paths, lice
 - Android notification permission guidance: https://developer.android.com/develop/ui/views/notifications/notification-permission. Decision: request POST_NOTIFICATIONS on Android 13+ only after a user enables a reminder; permission denial leaves that reminder disabled.
 - Reminders: daily periodic worker checks actual local expenses/budget and Khata due dates. Notifications deliberately avoid exposing amounts or people’s names on the lock screen.
 - Security: optional 4–12 digit app PIN is stored as a salted PBKDF2-HMAC-SHA256 hash (150,000 iterations), compared in constant time, and temporarily rate-limited after repeated failures. The app locks when it leaves the foreground if a PIN is configured.
-- Security limitation: the PIN gate does not encrypt the SQLite database against device-level forensic access. Biometrics and an audited encrypted-database design are not claimed as implemented.
+- Security limitation: the PIN gate does not encrypt the SQLite database against device-level forensic access. Android Auto Backup is disabled so the app does not silently back up financial records through the platform backup path. Biometrics and an audited encrypted-database design are not claimed as implemented.
 - Legacy-data migration is implemented as an explicit preview/confirm workflow: it opens the prior app database read-only, converts Double rupees to paise with decimal HALF_UP rounding, imports expenses/loans/category budgets transactionally, skips exact duplicates, and never deletes the old database. The new target Room 2→3 migration also preserves metadata columns.
 
 

@@ -20,7 +20,7 @@ class FinanceLedgerCsvExporterTest {
             amountPaise = 250000, createdAtEpochMillis = 1, updatedAtEpochMillis = 1
         )
         val csv = FinanceLedgerCsvExporter.export(listOf(loan), listOf(repayment), listOf(budget))
-        assertTrue(csv.contains("LOAN,1,\"Ravi, Kumar\",LENT,100.50,5.00,95.50"))
+        assertTrue(csv.contains("LOAN,1,,\"Ravi, Kumar\",LENT,100.50,5.00,95.50"))
         assertTrue(csv.contains("REPAYMENT,1"))
         assertTrue(csv.contains("BUDGET,1"))
         assertTrue(csv.contains("'=formula"))

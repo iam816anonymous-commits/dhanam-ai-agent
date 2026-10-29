@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -78,7 +81,7 @@ fun AppLockGate(content: @Composable () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedTextField(
                     value = pin, onValueChange = { pin = it.filter(Char::isDigit).take(12) },
-                    label = { Text("PIN") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+                    label = { Text("PIN") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), modifier = Modifier.fillMaxWidth()
                 )
                 if (error != null) Text(error.orEmpty(), color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(top = 8.dp))

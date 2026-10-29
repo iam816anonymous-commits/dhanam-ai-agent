@@ -33,7 +33,7 @@ fun SettingsScreen() {
         Text("Privacy, backups, reports and on-device AI", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         SettingsInfoCard(
             title = "Financial privacy",
-            detail = "Financial records are stored in the local Room database. CSV and PDF files are written only to a destination you explicitly choose. The app does not upload transaction data."
+            detail = "Financial records are stored in the local Room database. Android backup is disabled for this app; CSV and PDF files are written only to destinations you explicitly choose. The app does not upload transaction data."
         )
         FinanceDataSection()
         LegacyMigrationSection()

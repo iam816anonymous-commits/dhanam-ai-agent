@@ -9,11 +9,12 @@ data class ValidatedKhataInput(
     val principalPaise: Long,
     val openedOn: LocalDate,
     val dueOn: LocalDate?,
-    val note: String
+    val note: String,
+    val phoneNumber: String
 )
 
 object KhataValidator {
-    fun validate(person: String, direction: String, amount: String, openedOn: String, dueOn: String, note: String): ValidatedKhataInput {
+    fun validate(person: String, direction: String, amount: String, openedOn: String, dueOn: String, note: String, phoneNumber: String = ""): ValidatedKhataInput {
         val normalizedPerson = person.trim()
         require(normalizedPerson.isNotEmpty()) { "Enter the person's name." }
         require(normalizedPerson.length <= 100) { "Name must be 100 characters or fewer." }
@@ -23,7 +24,9 @@ object KhataValidator {
         require(due == null || !due.isBefore(opened)) { "Due date cannot be before the start date." }
         val normalizedNote = note.trim()
         require(normalizedNote.length <= 1000) { "Note must be 1,000 characters or fewer." }
-        return ValidatedKhataInput(normalizedPerson, direction, MoneyParser.parseRupeesToPaise(amount), opened, due, normalizedNote)
+        val phone = phoneNumber.trim()
+        require(phone.length <= 40 && phone.all { it.isDigit() || it in "+- ()" }) { "Phone number may contain digits, spaces, +, -, and parentheses only." }
+        return ValidatedKhataInput(normalizedPerson, direction, MoneyParser.parseRupeesToPaise(amount), opened, due, normalizedNote, phone)
     }
 
     private fun parseDate(value: String, errorMessage: String): LocalDate = try {

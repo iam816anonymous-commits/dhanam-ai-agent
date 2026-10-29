@@ -4,6 +4,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -36,13 +39,13 @@ fun PinSettingsSection() {
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (configured) {
                 OutlinedTextField(currentPin, { currentPin = it.filter(Char::isDigit).take(12) },
-                    label = { Text("Current PIN") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    label = { Text("Current PIN") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), modifier = Modifier.fillMaxWidth())
             }
             OutlinedTextField(newPin, { newPin = it.filter(Char::isDigit).take(12) },
                 label = { Text(if (configured) "New PIN (4–12 digits)" else "PIN (4–12 digits)") },
-                singleLine = true, modifier = Modifier.fillMaxWidth())
+                singleLine = true, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), modifier = Modifier.fillMaxWidth())
             OutlinedTextField(confirmPin, { confirmPin = it.filter(Char::isDigit).take(12) },
-                label = { Text("Confirm PIN") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                label = { Text("Confirm PIN") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), modifier = Modifier.fillMaxWidth())
             Button(onClick = {
                 try {
                     if (configured && !PinSecurity.verifyPin(context, currentPin)) {
