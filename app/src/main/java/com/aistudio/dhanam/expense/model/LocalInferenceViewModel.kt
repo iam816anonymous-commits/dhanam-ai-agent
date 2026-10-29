@@ -108,6 +108,10 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                         "The app process has reached the 2 GiB peak-memory budget. Unload other apps and try again."
                     }
                     conversation = candidate.createConversation(createConversationConfig())
+                } catch (error: OutOfMemoryError) {
+                    try { candidate.close() } catch (_: Exception) { }
+                    engine = null
+                    throw error
                 } catch (error: Exception) {
                     candidate.close()
                     engine = null
@@ -124,6 +128,15 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
             } catch (cancelled: CancellationException) {
                 _state.update { it.copy(isLoading = false, status = "Model loading cancelled.") }
                 throw cancelled
+            } catch (error: OutOfMemoryError) {
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        isReady = false,
+                        status = "Model load ran out of memory. Close other apps before retrying.",
+                        error = "The device ran out of memory while loading the local model."
+                    )
+                }
             } catch (error: Exception) {
                 _state.update {
                     it.copy(
@@ -185,7 +198,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                 val peakBytes = ProcessMemoryBudget.readPeakResidentBytes()
                 if (peakBytes == null || peakBytes >= ModelCatalog.MAX_PROCESS_PEAK_BYTES) {
                     shouldUnload = true
-                    try { agentConversation.cancelProcess() } catch (_: Exception) { }
+                    try { temporary?.cancelProcess() } catch (_: Exception) { }
                     throw IllegalStateException("The 2 GiB process peak-memory limit was reached or could not be measured.")
                 }
                 val text = chunk.toString()
