@@ -70,6 +70,10 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
+        // A new command supersedes the previous draft. Clear it before asynchronous lookup
+        // so the old confirmation cannot be tapped while the new request is being resolved.
+        _state.value = _state.value.copy(pendingAction = null)
+
         val repayment = Regex("""(?i)^record repayment\s+([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s+from\s+(.+)$""").matchEntire(input)
         if (repayment != null) {
             viewModelScope.launch {

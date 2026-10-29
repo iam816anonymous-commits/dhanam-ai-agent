@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -17,7 +16,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -36,27 +34,28 @@ fun AgentScreen(viewModel: AgentViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
     var input by remember { mutableStateOf("") }
     val pending = state.pendingAction
-    if (pending != null) {
-        AlertDialog(
-            onDismissRequest = viewModel::cancelPending,
-            title = { Text("Review financial change") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Nothing has been saved yet. Check the details carefully.")
-                    Text(pending.summary, fontWeight = FontWeight.SemiBold)
-                    Text("Confirming writes to this device's finance database. Dhanam reads the saved record back before reporting success.")
-                }
-            },
-            confirmButton = { Button(onClick = viewModel::confirmPending, enabled = !state.busy) { Text(if (state.busy) "Saving…" else "Confirm and save") } },
-            dismissButton = { TextButton(onClick = viewModel::cancelPending, enabled = !state.busy) { Text("Cancel") } }
-        )
-    }
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
             Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("Dhanam AI", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Text("Your private finance companion", style = MaterialTheme.typography.bodyMedium)
                 Text("Approved actions only · Local database · Read-back verification", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            }
+        }
+
+        if (pending != null) {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Review financial change", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("Nothing has been saved yet. You can correct the draft below, or confirm it here.")
+                    Text(pending.summary, fontWeight = FontWeight.SemiBold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = viewModel::confirmPending, enabled = !state.busy, modifier = Modifier.weight(1f)) {
+                            Text(if (state.busy) "Saving…" else "Confirm and save")
+                        }
+                        OutlinedButton(onClick = viewModel::cancelPending, enabled = !state.busy) { Text("Cancel") }
+                    }
+                }
             }
         }
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
