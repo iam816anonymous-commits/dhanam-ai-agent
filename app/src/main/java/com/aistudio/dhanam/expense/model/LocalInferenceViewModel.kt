@@ -150,9 +150,22 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
         }
         val activeEngine = checkNotNull(engine) { "The local model is not loaded." }
         _state.update { it.copy(isGenerating = true, reply = "", error = null, status = "Interpreting the request on-device…") }
+
+        // A second Conversation means a second KV cache. On 4 GiB phones that extra cache can
+        // trigger a native OOM even though the model weights themselves fit. Reuse the engine,
+        // but never keep two live conversations at the same time.
+        val previousConversation = conversation
+        conversation = null
+        try { previousConversation?.close() } catch (_: Exception) { }
         var temporary: Conversation? = null
         var shouldUnload = false
+        var output = ""
         try {
+            val peakBefore = ProcessMemoryBudget.readPeakResidentBytes()
+            check(peakBefore != null && peakBefore < ModelCatalog.MAX_PROCESS_PEAK_BYTES) {
+                shouldUnload = true
+                "The process is already at the 2 GiB peak-memory limit; the model will be unloaded."
+            }
             temporary = activeEngine.createConversation(
                 ConversationConfig(
                     systemInstruction = Contents.of(
@@ -165,17 +178,25 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                 )
             )
             activeAgentConversation = temporary
-            val output = StringBuilder()
+            val builder = StringBuilder()
             temporary.sendMessageAsync(prompt).collect { chunk ->
                 val peakBytes = ProcessMemoryBudget.readPeakResidentBytes()
                 if (peakBytes == null || peakBytes >= ModelCatalog.MAX_PROCESS_PEAK_BYTES) {
                     shouldUnload = true
+                    try { temporary?.cancelProcess() } catch (_: Exception) { }
                     throw IllegalStateException("The 2 GiB process peak-memory limit was reached or could not be measured.")
                 }
-                output.append(chunk.toString())
-                _state.update { it.copy(reply = output.toString()) }
+                val text = chunk.toString()
+                if (builder.length + text.length > MAX_AGENT_OUTPUT_CHARS) {
+                    shouldUnload = true
+                    try { temporary?.cancelProcess() } catch (_: Exception) { }
+                    throw IllegalStateException("The local model returned an unexpectedly long result. It will be unloaded for safety.")
+                }
+                builder.append(text)
+                _state.update { it.copy(reply = builder.toString()) }
             }
-            output.toString()
+            output = builder.toString()
+            output
         } finally {
             try { temporary?.close() } catch (_: Exception) { }
             if (activeAgentConversation === temporary) activeAgentConversation = null
@@ -184,13 +205,26 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                 conversation = null
                 try { activeEngine.close() } catch (_: Exception) { }
                 engine = null
-                _state.update { it.copy(isReady = false, status = "Model unloaded because its memory safety limit was reached.", error = null) }
+                _state.update { it.copy(isReady = false, status = "Model unloaded because a safety limit was reached.", error = null) }
             } else {
-                _state.update { it.copy(status = "Local intent proposal complete.") }
+                try {
+                    // Restore the normal assistant conversation only after the classifier cache
+                    // has been released. This keeps one KV cache alive at any given time.
+                    conversation = activeEngine.createConversation(createConversationConfig())
+                    _state.update { it.copy(status = "Local intent proposal complete.") }
+                } catch (error: Exception) {
+                    conversation = null
+                    try { activeEngine.close() } catch (_: Exception) { }
+                    engine = null
+                    _state.update {
+                        it.copy(isReady = false, status = "Could not restore the local chat. Reload the model.", error = error.message)
+                    }
+                }
             }
             _state.update { it.copy(isGenerating = false) }
         }
     }
+
 
     fun sendMessage(rawPrompt: String) {
         val prompt = try {
@@ -205,6 +239,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
             stopRequested = false
             _state.update { it.copy(isGenerating = true, reply = "", error = null, status = "Generating on-device…") }
             try {
+                val builder = StringBuilder()
                 checkNotNull(conversation) { "The local conversation is not available. Reload the model." }
                     .sendMessageAsync(prompt)
                     .collect { chunk ->
@@ -220,7 +255,15 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                             }
                             conversation?.cancelProcess()
                         } else {
-                            _state.update { it.copy(reply = it.reply + chunk.toString()) }
+                            val piece = chunk.toString()
+                            if (builder.length + piece.length > MAX_CHAT_OUTPUT_CHARS) {
+                                stopRequested = true
+                                _state.update { it.copy(status = "Response limit reached. Stopping to keep memory use bounded.", error = null) }
+                                conversation?.cancelProcess()
+                            } else {
+                                builder.append(piece)
+                                _state.update { it.copy(reply = builder.toString()) }
+                            }
                         }
                     }
                 if (!stopRequested) {
@@ -350,6 +393,11 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
             dispatcher.close()
         }.invokeOnCompletion { scope.cancel() }
         super.onCleared()
+    }
+
+    private companion object {
+        const val MAX_CHAT_OUTPUT_CHARS = 8_000
+        const val MAX_AGENT_OUTPUT_CHARS = 2_000
     }
 
     private fun createConversationConfig() = ConversationConfig(
