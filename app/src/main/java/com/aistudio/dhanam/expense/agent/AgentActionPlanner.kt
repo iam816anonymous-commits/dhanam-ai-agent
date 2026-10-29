@@ -31,7 +31,7 @@ object AgentActionPlanner {
     )
 
     fun parse(text: String): PlannerResult {
-        val input = text.trim().replace(Regex("\\s+"), " ")
+        val input = text.trim().replace(Regex("\s+"), " ")
         if (input.isEmpty()) return PlannerResult(message = "Tell me what you want to do.")
         val lower = input.lowercase()
         if (lower in setOf("help", "what can you do", "commands")) {
@@ -59,8 +59,8 @@ object AgentActionPlanner {
         val categoryWord = categories.keys.sortedByDescending { it.length }.firstOrNull { Regex("""\b${Regex.escape(it)}\b""").containsMatchIn(lower) }
         val category = categoryWord?.let { categories[it] } ?: "Other"
         val title = when {
-            Regex("""\bon\\s+(.+)$""", RegexOption.IGNORE_CASE).containsMatchIn(input) ->
-                Regex("""\bon\\s+(.+)$""", RegexOption.IGNORE_CASE).find(input)!!.groupValues[1]
+            Regex("""\bon\s+(.+)$""", RegexOption.IGNORE_CASE).containsMatchIn(input) ->
+                Regex("""\bon\s+(.+)$""", RegexOption.IGNORE_CASE).find(input)!!.groupValues[1]
                     .replace(Regex("""[.!?]$"""), "").take(120)
             else -> input.replace(amountMatch.value, "").replace(Regex("""(?i)\b(i spent|spent|expense|add|record|bought|paid for)\b"""), "").trim().take(120).ifBlank { category }
         }
