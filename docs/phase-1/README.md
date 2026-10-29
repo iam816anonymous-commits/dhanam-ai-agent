@@ -19,7 +19,14 @@ Room persistence, expense/loan/budget CRUD, finance calculations, agent planner,
 
 ## Verification status
 
-The repository changes are committed, but no local Android SDK/Gradle build was executed in the authoring environment. The GitHub Actions workflow is the next build verification gate. Do not mark Phase 1 accepted until CI is green and the app has been launched on an API 27-compatible environment and a current Android device/emulator.
+- GitHub Actions run [40854252033](https://github.com/iam816anonymous-commits/dhanam-ai-agent/actions/runs/40854252033) completed successfully on 2026-10-29.
+- The job passed unit tests, Android lint, debug APK assembly, APK existence verification, and debug APK artifact upload.
+- This is CI build evidence only. It does not prove app installation, navigation, API 27 behavior, model performance, offline inference, or physical-device stability. Those checks remain pending.
+- No local Android SDK/Gradle build was executed in the authoring environment.
+
+## Research requirement
+
+Before implementing each feature in the parity matrix, follow [the open-source research protocol](../research/OPEN_SOURCE_RESEARCH_PROTOCOL.md) and record source commits, licenses, implementation findings, decisions, tests, and limitations in [the feature research log](../research/FEATURE_RESEARCH_LOG.md). The repositories listed there are candidates, not pre-approved dependencies.
 
 ## Known limitation
 
