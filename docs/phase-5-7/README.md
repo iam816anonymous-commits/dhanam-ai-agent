@@ -31,7 +31,7 @@ Implemented foundation:
 Remaining limitations:
 - The local model supports only schema-constrained expense/budget proposals; quality varies by model and wording. It is not allowed to execute actions, access records, or propose repayments.
 - Telugu coverage is deterministic starter coverage, not broad language understanding; unrecognized Telugu commands ask for clarification.
-- Voice recognition depends on Android's installed on-device language packs and must be validated on each target device. No offline recognizer is available on Android 8.1.
+- Voice recognition depends on Android's installed speech service and language packs and must be validated on each target device. Android 8–11 can request offline recognition but the platform does not guarantee the system service honours that request.
 
 ## Phase 7 — Verification and release readiness
 
@@ -47,4 +47,4 @@ Release gates still required:
 
 ## Privacy and safety boundary
 
-The floating orb is an in-app Compose overlay; it does not request Android's system-wide overlay permission, draw over other apps, or use an AccessibilityService. Financial writes remain inside the app and require user confirmation. No cloud API or network action is used by the command parser.
+The animated assistant core is rendered inside the Agent screen; it does not request Android's system-wide overlay permission, draw over other apps, or use an AccessibilityService. Financial writes remain inside the app and require user confirmation. No cloud API or network action is used by the command parser.
