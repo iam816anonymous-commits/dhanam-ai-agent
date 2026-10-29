@@ -289,7 +289,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                             if (builder.length + piece.length > MAX_CHAT_OUTPUT_CHARS) {
                                 outputLimitReached = true
                                 stopRequested = true
-                                _state.update { it.copy(status = "Response reached the 4,000-character safety limit. Stopping generation…") }
+                                _state.update { it.copy(status = "Response reached the 1,800-character safety limit. Stopping generation…") }
                                 try { conversation?.cancelProcess() } catch (_: Exception) { }
                             } else {
                                 builder.append(piece)
@@ -339,7 +339,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                         _state.update {
                             it.copy(
                                 status = if (outputLimitReached) {
-                                    "Response capped at 4,000 characters. A fresh local conversation is ready."
+                                    "Response capped at 1,800 characters. A fresh local conversation is ready."
                                 } else {
                                     "Generation stopped. A fresh local conversation is ready."
                                 },
@@ -446,7 +446,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
     }
 
     private companion object {
-        const val MAX_CHAT_OUTPUT_CHARS = 4_000
+        const val MAX_CHAT_OUTPUT_CHARS = 1_800
         const val MAX_AGENT_OUTPUT_CHARS = 2_000
         const val UI_UPDATE_CHUNK_INTERVAL = 6
     }

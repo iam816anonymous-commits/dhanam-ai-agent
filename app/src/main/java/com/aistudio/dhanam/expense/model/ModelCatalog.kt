@@ -96,7 +96,7 @@ object ModelCatalog {
         val reasons = buildList {
             if (memory.totalMem < model.minTotalRamBytes) add("Device RAM is below the model's minimum total-memory requirement.")
             if (memory.availMem < model.minAvailableRamBytes) add("Currently available RAM is below this model’s requirement before loading. Close other apps and recheck.")
-            if (freeStorage < 256L * MIB) add("At least 256 MiB of free app storage is required for runtime cache and temporary files.")
+            if (freeStorage < model.minFreeStorageBytes) add("Free app storage is below this model\u2019s runtime reserve of ${model.minFreeStorageBytes / MIB} MiB. Free more storage and recheck before loading.")
         }
         return DeviceEligibility(reasons.isEmpty(), memory.totalMem, memory.availMem, freeStorage, reasons)
     }
