@@ -51,12 +51,31 @@ jobs:
       - name: Run instrumented database and device smoke tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 34
           target: google_apis
           arch: x86_64
           profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 4096 -cores 2
           disable-animations: true
-          script: ./gradlew --no-daemon :app:connectedDebugAndroidTest
+          script: ./gradlew --no-daemon :app:connectedDebugAndroidTest --stacktrace
+
+      - name: Capture emulator diagnostics on instrumented-test failure
+        if: failure()
+        shell: bash
+        run: |
+          mkdir -p app/build/ci-diagnostics
+          adb devices -l > app/build/ci-diagnostics/adb-devices.txt 2>&1 || true
+          adb logcat -d -t 8000 > app/build/ci-diagnostics/logcat.txt 2>&1 || true
+          find app/build/reports/androidTests -type f -maxdepth 5 -print > app/build/ci-diagnostics/test-reports.txt 2>&1 || true
+
+      - name: Upload emulator diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-emulator-diagnostics
+          path: app/build/ci-diagnostics/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
