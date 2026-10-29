@@ -180,7 +180,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                 shouldUnload = true
                 "The process is already at the 2 GiB peak-memory limit; the model will be unloaded."
             }
-            temporary = activeEngine.createConversation(
+            val agentConversation = activeEngine.createConversation(
                 ConversationConfig(
                     systemInstruction = Contents.of(
                         "You are a strict finance-command classifier. Return exactly one JSON object and no markdown. " +
@@ -191,14 +191,15 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                     )
                 )
             )
-            activeAgentConversation = temporary
+            temporary = agentConversation
+            activeAgentConversation = agentConversation
             val builder = StringBuilder()
             var chunksSinceUiUpdate = 0
-            temporary.sendMessageAsync(prompt).collect { chunk ->
+            agentConversation.sendMessageAsync(prompt).collect { chunk ->
                 val peakBytes = ProcessMemoryBudget.readPeakResidentBytes()
                 if (peakBytes == null || peakBytes >= ModelCatalog.MAX_PROCESS_PEAK_BYTES) {
                     shouldUnload = true
-                    try { temporary?.cancelProcess() } catch (_: Exception) { }
+                    try { agentConversation.cancelProcess() } catch (_: Exception) { }
                     throw IllegalStateException("The 2 GiB process peak-memory limit was reached or could not be measured.")
                 }
                 val text = chunk.toString()
