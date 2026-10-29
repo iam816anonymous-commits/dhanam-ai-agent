@@ -36,6 +36,7 @@ object AgentActionPlanner {
         val input = text.trim().replace(Regex("""\s+"""), " ")
         if (input.isEmpty()) return PlannerResult(message = "Tell me what you want to do.")
         val lower = input.lowercase()
+        parseTelugu(input)?.let { return it }
         if (lower in setOf("help", "what can you do", "commands")) {
             return PlannerResult(message = "Try: “I spent 250 on lunch”, “set food budget to 3000”, or “record repayment 500 from Ravi”. I'll show a preview and ask before saving.")
         }
@@ -71,6 +72,56 @@ object AgentActionPlanner {
             PlannerResult(PlannedFinanceAction.AddExpense(validated.title, validated.amountPaise, validated.category, validated.occurredOn), "Review the expense before saving.")
         } catch (e: Exception) {
             PlannerResult(message = e.message ?: "I couldn't validate that expense.", needsClarification = true)
+        }
+    }
+
+
+    private val teluguCategoryTerms = listOf(
+        Triple("ఆహారం", "Food", "భోజనం"),
+        Triple("భోజనం", "Food", "భోజనం"),
+        Triple("భోజన", "Food", "భోజనం"),
+        Triple("ఆహార", "Food", "భోజనం"),
+        Triple("లంచ్", "Food", "లంచ్"),
+        Triple("డిన్నర్", "Food", "డిన్నర్"),
+        Triple("టిఫిన్", "Food", "టిఫిన్"),
+        Triple("కిరాణా", "Food", "కిరాణా"),
+        Triple("రవాణా", "Transport", "ప్రయాణం"),
+        Triple("పెట్రోల్", "Transport", "పెట్రోల్"),
+        Triple("బస్సు", "Transport", "బస్సు"),
+        Triple("ప్రయాణం", "Transport", "ప్రయాణం"),
+        Triple("షాపింగ్", "Shopping", "షాపింగ్"),
+        Triple("బట్టలు", "Shopping", "బట్టలు"),
+        Triple("బిల్లు", "Bills", "బిల్లు"),
+        Triple("కరెంట్", "Bills", "కరెంట్"),
+        Triple("అద్దె", "Bills", "అద్దె"),
+        Triple("ఆరోగ్యం", "Health", "మందులు"),
+        Triple("మందులు", "Health", "మందులు"),
+        Triple("వైద్యం", "Health", "వైద్యం"),
+        Triple("విద్య", "Education", "విద్య"),
+        Triple("ఫీజు", "Education", "ఫీజు"),
+        Triple("ఇతర", "Other", "ఇతర ఖర్చు")
+    )
+
+    /** Deterministic starter coverage for common Telugu expense and budget phrases. */
+    private fun parseTelugu(input: String): PlannerResult? {
+        if (!Regex("""[\u0C00-\u0C7F]""").containsMatchIn(input)) return null
+        val lower = input.lowercase()
+        val amount = amountPattern.findAll(input).lastOrNull()?.groupValues?.get(1)
+            ?: return PlannerResult(message = "దయచేసి మొత్తాన్ని అంకెల్లో చెప్పండి. ఉదాహరణ: భోజనానికి 250 ఖర్చు చేశాను.", needsClarification = true)
+        val term = teluguCategoryTerms.firstOrNull { lower.contains(it.first) }
+            ?: return PlannerResult(message = "దయచేసి ఖర్చు లేదా బడ్జెట్ వర్గాన్ని స్పష్టంగా చెప్పండి: ఆహారం, ప్రయాణం, షాపింగ్, బిల్లులు, ఆరోగ్యం లేదా విద్య.", needsClarification = true)
+        return try {
+            val paise = MoneyParser.parseRupeesToPaise(amount)
+            if (lower.contains("బడ్జెట్")) {
+                PlannerResult(PlannedFinanceAction.SetBudget(term.second, paise, YearMonth.now()), "బడ్జెట్ మార్పును సేవ్ చేసే ముందు పరిశీలించండి.")
+            } else if (lower.contains("ఖర్చు") || lower.contains("కొన్న") || lower.contains("చెల్లించ")) {
+                val validated = ExpenseInputValidator.validate(term.third, amount, term.second, LocalDate.now().toString(), "")
+                PlannerResult(PlannedFinanceAction.AddExpense(validated.title, validated.amountPaise, validated.category, validated.occurredOn), "ఖర్చు వివరాలను పరిశీలించి నిర్ధారించిన తర్వాతే సేవ్ చేస్తాను.")
+            } else {
+                PlannerResult(message = "మీరు ఖర్చు నమోదు చేయాలనుకుంటున్నారా లేదా బడ్జెట్ మార్చాలనుకుంటున్నారా? దయచేసి స్పష్టంగా చెప్పండి.", needsClarification = true)
+            }
+        } catch (error: Exception) {
+            PlannerResult(message = error.message ?: "మొత్తాన్ని తనిఖీ చేయండి.", needsClarification = true)
         }
     }
 

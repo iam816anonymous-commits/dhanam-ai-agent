@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aistudio.dhanam.expense.agent.AgentViewModel
+import com.aistudio.dhanam.expense.ui.components.OfflineVoiceInput
 
 @Composable
 fun AgentScreen(viewModel: AgentViewModel = viewModel()) {
@@ -75,6 +76,10 @@ fun AgentScreen(viewModel: AgentViewModel = viewModel()) {
             value = input, onValueChange = { input = it.take(1000) }, modifier = Modifier.fillMaxWidth(),
             label = { Text("Tell Dhanam what you need") }, placeholder = { Text("I spent 250 on lunch…") },
             minLines = 1, maxLines = 3, enabled = !state.busy
+        )
+        OfflineVoiceInput(
+            enabled = !state.busy,
+            onRecognized = { spoken -> input = listOf(input.trim(), spoken).filter { it.isNotBlank() }.joinToString(" ").take(1000) }
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { viewModel.submit(input); input = "" }, enabled = input.isNotBlank() && !state.busy, modifier = Modifier.weight(1f)) { Text("Send") }

@@ -63,4 +63,15 @@ class AgentActionPlannerTest {
         assertEquals("What amount?", result.message)
     }
 
+    @Test fun commonTeluguExpenseAndBudgetPhrasesAreSupported() {
+        val expense = AgentActionPlanner.parse("భోజనానికి 250 ఖర్చు చేశాను").action as PlannedFinanceAction.AddExpense
+        assertEquals(25000L, expense.amountPaise)
+        assertEquals("Food", expense.category)
+        assertEquals("భోజనం", expense.title)
+
+        val budget = AgentActionPlanner.parse("ఆహార బడ్జెట్ 3000").action as PlannedFinanceAction.SetBudget
+        assertEquals(300000L, budget.amountPaise)
+        assertEquals("Food", budget.category)
+    }
+
 }
