@@ -27,8 +27,8 @@
 - Model files can be removed from app-private storage.
 
 ## Acceptance status
-- CI and APK artifact verification: pending for this commit.
-- Catalog pinning, file-integrity and prompt-validation unit tests added; a device-only inference smoke test is also compiled into the Android test APK. CI pending.
+- CI run https://github.com/iam816anonymous-commits/dhanam-ai-agent/actions/runs/40876779039 — success: unit tests, lint, debug APK assembly, instrumented-test APK assembly, APK existence checks, and artifact upload.
+- Catalog pinning, file-integrity and prompt-validation unit tests passed in the successful CI run above; the device-only inference smoke test compiled into the Android test APK. It was not run on a physical device.
 - Download cancellation/retry, corrupted response and low-storage behavior: physical-device verification pending.
 - Physical-device benchmark and inference smoke test: pending. Runtime code is implemented and enabled after model verification/resource checks, but successful generation on the target phone is not claimed until installed and tested there.
 - The resource gate is intentionally conservative. If it rejects the device, the app offers no download action; do not bypass the gate just to test the model.
