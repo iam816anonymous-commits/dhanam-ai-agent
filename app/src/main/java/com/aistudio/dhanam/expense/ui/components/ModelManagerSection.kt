@@ -44,10 +44,10 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
         ) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(model.displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("474.61 MiB · Apache-2.0 · 2,048-token context", style = MaterialTheme.typography.bodySmall)
-                Text("Pinned source revision; downloads are checked against exact byte size and SHA-256.", style = MaterialTheme.typography.bodySmall)
+                Text("331.14 MiB · Apache-2.0 · 1,280-token KV cache · No-thinking mode", style = MaterialTheme.typography.bodySmall)
+                Text("Pinned Hugging Face artifact revision; exact byte size and SHA-256 are verified after download.", style = MaterialTheme.typography.bodySmall)
                 Text(
-                    "Resource gate: at least 3,500 MiB total RAM, 2,304 MiB currently available RAM, and 1,280 MiB free app storage.",
+                    "Safety gate: at least 3,500 MiB total RAM, 1,536 MiB currently available RAM, and 1,280 MiB free app storage. The app process is unloaded if its measured peak RSS reaches 2 GiB.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -69,9 +69,7 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
                 }
                 if (state.isVerified) {
                     Text("Verified model file is installed.", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
-                    if (state.preferredModelId == model.id) {
-                        Text("Saved as preferred model.", style = MaterialTheme.typography.bodySmall)
-                    }
+                    if (state.preferredModelId == model.id) Text("Saved as preferred model.", style = MaterialTheme.typography.bodySmall)
                 }
                 state.message?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -88,17 +86,14 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
                     }
                 }
                 Text(
-                    "After the model is downloaded and verified, local CPU inference is available below. GPU/NPU acceleration is not enabled until separately qualified.",
+                    "Inference uses CPU only. GPU/NPU acceleration is not enabled. This is an initial qualification build, not proof that this phone passed a device benchmark.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
         if (state.isVerified) {
-            LocalInferenceSection(
-                viewModel = inferenceViewModel,
-                isPreferred = state.preferredModelId == model.id
-            )
+            LocalInferenceSection(viewModel = inferenceViewModel, isPreferred = state.preferredModelId == model.id)
         }
     }
 }

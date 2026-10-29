@@ -52,6 +52,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
     private var conversation: Conversation? = null
     @Volatile private var loadJob: Job? = null
     private var stopRequested = false
+    private var memoryBudgetExceeded = false
 
     private val _state = MutableStateFlow(LocalInferenceState())
     val state: StateFlow<LocalInferenceState> = _state.asStateFlow()
@@ -96,8 +97,15 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                 // LiteRT-LM forbids closing an Engine whose initialize() call throws.
                 candidate.initialize()
                 engine = candidate
-                currentCoroutineContext().ensureActive()
                 try {
+                    currentCoroutineContext().ensureActive()
+                    val peakBytes = ProcessMemoryBudget.readPeakResidentBytes()
+                    check(peakBytes != null) {
+                        "Cannot verify this process's peak memory. Model loading is blocked for safety."
+                    }
+                    check(peakBytes < ModelCatalog.MAX_PROCESS_PEAK_BYTES) {
+                        "The app process has reached the 2 GiB peak-memory budget. Unload other apps and try again."
+                    }
                     conversation = candidate.createConversation(createConversationConfig())
                 } catch (error: Exception) {
                     candidate.close()
@@ -144,7 +152,20 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                 checkNotNull(conversation) { "The local conversation is not available. Reload the model." }
                     .sendMessageAsync(prompt)
                     .collect { chunk ->
-                        _state.update { it.copy(reply = it.reply + chunk.toString()) }
+                        val peakBytes = ProcessMemoryBudget.readPeakResidentBytes()
+                        if (peakBytes == null || peakBytes >= ModelCatalog.MAX_PROCESS_PEAK_BYTES) {
+                            memoryBudgetExceeded = true
+                            stopRequested = true
+                            _state.update {
+                                it.copy(
+                                    status = "The 2 GiB process peak-memory budget was reached or could not be measured. Stopping and unloading the model.",
+                                    error = null
+                                )
+                            }
+                            conversation?.cancelProcess()
+                        } else {
+                            _state.update { it.copy(reply = it.reply + chunk.toString()) }
+                        }
                     }
                 if (!stopRequested) {
                     _state.update { it.copy(status = "Response complete. Generated locally; no cloud API was used.") }
@@ -154,7 +175,20 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
             } catch (error: Exception) {
                 _state.update { it.copy(status = "Local inference failed.", error = error.message ?: error.javaClass.simpleName) }
             } finally {
-                if (stopRequested) {
+                if (stopRequested && memoryBudgetExceeded) {
+                    try { conversation?.close() } catch (_: Exception) { }
+                    conversation = null
+                    try { engine?.close() } catch (_: Exception) { }
+                    engine = null
+                    _state.update {
+                        it.copy(
+                            isReady = false,
+                            status = "Model unloaded because the 2 GiB process peak-memory budget was reached.",
+                            error = null
+                        )
+                    }
+                    memoryBudgetExceeded = false
+                } else if (stopRequested) {
                     // LiteRT-LM does not support reusing a Conversation after cancelProcess().
                     // Wait for the streaming flow to end, then replace that conversation.
                     try {

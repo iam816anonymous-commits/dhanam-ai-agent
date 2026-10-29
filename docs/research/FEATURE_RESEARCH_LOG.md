@@ -49,15 +49,13 @@ See 2026-10-29-initial-source-review.md for exact commits, inspected paths, lice
 
 
 ## Phase 3 research — 2026-10-29
-- Official Android LiteRT-LM Kotlin skill: https://developer.android.com/agents/skills/device-ai/litert/litert-lm/skill. Model files belong in app-private/app-specific storage rather than APK assets; initialization must be off-main-thread; engine/conversation ownership must be serialized. No runtime dependency added until compatibility is verified.
-- LiteRT-LM source repository: https://github.com/google-ai-edge/LiteRT-LM, Apache-2.0. Compared with llama.cpp; selected LiteRT-LM as the initial runtime candidate because the reviewed artifact is a .litertlm bundle. llama.cpp remains an alternative but is not added.
-- Model repository: https://huggingface.co/litert-community/Qwen3-0.6B, Apache-2.0. Selected mixed INT4 artifact at immutable revision 154c5de0fc0fc5002a7da570ba8c67edffa32ca2; SHA-256 7900eb4e7362d88c58782c6f9999bb7a129e03544aa98b8f338ea0cc5d8c22c1; size 497516544 bytes; 2048-token context.
-- Implementation: app/src/main/java/com/aistudio/dhanam/expense/model/ and ui/components/ModelManagerSection.kt.
-- Safety gate: require at least 3500 MiB total RAM, 2304 MiB currently available RAM, and 1280 MiB free app-private storage. Published performance data is from a different TECNO model, so it is not treated as target-device validation.
-- Tests: model catalog pinning test added; CI pending.
-- Runtime activation and physical-device smoke test remain blocked on real target-device measurements and successful dependency/API compatibility checks.
-
-
+- Official Android LiteRT-LM Kotlin skill: https://developer.android.com/agents/skills/device-ai/litert/litert-lm/skill. Model files remain outside APK assets; initialization is off-main-thread; engine/conversation operations are serialized.
+- Runtime: LiteRT-LM 0.16.1, CPU backend only. GPU/NPU is not enabled or assumed.
+- Model repository: https://huggingface.co/litert-community/Qwen3-0.6B-int4, Apache-2.0. Selected no-thinking INT4 artifact `qwen3_0.6b_nothink_q4_block32_ekv1280.litertlm`, pinned to artifact commit `6aa2daf`; SHA-256 `2df6821ec12702dafd33915e7a1a1adc7c4b053f3672fd9555dfaf3a114c4139`; size 347251840 bytes; 1280-token KV cache. Upstream CPU peak RSS measurements are from a Samsung Galaxy S26, not the target Tecno phone: https://huggingface.co/litert-community/Qwen3-0.6B-int4.
+- Runtime guard: 1,536 MiB pre-load available-RAM threshold, at least 3,500 MiB total RAM, 1,280 MiB free app storage for download, and a 2 GiB process VmHWM ceiling checked after load and during generation. Model loading is refused or generation stopped/unloaded if the budget is reached or cannot be verified.
+- Legacy artifact migration removes only the prior fixed model file and partial download; it does not touch finance data.
+- Tests added: catalog revision/hash/size/context/budget assertions, VmHWM parser tests, and device smoke-test assertions after load and generation.
+- Physical-device qualification remains pending; no claim is made that the user's exact Tecno phone has passed the 2 GiB peak-RSS budget.
 ## Phase 2B–2E research and implementation — 2026-10-29
 
 - Official Room guidance: https://developer.android.com/training/data-storage/room and migration guidance: https://developer.android.com/training/data-storage/room/migrating-db-versions. Decision: additive Room 1→2→3→4 migrations only; no destructive fallback; store amounts as integer paise and keep monthly calculations deterministic.

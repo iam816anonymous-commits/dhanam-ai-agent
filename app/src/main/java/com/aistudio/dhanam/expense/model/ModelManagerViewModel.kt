@@ -31,7 +31,10 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
     val state: StateFlow<ModelManagerState> = _state.asStateFlow()
     private var downloadJob: Job? = null
 
-    init { refresh() }
+    init {
+        viewModelScope.launch(Dispatchers.IO) { ModelCatalog.removeLegacyArtifact(getApplication()) }
+        refresh()
+    }
 
     fun refresh() {
         viewModelScope.launch {

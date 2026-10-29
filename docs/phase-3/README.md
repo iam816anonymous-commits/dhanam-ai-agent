@@ -8,14 +8,13 @@
 - LiteRT-LM 0.16.1 is pinned because it carries Kotlin metadata 2.3.0 and is compatible with Kotlin 2.2.x; LiteRT-LM 0.17.x–0.18.x require Kotlin 2.3 or newer. The app currently uses AGP 8.7.3 and Gradle 8.9, so this runtime version limits unrelated toolchain changes. Compatibility notes: https://github.com/google-ai-edge/LiteRT-LM/blob/main/docs/api/kotlin/getting_started.md.
 
 ### Candidate artifact
-- Repository: https://huggingface.co/litert-community/Qwen3-0.6B
+- Repository: https://huggingface.co/litert-community/Qwen3-0.6B-int4
 - Model license: Apache-2.0, as stated on the model card.
-- Artifact: qwen3_0_6b_mixed_int4.litertlm, mixed INT4 weights, 2,048-token context, 497,516,544 bytes.
-- Immutable upstream revision: 154c5de0fc0fc5002a7da570ba8c67edffa32ca2.
-- Expected SHA-256: 7900eb4e7362d88c58782c6f9999bb7a129e03544aa98b8f338ea0cc5d8c22c1.
-- Artifact evidence: https://huggingface.co/litert-community/Qwen3-0.6B/commit/154c5de0fc0fc5002a7da570ba8c67edffa32ca2 and https://huggingface.co/litert-community/Qwen3-0.6B/blob/refs%2Fpr%2F6/qwen3_0_6b_mixed_int4.litertlm
-- The upstream card includes measurements from a TECNO LJ9, not Dhanam's exact target phone. Those numbers are indicative only and do not prove compatibility or safe runtime memory on the target device.
-
+- Artifact: qwen3_0.6b_nothink_q4_block32_ekv1280.litertlm, dynamic INT4 block-32 weights, no-thinking mode, 1,280-token KV-cache, 347,251,840 bytes (331.14 MiB).
+- Immutable upstream file revision: 6aa2daf (artifact commit); download URL pins that revision rather than mutable main.
+- Expected SHA-256: 2df6821ec12702dafd33915e7a1a1adc7c4b053f3672fd9555dfaf3a114c4139.
+- Artifact evidence: https://huggingface.co/litert-community/Qwen3-0.6B-int4/blob/main/qwen3_0.6b_nothink_q4_block32_ekv1280.litertlm.
+- Upstream reports about 1,032–1,036 MB peak RSS on a Samsung Galaxy S26 using CPU/XNNPACK. This is a different device and does not establish safe operation on Dhanam's 4 GB Tecno phone.
 ## Implemented
 - One reviewed catalog item with a revision-pinned HTTPS URL, exact byte count, SHA-256, license and context metadata.
 - Runtime resource checks for total RAM, currently available RAM and app-private free storage. Download is disabled until all thresholds pass.
@@ -48,10 +47,10 @@
 
 
 ## Running the on-device inference smoke test
-1. Install the debug APK on the target phone.
+1. Install the updated debug APK on the target phone. The app removes the superseded 475 MiB model artifact from its private model directory.
 2. Open **Settings → Local AI model**, tap **Download model**, wait for size/SHA-256 verification, then tap **Set preferred**.
-3. Wait for the runtime resource check to pass and tap **Load verified model**.
-4. Send a short prompt in the local inference chat and confirm a response appears. This is the direct UI smoke test.
+3. Close other apps. Wait for the runtime resource check to pass and tap **Load verified model**. Loading is refused if available RAM is below 1,536 MiB or process peak RSS cannot be measured/has reached 2 GiB.
+4. Send a short prompt in the local inference chat and confirm a response appears. If process peak RSS reaches 2 GiB, generation is stopped and the model is unloaded.
 5. For the instrumented test, install the `app-debug-androidTest.apk` from the same CI artifact and run:
    `adb shell am instrument -w -e class com.aistudio.dhanam.expense.model.LocalInferenceDeviceSmokeTest com.aistudio.dhanam.expense.test/androidx.test.runner.AndroidJUnitRunner`
    The test intentionally skips if the reviewed model is absent/invalid or the device does not meet the runtime resource gate. It never downloads the model itself.
