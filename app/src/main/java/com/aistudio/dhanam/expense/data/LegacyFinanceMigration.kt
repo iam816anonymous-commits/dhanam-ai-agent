@@ -75,7 +75,7 @@ object LegacyFinanceMigration {
                         try {
                             val person = cursor.getString(1)?.trim().orEmpty()
                             require(person.isNotBlank() && person.length <= 100) { "person name is blank or too long" }
-                            val principal = toPaise(cursor.getDouble(2), allowZero = false)
+                            val principal = LegacyMoneyConverter.toPaise(cursor.getDouble(2), allowZero = false)
                             val paid = LegacyMoneyConverter.toPaise(cursor.getDouble(3), allowZero = true)
                             require(paid <= principal) { "amount paid exceeds principal" }
                             val openedMillis = cursor.getLong(4)

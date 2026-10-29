@@ -24,6 +24,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.rememberCoroutineScope
 import com.aistudio.dhanam.expense.data.FinanceCsvTransfer
 import com.aistudio.dhanam.expense.data.FinanceDatabase
+import com.aistudio.dhanam.expense.data.FinanceLedgerCsvExporter
+import java.time.YearMonth
+import kotlinx.coroutines.flow.first
 import com.aistudio.dhanam.expense.data.CsvImportPreview
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -50,6 +53,21 @@ fun FinanceDataSection() {
             catch (e: Exception) { message = e.message ?: "Export failed." }
         }
     }
+    val ledgerExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) scope.launch {
+            try {
+                val text = withContext(Dispatchers.IO) {
+                    val loans = db.financeDao().observeLoans().first()
+                    val repayments = db.financeDao().allRepayments()
+                    val budgets = db.financeDao().observeBudgetsForMonth(YearMonth.now().atDay(1).toEpochDay()).first()
+                    FinanceLedgerCsvExporter.export(loans, repayments, budgets)
+                }
+                withContext(Dispatchers.IO) { FinanceCsvTransfer.writeText(context.contentResolver, uri, text) }
+                message = "Khata, repayment and current-month budget ledger exported."
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { message = e.message ?: "Ledger export failed." }
+        }
+    }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
             try {
@@ -71,6 +89,9 @@ fun FinanceDataSection() {
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Button(onClick = { exportLauncher.launch("dhanam-expenses.csv") }, modifier = Modifier.fillMaxWidth()) {
                 Text("Export expenses to CSV")
+            }
+            Button(onClick = { ledgerExportLauncher.launch("dhanam-khata-ledger.csv") }, modifier = Modifier.fillMaxWidth()) {
+                Text("Export Khata, repayments and budgets")
             }
             Button(onClick = { importLauncher.launch(arrayOf("text/*", "application/csv", "application/vnd.ms-excel")) },
                 enabled = !busy, modifier = Modifier.fillMaxWidth()) {
