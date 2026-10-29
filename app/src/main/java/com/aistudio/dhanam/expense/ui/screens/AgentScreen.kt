@@ -15,11 +15,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -37,6 +39,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,6 +63,10 @@ private data class QuickCommand(val label: String, val prompt: String)
 fun AgentScreen(viewModel: AgentViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
     var input by remember { mutableStateOf("") }
+    val listState = rememberLazyListState()
+    LaunchedEffect(state.messages.size) {
+        if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.lastIndex)
+    }
     val quickCommands = remember {
         listOf(
             QuickCommand("＋ Expense", "I spent ₹250 on lunch"),
@@ -70,7 +77,7 @@ fun AgentScreen(viewModel: AgentViewModel = viewModel()) {
     }
 
     Column(
-        Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 8.dp),
+        Modifier.fillMaxSize().imePadding().padding(horizontal = 14.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(9.dp)
     ) {
         Row(
@@ -141,7 +148,8 @@ fun AgentScreen(viewModel: AgentViewModel = viewModel()) {
         }
 
         LazyColumn(
-            Modifier.weight(1f).fillMaxWidth(),
+            state = listState,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             items(state.messages, key = { it.id }) { message ->

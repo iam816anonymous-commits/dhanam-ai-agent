@@ -31,8 +31,9 @@ import androidx.core.content.ContextCompat
 import android.content.pm.PackageManager
 
 /**
- * Offline-only speech input. Never falls back to a general recognizer that may upload audio.
- * On Android versions without the on-device SpeechRecognizer API, text entry remains available.
+ * Privacy-aware speech input. Android 12+ uses the dedicated on-device recognizer.
+ * Android 8–11 use the installed system recognizer with EXTRA_PREFER_OFFLINE; that is a
+ * preference, not a platform guarantee, so the UI warns users that the service may ignore it.
  */
 @Composable
 fun OfflineVoiceInput(
@@ -43,7 +44,15 @@ fun OfflineVoiceInput(
     val context = LocalContext.current
     val latestOnRecognized by rememberUpdatedState(onRecognized)
     var language by remember { mutableStateOf("en-IN") }
-    var status by remember { mutableStateOf("Voice input uses the device's on-device recognizer only.") }
+    var status by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                "Voice uses the dedicated on-device recognizer when available."
+            } else {
+                "Android 8–11 use the system speech service with offline preference; the service may ignore it."
+            }
+        )
+    }
     var recognizer by remember { mutableStateOf<SpeechRecognizer?>(null) }
 
     val startListening: () -> Unit = {
@@ -145,7 +154,7 @@ fun OfflineVoiceInput(
                 val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
                 if (granted) startListening() else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }) {
-                Text("Speak offline")
+                Text(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) "Speak offline" else "Speak (offline preferred)")
             }
         }
         Text(status, modifier = Modifier.padding(start = 4.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

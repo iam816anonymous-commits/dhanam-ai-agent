@@ -25,8 +25,8 @@ Implemented foundation:
 - Conversational phrasing for the supported command families, help/examples, validation feedback and action confirmation/cancellation.
 - Corrections to a staged draft support changing amount, category, and description. The confirmation preview is inline so a user can correct the draft before saving.
 - The transcript and pending action stay in the in-memory ViewModel and are not written to Room or uploaded; they are not durable across process death.
-- Offline voice input has English (India) and Telugu locale choices. It calls Android's on-device recognizer only and never falls back to an online recognizer. It requires Android 12+ and an installed on-device recognizer; older phones (including Android 8.1) remain text-only.
-- A persistent in-app floating assistant orb animates/pulses and moves while indicating thinking, approval or execution status. Tapping it navigates to the Agent screen.
+- Offline voice input has English (India) and Telugu locale choices. Android 12+ uses Android's dedicated on-device recognizer when available. Android 8–11 use the installed system speech service with `EXTRA_PREFER_OFFLINE`; Android does not guarantee that a legacy speech service honours this preference. The UI labels this honestly. For strict offline privacy on older phones, use text input unless the installed recognizer is known to run offline.
+- The Agent screen now follows the original Dhanam palette and chat layout: teal/amber on slate, animated assistant core, quick-command chips, status pill, clear-chat control, auto-scrolling transcript, inline approval preview, and English/Telugu voice controls.
 
 Remaining limitations:
 - The local model supports only schema-constrained expense/budget proposals; quality varies by model and wording. It is not allowed to execute actions, access records, or propose repayments.
@@ -35,13 +35,13 @@ Remaining limitations:
 
 ## Phase 7 — Verification and release readiness
 
-Automated tests cover action parsing, model-proposal allowlisting, amount/category mapping, staged corrections, Telugu starter commands, required clarification and rejecting unsupported repayment intents. Android instrumentation tests exercise Room expense read-back, budget upsert, repayment idempotency and overpayment rejection on an emulator. The optional model smoke test skips unless the exact verified artifact is already present; CI never downloads it. Existing repository tests cover exact paise conversion, expense validation, Khata validation, repayment idempotency/overpayment checks, and migration/data-transfer logic.
+Automated unit tests cover action parsing, model-proposal allowlisting, amount/category mapping, staged corrections, Telugu starter commands, required clarification and rejecting unsupported repayment intents. CI runs unit tests, lint, debug APK assembly and Android instrumentation APK assembly. It does not run `connectedAndroidTest` or the physical-device model smoke test; those require an attached emulator/device and a manually installed, verified model. The optional model smoke test skips unless the exact verified artifact is already present; CI never downloads it. Existing repository tests cover exact paise conversion, expense validation, Khata validation, repayment idempotency/overpayment checks, and migration/data-transfer logic.
 
 Release gates still required:
-- GitHub Actions must pass for the commit containing this implementation.
+- GitHub Actions must pass for the commit containing this implementation. A green CI result verifies compilation and automated unit tests; it does not prove native inference stability on the Tecno phone.
 - Run the UI and database flows on a physical Android device, including process restart and upgrade/migration checks.
 - Test low available RAM/storage, cancellation, app background/foreground, interrupted writes, and verify no duplicate repayments.
-- Verify model inference on the exact Tecno target device before claiming local-model compatibility.
+- Verify model inference and offline speech on the exact Tecno target device before claiming device compatibility.
 - Verify the 2 GiB peak-RSS requirement on-device; a pre-load free-RAM threshold is not a guarantee against system-wide pressure.
 - Do not declare Phase 5–7 complete until the remaining conversational features and physical-device acceptance tests pass.
 
