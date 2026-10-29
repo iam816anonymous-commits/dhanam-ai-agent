@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.aistudio.dhanam.expense.security.PinSettingsSection
 import com.aistudio.dhanam.expense.reminders.FinanceReminderSection
 import com.aistudio.dhanam.expense.ui.components.FinanceDataSection
+import com.aistudio.dhanam.expense.ui.components.LegacyMigrationSection
 import com.aistudio.dhanam.expense.ui.components.ModelManagerSection
 import com.aistudio.dhanam.expense.ui.theme.MutedText
 
@@ -35,6 +36,7 @@ fun SettingsScreen() {
             detail = "Financial records are stored in the local Room database. CSV and PDF files are written only to a destination you explicitly choose. The app does not upload transaction data."
         )
         FinanceDataSection()
+        LegacyMigrationSection()
         ModelManagerSection()
         PinSettingsSection()
         FinanceReminderSection()

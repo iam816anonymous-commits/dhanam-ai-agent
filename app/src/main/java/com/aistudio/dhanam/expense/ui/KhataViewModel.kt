@@ -12,6 +12,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.Flow
+import com.aistudio.dhanam.expense.data.RepaymentEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -24,6 +26,7 @@ class KhataViewModel(application: Application) : AndroidViewModel(application) {
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
     fun clearMessage() { _message.value = null }
+    fun repaymentsFor(loanId: Long): Flow<List<RepaymentEntity>> = dao.observeRepayments(loanId)
 
     fun addLoan(person: String, direction: String, amount: String, opened: String, due: String, note: String) {
         viewModelScope.launch {

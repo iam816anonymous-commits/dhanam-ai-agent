@@ -37,6 +37,7 @@ import com.aistudio.dhanam.expense.domain.ExpenseInputValidator
 import com.aistudio.dhanam.expense.domain.MoneyParser
 import com.aistudio.dhanam.expense.ui.ExpensesViewModel
 import java.time.LocalDate
+import java.time.YearMonth
 
 @Composable
 fun ExpensesScreen(viewModel: ExpensesViewModel = viewModel()) {
@@ -51,9 +52,13 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = viewModel()) {
     var pendingDelete by remember { mutableStateOf<ExpenseEntity?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("All") }
+    var dateFilter by remember { mutableStateOf("This month") }
     val visibleExpenses = expenses.filter { expense ->
         val query = searchQuery.trim()
         (selectedCategory == "All" || expense.category == selectedCategory) &&
+            (dateFilter == "All dates" ||
+                YearMonth.from(LocalDate.ofEpochDay(expense.occurredOnEpochDay)).toString() ==
+                    (if (dateFilter == "This month") YearMonth.now().toString() else YearMonth.now().minusMonths(1).toString())) &&
             (query.isEmpty() || expense.title.contains(query, ignoreCase = true) ||
                 expense.note.contains(query, ignoreCase = true) || expense.category.contains(query, ignoreCase = true))
     }
@@ -130,9 +135,20 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = viewModel()) {
             label = { Text("Search description, note or category") }, singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            (listOf("All") + ExpenseInputValidator.categories).forEach { filter ->
-                FilterChip(selected = selectedCategory == filter, onClick = { selectedCategory = filter }, label = { Text(filter) })
+        Text("Category", style = MaterialTheme.typography.labelLarge)
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            (listOf("All") + ExpenseInputValidator.categories).chunked(3).forEach { group ->
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    group.forEach { filter ->
+                        FilterChip(selected = selectedCategory == filter, onClick = { selectedCategory = filter }, label = { Text(filter) })
+                    }
+                }
+            }
+        }
+        Text("Date range", style = MaterialTheme.typography.labelLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("This month", "Previous month", "All dates").forEach { filter ->
+                FilterChip(selected = dateFilter == filter, onClick = { dateFilter = filter }, label = { Text(filter) })
             }
         }
         Text("Transaction history (${visibleExpenses.size})", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)

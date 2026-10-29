@@ -20,7 +20,9 @@ data class KhataLoanEntity(
     @ColumnInfo(name = "due_on_epoch_day") val dueOnEpochDay: Long?,
     val note: String,
     @ColumnInfo(name = "created_at_epoch_millis") val createdAtEpochMillis: Long,
-    @ColumnInfo(name = "updated_at_epoch_millis") val updatedAtEpochMillis: Long
+    @ColumnInfo(name = "updated_at_epoch_millis") val updatedAtEpochMillis: Long,
+    @ColumnInfo(name = "phone_number", defaultValue = "''") val phoneNumber: String = "",
+    @ColumnInfo(name = "is_settled", defaultValue = "0") val isSettled: Boolean = false
 ) {
-    val outstandingPaise: Long get() = principalPaise - paidPaise
+    val outstandingPaise: Long get() = if (isSettled) 0L else (principalPaise - paidPaise).coerceAtLeast(0L)
 }

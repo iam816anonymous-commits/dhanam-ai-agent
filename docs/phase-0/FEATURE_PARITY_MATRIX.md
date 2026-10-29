@@ -59,7 +59,7 @@ A feature is complete only when (1) it exists in the parity matrix, (2) the UI/a
 | 2C Budgets/safe-to-spend | Overall monthly budget and deterministic daily allowance implemented | Per-category budget editor and edge-case UI review |
 | 2D Khata/repayments | Local loans, direction, due date, outstanding balance and transactional repayments implemented | Edit workflow and visible repayment history |
 | 2E Import/export/reports | CSV export/import with preview/validation and monthly PDF export implemented | Legacy-data import, device URI-provider checks and larger-file tests |
-| 2F Reminders/security/settings/migration | Budget and due-date reminders, optional PIN app lock and persisted reminder preferences implemented | Biometrics, encrypted-database protection, full settings coverage and migration from the separate legacy app database remain |
+| 2F Reminders/security/settings/migration | Budget/due-date reminders, optional PIN lock, legacy PIN continuity and previewed legacy DB migration implemented | Biometrics, encrypted-database protection, remaining preferences and device verification remain |
 
 This status snapshot describes code coverage, not a release-complete Phase 2. See the feature research log for sources and CI evidence.
 
@@ -67,3 +67,6 @@ This status snapshot describes code coverage, not a release-complete Phase 2. Se
 ### Phase 2F implementation note
 
 The app uses WorkManager for deferrable periodic reminders; Android/OEM battery policies can delay execution, so this is not an exact-time alarm. On Android 13+, notification permission is requested only when a user enables reminders. The optional PIN gate is a privacy barrier for casual access, not database encryption. Legacy data migration remains incomplete.
+
+
+Legacy migration reads `dhanam_expense_database` read-only and only runs after preview/explicit confirmation. It imports expenses, loans, and category budgets in one transaction, with explicit HALF_UP conversion of legacy Double rupees to paise. It does not delete the old database. See the feature research log for source commit and limitations.

@@ -18,5 +18,7 @@ data class ExpenseEntity(
     @ColumnInfo(name = "occurred_on_epoch_day") val occurredOnEpochDay: Long,
     val note: String,
     @ColumnInfo(name = "created_at_epoch_millis") val createdAtEpochMillis: Long,
-    @ColumnInfo(name = "updated_at_epoch_millis") val updatedAtEpochMillis: Long
+    @ColumnInfo(name = "updated_at_epoch_millis") val updatedAtEpochMillis: Long,
+    @ColumnInfo(name = "payment_mode", defaultValue = "'Unknown'") val paymentMode: String = "Unknown",
+    @ColumnInfo(name = "detected_language", defaultValue = "'en'") val detectedLanguage: String = "en"
 )

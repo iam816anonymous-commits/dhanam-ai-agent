@@ -28,6 +28,7 @@ interface FinanceDao {
     suspend fun findBudget(category: String, monthEpochDay: Long): BudgetEntity?
 
     @Insert suspend fun insertBudget(budget: BudgetEntity): Long
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertBudgetIfMissing(budget: BudgetEntity): Long
     @Update suspend fun updateBudget(budget: BudgetEntity): Int
 
     @Transaction
@@ -57,6 +58,16 @@ interface FinanceDao {
     @Insert suspend fun insertLoan(loan: KhataLoanEntity): Long
     @Update suspend fun updateLoan(loan: KhataLoanEntity): Int
 
+    @Query("""SELECT * FROM khata_loans
+        WHERE person_name = :personName AND direction = :direction
+        AND principal_paise = :principalPaise AND paid_paise = :paidPaise
+        AND opened_on_epoch_day = :openedOnEpochDay
+        AND ((due_on_epoch_day IS NULL AND :dueOnEpochDay IS NULL) OR due_on_epoch_day = :dueOnEpochDay)
+        AND note = :note AND phone_number = :phoneNumber AND is_settled = :isSettled
+        LIMIT 1""")
+    suspend fun findMatchingLoan(personName: String, direction: String, principalPaise: Long, paidPaise: Long,
+        openedOnEpochDay: Long, dueOnEpochDay: Long?, note: String, phoneNumber: String, isSettled: Boolean): KhataLoanEntity?
+
     @Query("SELECT * FROM khata_repayments WHERE loan_id = :loanId ORDER BY paid_on_epoch_day DESC, id DESC")
     fun observeRepayments(loanId: Long): Flow<List<RepaymentEntity>>
 
@@ -66,7 +77,11 @@ interface FinanceDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertRepayment(repayment: RepaymentEntity): Long
 
-    @Query("UPDATE khata_loans SET paid_paise = paid_paise + :amountPaise, updated_at_epoch_millis = :now WHERE id = :loanId AND principal_paise - paid_paise >= :amountPaise")
+    @Query("""UPDATE khata_loans
+        SET paid_paise = paid_paise + :amountPaise,
+            is_settled = CASE WHEN principal_paise - paid_paise = :amountPaise THEN 1 ELSE is_settled END,
+            updated_at_epoch_millis = :now
+        WHERE id = :loanId AND is_settled = 0 AND principal_paise - paid_paise >= :amountPaise""")
     suspend fun incrementPaid(loanId: Long, amountPaise: Long, now: Long): Int
 
     @Transaction
@@ -90,22 +105,48 @@ interface FinanceDao {
     @Query("SELECT * FROM khata_repayments ORDER BY paid_on_epoch_day DESC, id DESC")
     suspend fun allRepayments(): List<RepaymentEntity>
 
-    @Insert suspend fun insertExpenses(expenses: List<ExpenseEntity>): List<Long>
-
     @Transaction
     suspend fun importExpensesSkippingExactDuplicates(expenses: List<ExpenseEntity>): Int {
         var insertedCount = 0
         for (expense in expenses) {
-            val existing = findExactExpense(
-                expense.title, expense.amountPaise, expense.category,
-                expense.occurredOnEpochDay, expense.note
-            )
+            val existing = findExactExpense(expense.title, expense.amountPaise, expense.category,
+                expense.occurredOnEpochDay, expense.note)
             if (existing == null) {
                 insertExpense(expense)
                 insertedCount++
             }
         }
         return insertedCount
+    }
+
+    @Transaction
+    suspend fun importLegacyRecords(
+        expenses: List<ExpenseEntity>,
+        loans: List<KhataLoanEntity>,
+        budgets: List<BudgetEntity>
+    ): LegacyImportCounts {
+        var expenseCount = 0
+        var loanCount = 0
+        var budgetCount = 0
+        for (expense in expenses) {
+            if (findExactExpense(expense.title, expense.amountPaise, expense.category,
+                    expense.occurredOnEpochDay, expense.note) == null) {
+                insertExpense(expense)
+                expenseCount++
+            }
+        }
+        for (loan in loans) {
+            if (findMatchingLoan(loan.personName, loan.direction, loan.principalPaise, loan.paidPaise,
+                    loan.openedOnEpochDay, loan.dueOnEpochDay, loan.note, loan.phoneNumber, loan.isSettled) == null) {
+                insertLoan(loan)
+                loanCount++
+            }
+        }
+        for (budget in budgets) {
+            if (findBudget(budget.category, budget.monthEpochDay) == null &&
+                insertBudgetIfMissing(budget) != -1L) budgetCount++
+        }
+        return LegacyImportCounts(expenseCount, loanCount, budgetCount)
     }
 
     @Query("SELECT * FROM expenses WHERE title = :title AND amount_paise = :amountPaise AND category = :category AND occurred_on_epoch_day = :dateEpochDay AND note = :note LIMIT 1")

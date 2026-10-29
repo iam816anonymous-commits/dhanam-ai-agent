@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [ExpenseEntity::class, BudgetEntity::class, KhataLoanEntity::class, RepaymentEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class FinanceDatabase : RoomDatabase() {
@@ -19,7 +19,7 @@ abstract class FinanceDatabase : RoomDatabase() {
     companion object {
         const val DATABASE_NAME = "dhanam_finance.db"
 
-        /** Additive migration: existing expenses are preserved; no destructive fallback is configured. */
+        /** Additive migration: existing finance records are preserved; no destructive fallback. */
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""CREATE TABLE IF NOT EXISTS budgets (
@@ -59,6 +59,16 @@ abstract class FinanceDatabase : RoomDatabase() {
             }
         }
 
+        /** Preserve v2 target data while adding metadata needed for legacy continuity. */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE expenses ADD COLUMN payment_mode TEXT NOT NULL DEFAULT 'Unknown'")
+                db.execSQL("ALTER TABLE expenses ADD COLUMN detected_language TEXT NOT NULL DEFAULT 'en'")
+                db.execSQL("ALTER TABLE khata_loans ADD COLUMN phone_number TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE khata_loans ADD COLUMN is_settled INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         @Volatile private var instance: FinanceDatabase? = null
 
         fun getInstance(context: Context): FinanceDatabase =
@@ -67,7 +77,7 @@ abstract class FinanceDatabase : RoomDatabase() {
                     context.applicationContext,
                     FinanceDatabase::class.java,
                     DATABASE_NAME
-                ).addMigrations(MIGRATION_1_2).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
             }
     }
 }

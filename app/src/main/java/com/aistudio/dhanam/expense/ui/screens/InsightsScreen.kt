@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -28,11 +29,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aistudio.dhanam.expense.data.FinanceDatabase
 import com.aistudio.dhanam.expense.data.FinancePdfReportExporter
+import com.aistudio.dhanam.expense.domain.ExpenseInputValidator
 import com.aistudio.dhanam.expense.domain.FinanceCalculations
 import com.aistudio.dhanam.expense.domain.MoneyParser
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.rememberCoroutineScope
 import java.time.LocalDate
 import java.time.YearMonth
@@ -52,13 +55,18 @@ fun InsightsScreen() {
         mutableStateOf(budgets.firstOrNull { it.category == FinanceCalculations.OVERALL_BUDGET_CATEGORY }
             ?.let { "%d.%02d".format(it.amountPaise / 100, it.amountPaise % 100) } ?: "")
     }
+    var selectedBudgetCategory by remember { mutableStateOf(ExpenseInputValidator.categories.first()) }
+    var categoryBudgetAmount by remember(month, budgets, selectedBudgetCategory) {
+        mutableStateOf(budgets.firstOrNull { it.category == selectedBudgetCategory }
+            ?.let { "%d.%02d".format(it.amountPaise / 100, it.amountPaise % 100) } ?: "")
+    }
     var message by remember { mutableStateOf<String?>(null) }
     val pdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
         if (uri != null) {
             val snapshot = summary
-            scope.launch(Dispatchers.IO) {
+            scope.launch {
                 try {
-                    FinancePdfReportExporter.write(context.contentResolver, uri, snapshot)
+                    withContext(Dispatchers.IO) { FinancePdfReportExporter.write(context.contentResolver, uri, snapshot) }
                     message = "PDF report saved."
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { message = e.message ?: "PDF export failed." }
@@ -82,7 +90,9 @@ fun InsightsScreen() {
             (if (it < 0) "Over budget by " else "") + MoneyParser.formatPaise(kotlin.math.abs(it))
         } ?: "Not available", "Based only on expenses saved on this device.")
         SummaryCard("Safe to spend today", summary.safeToSpendTodayPaise?.let(MoneyParser::formatPaise) ?: "Not available",
-            "Remaining budget divided across today and the remaining days of this month.")
+            if (month == YearMonth.now()) "Remaining budget divided across today and the remaining days of this month."
+            else "Available only for the current month with a positive overall budget.")
+
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Overall monthly budget", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -98,17 +108,48 @@ fun InsightsScreen() {
                             try {
                                 db.financeDao().saveBudget(FinanceCalculations.OVERALL_BUDGET_CATEGORY,
                                     month.atDay(1).toEpochDay(), amount, System.currentTimeMillis())
-                                message = "Budget saved on this device."
+                                message = "Overall budget saved on this device."
                             } catch (e: Exception) { message = e.message ?: "Could not save budget." }
                         }
                     } catch (e: Exception) { message = e.message ?: "Enter a valid budget." }
-                }, modifier = Modifier.fillMaxWidth()) { Text("Save budget") }
-                Button(onClick = { pdfLauncher.launch("dhanam-report-${month}.pdf") }, modifier = Modifier.fillMaxWidth()) {
+                }, modifier = Modifier.fillMaxWidth()) { Text("Save overall budget") }
+
+                Text("Category budgets", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    ExpenseInputValidator.categories.chunked(3).forEach { group ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            group.forEach { category ->
+                                FilterChip(selected = selectedBudgetCategory == category,
+                                    onClick = { selectedBudgetCategory = category },
+                                    label = { Text(category) })
+                            }
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = categoryBudgetAmount, onValueChange = { categoryBudgetAmount = it },
+                    label = { Text("Monthly limit for $selectedBudgetCategory (₹)") },
+                    placeholder = { Text("e.g. 2500.00") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+                )
+                Button(onClick = {
+                    try {
+                        val amount = MoneyParser.parseRupeesToPaise(categoryBudgetAmount)
+                        scope.launch {
+                            try {
+                                db.financeDao().saveBudget(selectedBudgetCategory, month.atDay(1).toEpochDay(),
+                                    amount, System.currentTimeMillis())
+                                message = "$selectedBudgetCategory budget saved."
+                            } catch (e: Exception) { message = e.message ?: "Could not save category budget." }
+                        }
+                    } catch (e: Exception) { message = e.message ?: "Enter a valid category budget." }
+                }, modifier = Modifier.fillMaxWidth()) { Text("Save category budget") }
+                if (message != null) Text(message.orEmpty(), color = MaterialTheme.colorScheme.primary)
+                Button(onClick = { pdfLauncher.launch("dhanam-report-$month.pdf") }, modifier = Modifier.fillMaxWidth()) {
                     Text("Export monthly report as PDF")
                 }
-                if (message != null) Text(message.orEmpty(), color = MaterialTheme.colorScheme.primary)
             }
         }
+
         Text("Category spending", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         if (summary.categoryTotalsPaise.isEmpty()) {
             Text("No expenses recorded in this month.", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -116,6 +157,34 @@ fun InsightsScreen() {
             summary.categoryTotalsPaise.forEach { (category, total) ->
                 SummaryCard(category, MoneyParser.formatPaise(total),
                     if (summary.totalSpentPaise > 0) "${total * 100 / summary.totalSpentPaise}% of recorded spending" else "No spending")
+            }
+        }
+
+        Text("Budget status by category", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        val categoryBudgets = budgets.filter { it.category != FinanceCalculations.OVERALL_BUDGET_CATEGORY }
+        if (categoryBudgets.isEmpty()) {
+            Text("No category budgets set for this month.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            categoryBudgets.forEach { budget ->
+                val spent = summary.categoryTotalsPaise[budget.category] ?: 0L
+                val remaining = budget.amountPaise - spent
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text(budget.category, fontWeight = FontWeight.SemiBold)
+                        Text("Limit: ${MoneyParser.formatPaise(budget.amountPaise)} · Spent: ${MoneyParser.formatPaise(spent)}")
+                        Text(if (remaining < 0) "Over limit by ${MoneyParser.formatPaise(kotlin.math.abs(remaining))}"
+                            else "Remaining: ${MoneyParser.formatPaise(remaining)}",
+                            color = if (remaining < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+                        TextButton(onClick = {
+                            scope.launch {
+                                try {
+                                    db.financeDao().deleteBudgetById(budget.id)
+                                    message = "${budget.category} budget removed."
+                                } catch (e: Exception) { message = e.message ?: "Could not remove budget." }
+                            }
+                        }) { Text("Remove budget") }
+                    }
+                }
             }
         }
     }

@@ -32,7 +32,7 @@ object FinanceCalculations {
         val overall = budgets.firstOrNull { it.category == OVERALL_BUDGET_CATEGORY && it.monthEpochDay == start }?.amountPaise
         val remaining = overall?.let { it - spent }
         val daysLeft = month.lengthOfMonth() - today.dayOfMonth + 1
-        val safe = remaining?.takeIf { it > 0 }?.let { it / daysLeft.coerceAtLeast(1) }
+        val safe = if (month == YearMonth.from(today)) remaining?.takeIf { it > 0 }?.let { it / daysLeft.coerceAtLeast(1) } else null
         return MonthlyFinanceSummary(month, spent, monthExpenses.size, categoryTotals, overall, remaining, safe)
     }
 

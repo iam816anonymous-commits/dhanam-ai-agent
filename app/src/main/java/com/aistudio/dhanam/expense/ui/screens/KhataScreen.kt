@@ -19,6 +19,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -77,29 +78,18 @@ fun KhataScreen(viewModel: KhataViewModel = viewModel()) {
         Text("Your records (${loans.size})", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         if (loans.isEmpty()) Text("No Khata records yet. Add a real record above.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         loans.forEach { loan ->
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(loan.personName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text(if (loan.direction == KhataValidator.LENT) "You lent" else "You borrowed",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Principal: ${MoneyParser.formatPaise(loan.principalPaise)}")
-                    Text("Paid: ${MoneyParser.formatPaise(loan.paidPaise)}")
-                    Text("Outstanding: ${MoneyParser.formatPaise(loan.outstandingPaise)}",
-                        style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                    Text("Started ${LocalDate.ofEpochDay(loan.openedOnEpochDay)}" +
-                        (loan.dueOnEpochDay?.let { " · Due ${LocalDate.ofEpochDay(it)}" } ?: ""),
-                        style = MaterialTheme.typography.bodySmall)
-                    if (loan.note.isNotBlank()) Text(loan.note, style = MaterialTheme.typography.bodySmall)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = {
-                            repaymentFor = loan
-                            repaymentAmount = ""
-                            repaymentDate = LocalDate.now().toString()
-                            repaymentNote = ""
-                        }, enabled = loan.outstandingPaise > 0) { Text("Record repayment") }
-                        TextButton(onClick = { deleteFor = loan }) { Text("Delete") }
-                    }
-                }
+            key(loan.id) {
+                KhataLoanCard(
+                    loan = loan,
+                    viewModel = viewModel,
+                    onRepay = {
+                        repaymentFor = loan
+                        repaymentAmount = ""
+                        repaymentDate = LocalDate.now().toString()
+                        repaymentNote = ""
+                    },
+                    onDelete = { deleteFor = loan }
+                )
             }
         }
     }
@@ -131,5 +121,45 @@ fun KhataScreen(viewModel: KhataViewModel = viewModel()) {
             confirmButton = { TextButton(onClick = { viewModel.deleteLoan(loan.id); deleteFor = null }) { Text("Delete") } },
             dismissButton = { TextButton(onClick = { deleteFor = null }) { Text("Cancel") } }
         )
+    }
+}
+
+
+@Composable
+private fun KhataLoanCard(
+    loan: KhataLoanEntity,
+    viewModel: KhataViewModel,
+    onRepay: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val repayments by remember(loan.id) { viewModel.repaymentsFor(loan.id) }.collectAsState(initial = emptyList())
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(loan.personName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(if (loan.direction == KhataValidator.LENT) "You lent" else "You borrowed",
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Principal: ${MoneyParser.formatPaise(loan.principalPaise)}")
+            Text("Paid: ${MoneyParser.formatPaise(loan.paidPaise)}")
+            Text("Outstanding: ${MoneyParser.formatPaise(loan.outstandingPaise)}",
+                style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+            Text("Started ${LocalDate.ofEpochDay(loan.openedOnEpochDay)}" +
+                (loan.dueOnEpochDay?.let { " · Due ${LocalDate.ofEpochDay(it)}" } ?: ""),
+                style = MaterialTheme.typography.bodySmall)
+            if (loan.phoneNumber.isNotBlank()) Text("Phone: ${loan.phoneNumber}", style = MaterialTheme.typography.bodySmall)
+            if (loan.note.isNotBlank()) Text(loan.note, style = MaterialTheme.typography.bodySmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onRepay, enabled = loan.outstandingPaise > 0) { Text("Record repayment") }
+                TextButton(onClick = onDelete) { Text("Delete") }
+            }
+            Text("Repayment history (${repayments.size})", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            if (repayments.isEmpty()) Text("No repayments recorded yet.", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            repayments.take(10).forEach { repayment ->
+                Text("${LocalDate.ofEpochDay(repayment.paidOnEpochDay)} · ${MoneyParser.formatPaise(repayment.amountPaise)}" +
+                    (repayment.note.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""),
+                    style = MaterialTheme.typography.bodySmall)
+            }
+            if (repayments.size > 10) Text("Showing the latest 10 repayments.", style = MaterialTheme.typography.bodySmall)
+        }
     }
 }
