@@ -6,8 +6,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.aistudio.dhanam.expense.ui.components.FinanceDataSection
 import com.aistudio.dhanam.expense.ui.components.ModelManagerSection
 import com.aistudio.dhanam.expense.ui.theme.MutedText
 
@@ -26,21 +27,22 @@ fun SettingsScreen() {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("Settings", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("Privacy, application status and on-device AI", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Privacy, backups, reports and on-device AI", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         SettingsInfoCard(
             title = "Financial privacy",
-            detail = "Financial records remain in local app storage. The app does not upload transactions, balances, prompts, or account data."
+            detail = "Financial records are stored in the local Room database. CSV and PDF files are written only to a destination you explicitly choose. The app does not upload transaction data."
         )
+        FinanceDataSection()
         ModelManagerSection()
         SettingsInfoCard(
-            title = "Runtime status",
-            detail = "A verified model file and saved model preference do not mean inference is active. Runtime integration is blocked until dependency compatibility and memory/stability are tested on the target phone."
+            title = "Security status",
+            detail = "This build does not yet enforce a PIN, biometric gate, or background auto-lock. Do not treat the app as protected against someone who already has access to your unlocked phone."
         )
         SettingsInfoCard(
-            title = "Security",
-            detail = "PIN, biometrics, auto-lock and legacy-data migration remain separate audited work; no unreviewed security control is implied."
+            title = "Reminders",
+            detail = "Scheduled budget and Khata due-date notifications are not enabled in this build. No reminder is claimed to be scheduled."
         )
-        SettingsInfoCard(title = "Version", detail = "Dhanam AI 0.3.0 · Phase 3 model manager foundation")
+        SettingsInfoCard(title = "Version", detail = "Dhanam AI 0.4.0 · Phase 2 finance features in progress")
     }
 }
 

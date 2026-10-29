@@ -49,6 +49,14 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = viewModel()) {
     var note by remember { mutableStateOf("") }
     var editingId by remember { mutableStateOf<Long?>(null) }
     var pendingDelete by remember { mutableStateOf<ExpenseEntity?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf("All") }
+    val visibleExpenses = expenses.filter { expense ->
+        val query = searchQuery.trim()
+        (selectedCategory == "All" || expense.category == selectedCategory) &&
+            (query.isEmpty() || expense.title.contains(query, ignoreCase = true) ||
+                expense.note.contains(query, ignoreCase = true) || expense.category.contains(query, ignoreCase = true))
+    }
 
     fun resetForm() {
         title = ""
@@ -116,16 +124,27 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = viewModel()) {
             }
         }
 
-        Text("Transaction history (${expenses.size})", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-        if (expenses.isEmpty()) {
+        Text("Search and filter", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        OutlinedTextField(
+            value = searchQuery, onValueChange = { searchQuery = it },
+            label = { Text("Search description, note or category") }, singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            (listOf("All") + ExpenseInputValidator.categories).forEach { filter ->
+                FilterChip(selected = selectedCategory == filter, onClick = { selectedCategory = filter }, label = { Text(filter) })
+            }
+        }
+        Text("Transaction history (${visibleExpenses.size})", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        if (visibleExpenses.isEmpty()) {
             Text(
-                "No expenses yet. Add your first real transaction above.",
+                if (expenses.isEmpty()) "No expenses yet. Add your first real transaction above." else "No records match the current search or category filter.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                expenses.forEach { expense ->
+                visibleExpenses.forEach { expense ->
                     Card(Modifier.fillMaxWidth()) {
                         Row(
                             Modifier.fillMaxWidth().padding(12.dp),

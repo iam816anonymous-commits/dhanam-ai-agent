@@ -48,3 +48,17 @@ A feature is complete only when (1) it exists in the parity matrix, (2) the UI/a
 - Use transaction IDs, not titles or “last item” guesses, to target edits, deletes and repayments.
 - Every analytical answer is computed from actual local records and must state the period used. Missing data is not zero unless the domain explicitly defines it as zero.
 - Preserve original timestamps/dates and define timezone handling before date-range queries.
+
+
+## Target implementation snapshot (2026-10-29)
+
+| Feature | Current target status | Remaining acceptance work |
+|---|---|---|
+| 2A Expense CRUD | Implemented; prior CI passed | Device persistence/restart smoke test |
+| 2B Dashboard/search/filter | Monthly dashboard, category totals, text search and category filter implemented | Date-range filters, large-history query bounds and device checks |
+| 2C Budgets/safe-to-spend | Overall monthly budget and deterministic daily allowance implemented | Per-category budget editor and edge-case UI review |
+| 2D Khata/repayments | Local loans, direction, due date, outstanding balance and transactional repayments implemented | Edit workflow and visible repayment history |
+| 2E Import/export/reports | CSV export/import with preview/validation and monthly PDF export implemented | Legacy-data import, device URI-provider checks and larger-file tests |
+| 2F Reminders/security/settings/migration | Not complete | Notifications, app lock/biometrics, auto-lock, persisted preferences and legacy schema/data migration remain |
+
+This status snapshot describes code coverage, not a release-complete Phase 2. See the feature research log for sources and CI evidence.

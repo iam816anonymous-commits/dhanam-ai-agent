@@ -1,5 +1,7 @@
 package com.aistudio.dhanam.expense.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,8 +27,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aistudio.dhanam.expense.data.FinanceDatabase
+import com.aistudio.dhanam.expense.data.FinancePdfReportExporter
 import com.aistudio.dhanam.expense.domain.FinanceCalculations
 import com.aistudio.dhanam.expense.domain.MoneyParser
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import java.time.LocalDate
@@ -36,18 +41,30 @@ import java.time.YearMonth
 fun InsightsScreen() {
     val context = LocalContext.current
     val db = remember(context) { FinanceDatabase.getInstance(context) }
+    val scope = rememberCoroutineScope()
     var month by remember { mutableStateOf(YearMonth.now()) }
     val expenses by db.expenseDao().observeAll().collectAsState(initial = emptyList())
     val budgets by db.financeDao().observeBudgetsForMonth(month.atDay(1).toEpochDay()).collectAsState(initial = emptyList())
     val summary = remember(expenses, budgets, month) {
         FinanceCalculations.monthlySummary(expenses, budgets, month, LocalDate.now())
     }
-    val scope = rememberCoroutineScope()
     var budgetAmount by remember(month, budgets) {
         mutableStateOf(budgets.firstOrNull { it.category == FinanceCalculations.OVERALL_BUDGET_CATEGORY }
             ?.let { "%d.%02d".format(it.amountPaise / 100, it.amountPaise % 100) } ?: "")
     }
     var message by remember { mutableStateOf<String?>(null) }
+    val pdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+        if (uri != null) {
+            val snapshot = summary
+            scope.launch(Dispatchers.IO) {
+                try {
+                    FinancePdfReportExporter.write(context.contentResolver, uri, snapshot)
+                    message = "PDF report saved."
+                } catch (e: CancellationException) { throw e }
+                catch (e: Exception) { message = e.message ?: "PDF export failed." }
+            }
+        }
+    }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -86,6 +103,9 @@ fun InsightsScreen() {
                         }
                     } catch (e: Exception) { message = e.message ?: "Enter a valid budget." }
                 }, modifier = Modifier.fillMaxWidth()) { Text("Save budget") }
+                Button(onClick = { pdfLauncher.launch("dhanam-report-${month}.pdf") }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Export monthly report as PDF")
+                }
                 if (message != null) Text(message.orEmpty(), color = MaterialTheme.colorScheme.primary)
             }
         }
