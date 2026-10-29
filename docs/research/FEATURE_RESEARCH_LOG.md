@@ -68,5 +68,15 @@ See 2026-10-29-initial-source-review.md for exact commits, inspected paths, lice
 - F10: CSV parser validates the complete file before allowing import, supports quoted commas/quotes/newlines, limits files to 10 MiB and 50,000 rows, and skips exact existing expense duplicates. Any invalid row blocks commit.
 - F11: PDF report is generated on-device and written only to a URI chosen by the user.
 - Implementation files: FinanceDatabase.kt, FinanceDao.kt, BudgetEntity.kt, KhataLoanEntity.kt, RepaymentEntity.kt, FinanceCalculations.kt, KhataValidator.kt, FinanceCsvTransfer.kt, FinancePdfReportExporter.kt, InsightsScreen.kt, KhataViewModel.kt, KhataScreen.kt, FinanceDataSection.kt and ExpensesScreen.kt.
-- Tests added: monthly boundary/paise/budget tests and CSV quoted-field/invalid-row tests. CI result for commit b01e4a770a42186660a0951993558c7fcc5947a3: https://github.com/iam816anonymous-commits/dhanam-ai-agent/actions/runs/40870757231 (passed).
+- Tests added: monthly boundary/paise/budget tests and CSV quoted-field/invalid-row tests. The database/dashboard/Khata batch CI passed at https://github.com/iam816anonymous-commits/dhanam-ai-agent/actions/runs/40870757231. CSV/PDF export batch CI is running separately; do not treat the earlier run as validation for those files.
 - Physical-device validation: pending.
+
+
+## Phase 2F reminders and app-lock implementation — 2026-10-29
+
+- WorkManager official guidance: https://developer.android.com/develop/background-work/background-tasks/persistent and https://developer.android.com/develop/background-work/background-tasks/persistent/how-to/manage-work. Decision: one uniquely named periodic worker; check preferences at execution time, cancel work when both reminder types are disabled, and do not promise exact-time execution.
+- Android notification permission guidance: https://developer.android.com/develop/ui/views/notifications/notification-permission. Decision: request POST_NOTIFICATIONS on Android 13+ only after a user enables a reminder; permission denial leaves that reminder disabled.
+- Reminders: daily periodic worker checks actual local expenses/budget and Khata due dates. Notifications deliberately avoid exposing amounts or people’s names on the lock screen.
+- Security: optional 4–12 digit app PIN is stored as a salted PBKDF2-HMAC-SHA256 hash (150,000 iterations), compared in constant time, and temporarily rate-limited after repeated failures. The app locks when it leaves the foreground if a PIN is configured.
+- Security limitation: the PIN gate does not encrypt the SQLite database against device-level forensic access. Biometrics and an audited encrypted-database design are not claimed as implemented.
+- Legacy-data migration is not yet implemented: current Room 1→2 migration preserves the new target app’s version-1 expense rows; mapping data from the separate legacy app database still needs an explicit source-schema audit and migration/preview workflow.

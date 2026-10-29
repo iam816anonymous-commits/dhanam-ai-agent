@@ -16,6 +16,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.aistudio.dhanam.expense.security.PinSettingsSection
+import com.aistudio.dhanam.expense.reminders.FinanceReminderSection
 import com.aistudio.dhanam.expense.ui.components.FinanceDataSection
 import com.aistudio.dhanam.expense.ui.components.ModelManagerSection
 import com.aistudio.dhanam.expense.ui.theme.MutedText
@@ -34,13 +36,11 @@ fun SettingsScreen() {
         )
         FinanceDataSection()
         ModelManagerSection()
+        PinSettingsSection()
+        FinanceReminderSection()
         SettingsInfoCard(
-            title = "Security status",
-            detail = "This build does not yet enforce a PIN, biometric gate, or background auto-lock. Do not treat the app as protected against someone who already has access to your unlocked phone."
-        )
-        SettingsInfoCard(
-            title = "Reminders",
-            detail = "Scheduled budget and Khata due-date notifications are not enabled in this build. No reminder is claimed to be scheduled."
+            title = "Security notes",
+            detail = "The optional PIN gate locks the app when it leaves the foreground and stores a salted PBKDF2 hash. It does not encrypt the database against device-level forensic access; use your device screen lock as well."
         )
         SettingsInfoCard(title = "Version", detail = "Dhanam AI 0.4.0 · Phase 2 finance features in progress")
     }
