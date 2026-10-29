@@ -70,7 +70,7 @@ class ModelDownloader(private val context: Context) {
             try {
                 Files.move(partial.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
             } catch (_: Exception) {
-                check(partial.renameTo(destination)) { "Could not safely finalize the verified model file." }
+                Files.move(partial.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
             }
             destination
         } catch (error: Throwable) {

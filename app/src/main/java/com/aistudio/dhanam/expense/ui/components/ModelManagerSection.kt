@@ -21,13 +21,15 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aistudio.dhanam.expense.model.ModelCatalog
 import com.aistudio.dhanam.expense.model.ModelManagerViewModel
+import com.aistudio.dhanam.expense.model.LocalInferenceViewModel
 import java.util.Locale
 
 @Composable
-fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel()) {
+fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenceViewModel: LocalInferenceViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
     val model = ModelCatalog.models.first()
     val eligibility = state.eligibility
+    val inferenceState by inferenceViewModel.state.collectAsState()
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Local AI model", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -68,7 +70,7 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel()) {
                 if (state.isVerified) {
                     Text("Verified model file is installed.", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
                     if (state.preferredModelId == model.id) {
-                        Text("Saved as preferred model (not loaded into a runtime).", style = MaterialTheme.typography.bodySmall)
+                        Text("Saved as preferred model.", style = MaterialTheme.typography.bodySmall)
                     }
                 }
                 state.message?.let {
@@ -82,15 +84,21 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel()) {
                         OutlinedButton(onClick = viewModel::refresh) { Text("Recheck") }
                     } else {
                         Button(onClick = viewModel::setPreferred) { Text("Set preferred") }
-                        OutlinedButton(onClick = viewModel::deleteModel) { Text("Remove") }
+                        OutlinedButton(onClick = viewModel::deleteModel, enabled = !inferenceState.isReady && !inferenceState.isLoading && !inferenceState.isGenerating) { Text("Remove") }
                     }
                 }
                 Text(
-                    "Inference is not activated in this phase. Runtime integration and a real-device memory/stability test are required before this model can power the agent.",
+                    "LiteRT-LM CPU inference is available below. GPU/NPU acceleration is not enabled until separately qualified.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+        if (state.isVerified) {
+            LocalInferenceSection(
+                viewModel = inferenceViewModel,
+                isPreferred = state.preferredModelId == model.id
+            )
         }
     }
 }

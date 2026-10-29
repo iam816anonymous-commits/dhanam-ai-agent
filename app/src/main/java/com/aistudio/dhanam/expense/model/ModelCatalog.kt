@@ -53,6 +53,20 @@ object ModelCatalog {
         return DeviceEligibility(reasons.isEmpty(), memory.totalMem, memory.availMem, freeStorage, reasons)
     }
 
+    /** Recheck load-time memory and cache headroom after the model has already been downloaded. */
+    fun runtimeEligibility(context: Context, model: ModelSpec): DeviceEligibility {
+        val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val memory = ActivityManager.MemoryInfo()
+        manager.getMemoryInfo(memory)
+        val freeStorage = StatFs(context.filesDir.absolutePath).availableBytes
+        val reasons = buildList {
+            if (memory.totalMem < model.minTotalRamBytes) add("Device RAM is below the model's minimum total-memory requirement.")
+            if (memory.availMem < model.minAvailableRamBytes) add("Currently available RAM is below the safe inference threshold. Close other apps and recheck.")
+            if (freeStorage < 256L * MIB) add("At least 256 MiB of free app storage is required for runtime cache and temporary files.")
+        }
+        return DeviceEligibility(reasons.isEmpty(), memory.totalMem, memory.availMem, freeStorage, reasons)
+    }
+
     fun modelFile(context: Context, model: ModelSpec): File =
         File(File(context.filesDir, "models"), model.fileName)
 

@@ -44,7 +44,7 @@ fun SettingsScreen() {
             title = "Security notes",
             detail = "The optional PIN gate locks the app when it leaves the foreground and stores a salted PBKDF2 hash. It does not encrypt the database against device-level forensic access; use your device screen lock as well."
         )
-        SettingsInfoCard(title = "Version", detail = "Dhanam AI 0.6.0 · Phase 2 finance features in progress")
+        SettingsInfoCard(title = "Version", detail = "Dhanam AI 0.7.0 · Local model inference preview")
     }
 }
 

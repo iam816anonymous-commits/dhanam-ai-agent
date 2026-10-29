@@ -79,7 +79,7 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
                 check(verified) { "Final model verification failed." }
                 _state.value = _state.value.copy(
                     isDownloading = false, progress = 1f, isVerified = true,
-                    message = "Download complete. File size and SHA-256 verified; inference is not enabled yet."
+                    message = "Download complete. File size and SHA-256 verified. Set it as preferred, then load it for local inference."
                 )
                 refresh()
             } catch (cancelled: CancellationException) {
@@ -112,7 +112,7 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
             preferences.edit().putString(KEY_PREFERRED, model.id).apply()
             _state.value = _state.value.copy(
                 preferredModelId = model.id,
-                message = "Preferred model saved. Runtime activation awaits device validation."
+                message = "Preferred model saved. Load it below to run a local inference test."
             )
         }
     }

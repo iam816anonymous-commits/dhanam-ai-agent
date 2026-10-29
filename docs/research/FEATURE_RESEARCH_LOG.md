@@ -15,7 +15,7 @@ This index records research and implementation evidence for each Dhanam feature 
 | F10 | CSV expense export/import implemented; CI/device evidence required | SAF picker, RFC-4180-style parser, validation preview, exact duplicate skipping, 10 MB/50k-row caps |
 | F11 | Monthly PDF report export implemented; CI/device evidence required | Generated locally from deterministic summary, saved only to user-selected URI |
 | F08–F09, F12–F20 | Pending | Insights beyond monthly totals, reminders, security lock/biometrics, migration of legacy data, and remaining preferences need dedicated work |
-| F21–F23 | Phase 3 model catalog/download implemented; runtime qualification pending | LiteRT-LM candidate; no runtime dependency until compatibility and target-device smoke tests pass |
+| F21–F23 | Model catalog/download and LiteRT-LM CPU inference code implemented; physical-device qualification pending | LiteRT-LM 0.16.1, Kotlin 2.2.21 / KSP 2.2.21-2.0.5; single-thread runtime ownership and prompt validation |
 | F24–F25 | Research pending per feature | Typed tools, policy, idempotency and read-back evidence required |
 | F26–F30 | Research/implementation pending per feature | Offline, migration, low-resource, privacy and CI evidence required |
 
@@ -98,3 +98,12 @@ See 2026-10-29-initial-source-review.md for exact commits, inspected paths, lice
 - Commit: https://github.com/iam816anonymous-commits/dhanam-ai-agent/commit/ee18b986872e2130bda9a8f1314452318ab452fe
 - CI run: https://github.com/iam816anonymous-commits/dhanam-ai-agent/actions/runs/40873923752 — **success** for unit tests, lint, debug APK assembly, APK existence verification and artifact upload.
 - This verifies the repository build/test pipeline, not runtime behavior on a physical Android device. The migration flow, notifications/Doze behavior, app lock across process death, and SAF providers still require a device smoke test.
+
+
+## Phase 3 runtime integration — 2026-10-29
+- Official LiteRT-LM Kotlin API and Android skill inspected: https://github.com/google-ai-edge/LiteRT-LM/blob/main/docs/api/kotlin/getting_started.md and https://developer.android.com/agents/skills/device-ai/litert/litert-lm/skill.
+- Compatibility decision: LiteRT-LM 0.17.x–0.18.x require Kotlin 2.3+ due Kotlin 2.4 metadata; 0.16.1 supports Kotlin 2.2+. This project stays on AGP 8.7.3 / Gradle 8.9 and upgrades Kotlin/Compose plugin to 2.2.21 with matching KSP 2.2.21-2.0.5.
+- Runtime uses CPU only for the first target qualification. A dedicated single-thread executor owns engine/conversation operations; initialization is off-main-thread; the model path is re-verified before loading; prompts are capped at 4,000 chars; stop, new-chat, and unload are wired.
+- The smoke-test chat is not connected to the finance database or write tools, and prompts/replies are not persisted or uploaded.
+- Automated validation: prompt validator unit tests and full Android CI to be recorded after the new commit.
+- Physical-device inference, thermal/memory profiling, cancellation behavior and model artifact load success remain unverified until installed on the target phone.
