@@ -21,10 +21,11 @@ import com.aistudio.dhanam.expense.reminders.FinanceReminderSection
 import com.aistudio.dhanam.expense.ui.components.FinanceDataSection
 import com.aistudio.dhanam.expense.ui.components.LegacyMigrationSection
 import com.aistudio.dhanam.expense.ui.components.ModelManagerSection
+import com.aistudio.dhanam.expense.model.LocalInferenceViewModel
 import com.aistudio.dhanam.expense.ui.theme.MutedText
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(inferenceViewModel: LocalInferenceViewModel) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -37,7 +38,7 @@ fun SettingsScreen() {
         )
         FinanceDataSection()
         LegacyMigrationSection()
-        ModelManagerSection()
+        ModelManagerSection(inferenceViewModel = inferenceViewModel)
         PinSettingsSection()
         FinanceReminderSection()
         SettingsInfoCard(

@@ -8,6 +8,7 @@ import com.aistudio.dhanam.expense.data.RepaymentEntity
 import com.aistudio.dhanam.expense.data.FinanceDatabase
 import com.aistudio.dhanam.expense.domain.MoneyParser
 import com.aistudio.dhanam.expense.domain.KhataValidator
+import com.aistudio.dhanam.expense.model.LocalInferenceViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,16 +29,47 @@ data class AgentState(
 class AgentViewModel(application: Application) : AndroidViewModel(application) {
     private val db = FinanceDatabase.getInstance(application)
     private val dao = db.financeDao()
+    private var localInference: LocalInferenceViewModel? = null
     private val _state = MutableStateFlow(AgentState())
     val state: StateFlow<AgentState> = _state.asStateFlow()
+
+    fun attachLocalInference(viewModel: LocalInferenceViewModel) {
+        localInference = viewModel
+    }
+
 
     fun submit(text: String) {
         val input = text.trim().take(1000)
         if (input.isEmpty() || _state.value.busy) return
+        val previousPending = _state.value.pendingAction
         _state.value = _state.value.copy(
             messages = _state.value.messages + AgentChatMessage(role = "user", text = input),
-            pendingAction = null, status = null, activity = "thinking"
+            status = null, activity = "thinking"
         )
+
+        if (input.lowercase() in setOf("cancel", "cancel that", "never mind", "nevermind", "stop", "discard")) {
+            _state.value = _state.value.copy(pendingAction = null, activity = "idle", status = "No changes were saved.")
+            appendAssistant("Cancelled. Nothing was changed.")
+            return
+        }
+
+        if (previousPending != null) {
+            val correction = AgentActionPlanner.applyCorrection(previousPending, input)
+            if (correction != null) {
+                _state.value = _state.value.copy(
+                    messages = _state.value.messages + AgentChatMessage(role = "assistant", text = correction.message),
+                    pendingAction = correction.action,
+                    activity = if (correction.action != null) "awaiting_confirmation" else "idle"
+                )
+                return
+            }
+            if (Regex("""(?i)^(actually|change that|correct that|instead|make it|set it|change the amount|change the category)\b""").containsMatchIn(input)) {
+                appendAssistant("I couldn't apply that correction safely. Please say, for example, “actually change that to 300”, “change category to transport”, or “change description to taxi”. The current draft has not been saved.")
+                _state.value = _state.value.copy(pendingAction = previousPending, activity = "awaiting_confirmation")
+                return
+            }
+        }
+
         val repayment = Regex("""(?i)^record repayment\s+([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s+from\s+(.+)$""").matchEntire(input)
         if (repayment != null) {
             viewModelScope.launch {
@@ -67,12 +99,40 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             }
             return
         }
+
         val result = AgentActionPlanner.parse(input)
-        _state.value = _state.value.copy(
-            messages = _state.value.messages + AgentChatMessage(role = "assistant", text = result.message),
-            pendingAction = result.action,
-            activity = if (result.action != null) "awaiting_confirmation" else "idle"
-        )
+        if (result.action != null || !result.needsClarification) {
+            _state.value = _state.value.copy(
+                messages = _state.value.messages + AgentChatMessage(role = "assistant", text = result.message),
+                pendingAction = result.action,
+                activity = if (result.action != null) "awaiting_confirmation" else "idle"
+            )
+            return
+        }
+
+        val inference = localInference
+        if (inference?.state?.value?.isReady == true) {
+            viewModelScope.launch {
+                try {
+                    val proposalText = inference.generateForAgent(AgentActionPlanner.modelPrompt(input))
+                    val proposal = AgentActionPlanner.parseModelProposal(proposalText)
+                    _state.value = _state.value.copy(
+                        messages = _state.value.messages + AgentChatMessage(role = "assistant", text = proposal.message),
+                        pendingAction = proposal.action,
+                        activity = if (proposal.action != null) "awaiting_confirmation" else "idle"
+                    )
+                } catch (error: Exception) {
+                    appendAssistant("I couldn't safely interpret that with the local model. No changes were made. Try a specific command or clarify the amount/category. ${error.message ?: ""}".trim())
+                    _state.value = _state.value.copy(pendingAction = null, activity = "idle")
+                }
+            }
+        } else {
+            _state.value = _state.value.copy(
+                messages = _state.value.messages + AgentChatMessage(role = "assistant", text = result.message + " For more flexible phrasing, load the verified on-device model in Settings; without it I use only the built-in command patterns."),
+                pendingAction = null,
+                activity = "idle"
+            )
+        }
     }
 
     fun cancelPending() {

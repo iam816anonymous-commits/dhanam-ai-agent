@@ -27,6 +27,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.aistudio.dhanam.expense.agent.AgentViewModel
+import com.aistudio.dhanam.expense.model.LocalInferenceViewModel
 import com.aistudio.dhanam.expense.ui.components.LivingAgentOverlay
 import com.aistudio.dhanam.expense.ui.screens.AgentScreen
 import com.aistudio.dhanam.expense.ui.screens.ExpensesScreen
@@ -37,6 +38,8 @@ import com.aistudio.dhanam.expense.ui.screens.SettingsScreen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DhanamApp(agentViewModel: AgentViewModel = viewModel()) {
+    val inferenceViewModel: LocalInferenceViewModel = viewModel()
+    agentViewModel.attachLocalInference(inferenceViewModel)
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
@@ -81,7 +84,7 @@ fun DhanamApp(agentViewModel: AgentViewModel = viewModel()) {
                 composable(AppDestination.EXPENSES.route) { ExpensesScreen() }
                 composable(AppDestination.KHATA.route) { KhataScreen() }
                 composable(AppDestination.INSIGHTS.route) { InsightsScreen() }
-                composable(AppDestination.SETTINGS.route) { SettingsScreen() }
+                composable(AppDestination.SETTINGS.route) { SettingsScreen(inferenceViewModel) }
             }
         }
         Box(Modifier.align(Alignment.BottomEnd).padding(end = 14.dp, bottom = 82.dp)) {
