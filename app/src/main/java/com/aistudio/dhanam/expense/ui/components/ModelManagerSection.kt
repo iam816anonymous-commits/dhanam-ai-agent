@@ -101,7 +101,15 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
                     if (state.isDownloading) {
                         OutlinedButton(onClick = viewModel::cancelDownload) { Text("Cancel") }
                     } else if (!state.isVerified) {
-                        Button(onClick = viewModel::download, enabled = eligibility?.allowed == true) { Text("Download model") }
+                        if (eligibility?.allowed == true) {
+                            Button(onClick = viewModel::download) { Text("Download model") }
+                        } else if (eligibility != null) {
+                            Text(
+                                "Download unavailable on this device. Resource checks must pass first.",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
                         OutlinedButton(onClick = viewModel::refresh) { Text("Recheck") }
                     } else {
                         Button(onClick = viewModel::setPreferred) { Text("Set preferred") }
