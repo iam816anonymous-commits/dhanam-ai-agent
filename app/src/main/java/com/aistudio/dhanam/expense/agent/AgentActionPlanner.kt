@@ -31,7 +31,9 @@ object AgentActionPlanner {
     )
 
     fun parse(text: String): PlannerResult {
-        val input = text.trim().replace(Regex("\s+"), " ")
+        // Kotlin regular-expression patterns containing backslashes must use a raw string
+        // or escape the backslash; raw strings keep this whitespace normalization readable.
+        val input = text.trim().replace(Regex("""\s+"""), " ")
         if (input.isEmpty()) return PlannerResult(message = "Tell me what you want to do.")
         val lower = input.lowercase()
         if (lower in setOf("help", "what can you do", "commands")) {
