@@ -3,7 +3,7 @@
 ## Phase 5 — Safe local finance actions
 
 Implemented foundation:
-- Deterministic command parsing for supported expense and monthly category-budget requests. Ambiguous/unrecognized requests do not create writes.
+- Deterministic command parsing for supported expense and monthly category-budget requests. Ambiguous or unrecognized requests do not create writes.
 - Repayment command requires an exact person name and exactly one open loan in the “I lent” direction; ambiguous matches are rejected.
 - Every write is staged as a preview and requires explicit confirmation. Dismiss/cancel writes nothing.
 - Amounts are parsed with the existing exact rupee-to-paise parser. Existing expense/category and budget validations are reused.
@@ -21,7 +21,7 @@ Current limitation: the first pass uses a conservative deterministic command par
 
 Implemented foundation:
 - In-memory chat transcript while the Agent screen's ViewModel remains alive.
-- Natural-ish phrasing for the three supported command families, help/examples, validation feedback and action confirmation/cancellation.
+- Conversational phrasing for the supported command families, help/examples, validation feedback and action confirmation/cancellation.
 - The transcript and pending action are not written to Room or uploaded.
 - A persistent in-app floating assistant orb animates/pulses and moves while indicating thinking, approval or execution status. Tapping it navigates to the Agent screen.
 
@@ -44,4 +44,4 @@ Release gates still required:
 
 ## Privacy and safety boundary
 
-The floating orb is an in-app Compose overlay; it does not request Android's system-wide overlay permission, draw over other apps, or use an AccessibilityService. Financial writes remain inside the app and require a user confirmation. No cloud API or network action is used by the command parser.
+The floating orb is an in-app Compose overlay; it does not request Android's system-wide overlay permission, draw over other apps, or use an AccessibilityService. Financial writes remain inside the app and require user confirmation. No cloud API or network action is used by the command parser.
