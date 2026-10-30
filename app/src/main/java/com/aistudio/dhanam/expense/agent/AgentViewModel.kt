@@ -336,8 +336,10 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         val snapshot = FinancialAnalysisEngine.analyze(expenses, budgets, loans, today)
         val monthStart = month.atDay(1).toEpochDay()
         val monthEnd = today.toEpochDay()
-        val allMonthExpenses = expenses.filter { it.occurredOnEpochDay in monthStart..monthEnd && it.amountPaise > 0 }
-        val monthExpenses = allMonthExpenses.filter { category == null || it.category.equals(category, ignoreCase = true) }
+        val monthExpenses = expenses.filter {
+            it.occurredOnEpochDay in monthStart..monthEnd && it.amountPaise > 0 &&
+                (category == null || it.category.equals(category, ignoreCase = true))
+        }
         val selectedExpenseTotalPaise = monthExpenses.fold(0L) { total, expense -> Math.addExact(total, expense.amountPaise) }
         val incomeTotalPaise = incomes.fold(0L) { total, record -> Math.addExact(total, record.amountPaise) }
         val lines = mutableListOf<String>()
