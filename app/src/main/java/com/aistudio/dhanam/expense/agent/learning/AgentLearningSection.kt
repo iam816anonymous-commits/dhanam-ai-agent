@@ -6,12 +6,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -44,6 +46,8 @@ fun AgentLearningSection() {
     val recommendationFeedback by db.financeDao().observeRecommendationFeedback().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     var skillActionMessage by remember { mutableStateOf<String?>(null) }
+    var confirmClearMemory by remember { mutableStateOf(false) }
+    var memoryClearMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(enabled) {
         if (enabled) NightlyAgentLearningScheduler.scheduleNext(context)
@@ -74,7 +78,7 @@ fun AgentLearningSection() {
                     )
                 }
                 Text(
-                    "Android may delay or skip background work because of Doze, battery restrictions or force-stop. Nightly work analyses local finance records and proposes tested exact-description skills. If the app's shared model runtime is already loaded in the same process, the intelligence and skill agents also use it sequentially. If it is unavailable, deterministic work still runs. No model weights are retrained and no skill is activated without your approval.",
+                    "Android may delay or skip background work because of Doze, battery restrictions or force-stop. Nightly work analyses local finance records and proposes tested exact-description skills. When the verified preferred model is compatible and resources/time permit, the worker loads it and runs all three agents sequentially through the same runtime. If it is unavailable, deterministic work still runs. No model weights are retrained and no skill is activated without your approval.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -264,5 +268,43 @@ fun AgentLearningSection() {
                 }
             }
         }
+        OutlinedButton(
+            onClick = { confirmClearMemory = true },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Clear agent memory and handoff history") }
+        if (memoryClearMessage != null) {
+            Text(memoryClearMessage.orEmpty(), color = MaterialTheme.colorScheme.primary)
+            TextButton(onClick = { memoryClearMessage = null }) { Text("Dismiss") }
+        }
+
+    }
+
+    if (confirmClearMemory) {
+        AlertDialog(
+            onDismissRequest = { confirmClearMemory = false },
+            title = { Text("Clear agent memory?") },
+            text = {
+                Text("This deletes the specialists' saved summaries and handoff history only. Expenses, income, budgets, Khata records, approved skills, recommendation feedback and daily learning reports are not deleted.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        try {
+                            db.financeDao().clearAgentMemoryAndHandoffs()
+                            memoryClearMessage = "Agent memories and handoff history cleared. Financial records and learning reports were preserved."
+                            confirmClearMemory = false
+                        } catch (error: CancellationException) {
+                            throw error
+                        } catch (error: Exception) {
+                            memoryClearMessage = error.message ?: "Could not clear agent memory."
+                            confirmClearMemory = false
+                        }
+                    }
+                }) { Text("Clear memory") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClearMemory = false }) { Text("Cancel") }
+            }
+        )
     }
 }
