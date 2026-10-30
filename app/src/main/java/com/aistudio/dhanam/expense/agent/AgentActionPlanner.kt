@@ -388,6 +388,33 @@ object AgentActionPlanner {
                         else -> null
                     }
                 }
+                is PlannedFinanceAction.AddIncome -> {
+                    val incomeCategory = IncomeInputValidator.categories.firstOrNull {
+                        Regex("""\\b${Regex.escape(it.lowercase())}\\b""").containsMatchIn(lower)
+                    } ?: action.category
+                    when {
+                        titleMatch != null -> {
+                            val title = titleMatch.groupValues[1].trim().trimEnd('.', '!', '?').take(80)
+                            val validated = IncomeInputValidator.validate(
+                                title, BigDecimal.valueOf(action.amountPaise, 2).toPlainString(),
+                                incomeCategory, action.date.toString(), action.note
+                            )
+                            PlannerResult(action.copy(title = validated.title, category = validated.category),
+                                "Updated the income description. Review it before saving.")
+                        }
+                        amountIntent && amountMatch != null -> {
+                            val validated = IncomeInputValidator.validate(
+                                action.title, amountMatch.groupValues[1], incomeCategory,
+                                action.date.toString(), action.note
+                            )
+                            PlannerResult(action.copy(amountPaise = validated.amountPaise, category = validated.category),
+                                "Updated the income amount. Review it before saving.")
+                        }
+                        incomeCategory != action.category && (lower.contains("category") || lower.contains("change") || lower.contains("actually")) ->
+                            PlannerResult(action.copy(category = incomeCategory), "Updated the income category. Review it before saving.")
+                        else -> null
+                    }
+                }
                 is PlannedFinanceAction.SetBudget -> when {
                     amountIntent && amountMatch != null -> PlannerResult(
                         action.copy(amountPaise = MoneyParser.parseRupeesToPaise(amountMatch.groupValues[1]), category = categoryWord?.let { categories[it] } ?: action.category),
