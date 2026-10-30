@@ -38,6 +38,8 @@ fun AgentLearningSection() {
     val db = remember(context) { FinanceDatabase.getInstance(context) }
     val reports by db.financeDao().observeAgentLearningReports().collectAsState(initial = emptyList())
     val skills by db.financeDao().observeAgentSkills().collectAsState(initial = emptyList())
+    val memories by db.financeDao().observeAgentMemories().collectAsState(initial = emptyList())
+    val messages by db.financeDao().observeAgentMessages().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(enabled) {
@@ -109,6 +111,55 @@ fun AgentLearningSection() {
         val activeCount = skills.count { it.status == "ACTIVE" }
         Text("Active approved skills: $activeCount", style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+        Text("Shared agent memory", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(
+            "Each specialist keeps a bounded local summary of its latest verified work. Memories are historical context, not a source of current financial balances.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (memories.isEmpty()) {
+            Text("Agent memories will appear after the first nightly run.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            memories.forEach { memory ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text(memory.agentRole.replace("_", " "), fontWeight = FontWeight.SemiBold)
+                        Text(memory.memoryKey.replace("_", " "), style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.secondary)
+                        Text(memory.memoryValue, style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            "Evidence date: ${LocalDate.ofEpochDay(memory.sourceReportEpochDay)} · Confidence: ${memory.confidencePercent}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
+        Text("Agent coordination history", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        if (messages.isEmpty()) {
+            Text("No inter-agent handoffs recorded yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            messages.take(12).forEach { message ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text("${message.fromAgent.replace("_", " ")} → ${message.toAgent.replace("_", " ")}",
+                            fontWeight = FontWeight.SemiBold)
+                        Text(message.messageType.replace("_", " "), style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.secondary)
+                        Text(message.summary, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
 
         Text("Agent learning history", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         if (reports.isEmpty()) {
