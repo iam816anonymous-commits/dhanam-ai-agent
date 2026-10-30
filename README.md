@@ -15,7 +15,8 @@ Implemented in the current codebase:
 - Finance Operations, Financial Intelligence and Skill Improvement specialist roles.
 - Nightly WorkManager scheduling between 01:00 and 06:00 local time, subject to Android battery/idle policies.
 - Versioned exact-description category skill proposals, leave-one-out validation and explicit user approval.
-- Local daily agent reports, role-isolated bounded memories, auditable inter-agent handoffs and skill review in Settings.\n- Income records are stored separately from expenses and included in monthly cash-flow summaries and full-ledger CSV export.
+- Local daily agent reports, role-isolated bounded memories, auditable inter-agent handoffs and skill review in Settings.
+- Income records are stored separately from expenses and included in monthly cash-flow summaries and full-ledger CSV export.
 
 This is an implementation milestone, not a claim of release completion. Physical-device qualification, remaining finance-parity items and extended migration/security tests are still required.
 
