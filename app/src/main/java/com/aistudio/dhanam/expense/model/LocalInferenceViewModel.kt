@@ -432,7 +432,8 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                             it.copy(isReady = false, status = "Phi-4 conversation reset failed. Reload the model.", error = error.message)
                         }
                     }
-                
+                }
+
                 _state.update { it.copy(isGenerating = false) }
             }
             }
