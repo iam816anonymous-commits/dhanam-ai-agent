@@ -307,7 +307,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             messages = listOf(
                 AgentChatMessage(
                     role = "assistant",
-                    text = "Hi, I'm Dhanam. I can prepare expenses, budgets, lending, borrowing and repayments. I'll show a preview and ask before saving."
+                    text = "Hi, I'm Dhanam. I can prepare expenses, income, budgets, lending, borrowing and repayments. I'll show a preview and ask before saving."
                 )
             ),
             pendingAction = null,
