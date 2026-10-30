@@ -69,7 +69,7 @@ fun AgentLearningSection() {
                     )
                 }
                 Text(
-                    "Android may delay or skip background work because of Doze, battery restrictions or force-stop. Nightly work analyses local finance records and proposes tested exact-description skills. It does not retrain model weights or activate skills without your approval.",
+                    "Android may delay or skip background work because of Doze, battery restrictions or force-stop. Nightly work analyses local finance records and proposes tested exact-description skills. If the app's shared model runtime is already loaded in the same process, the intelligence and skill agents also use it sequentially. If it is unavailable, deterministic work still runs. No model weights are retrained and no skill is activated without your approval.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
