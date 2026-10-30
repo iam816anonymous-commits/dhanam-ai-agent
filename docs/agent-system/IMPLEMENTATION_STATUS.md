@@ -22,7 +22,7 @@ The existing Compose UI and emerald/gold theme remain the application UI. Agent 
 - The Compose UI and WorkManager worker obtain the same model owner.
 - That owner creates one LiteRT-LM Engine and one `SharedAgentCoordinator`.
 - The coordinator serializes specialist inference, bounds queued requests, caps background inference duration and rejects background tasks outside the device-local 01:00–06:00 window.
-- The nightly worker runs Finance Operations, Financial Intelligence and Skill Improvement sequentially through that same coordinator. The interactive Finance Operations agent can use the same runtime during the day; read-only calculations and validated deterministic writes do not require model inference.
+- The nightly worker runs Finance Operations, Financial Intelligence and Skill Improvement sequentially through that same coordinator. **All model inference by all three agents is restricted to 01:00–06:00 local time.** During the day, Finance Operations still handles supported deterministic expense, income, budget, lending and repayment commands plus read-only spending/Khata analysis without invoking the model. The Settings model test console follows the same window.
 - The worker may load only the user's already-downloaded preferred model. The existing model resource-eligibility and file SHA-256 checks still run before Engine initialization. A worker-loaded model is unloaded afterward if it is idle; a model already loaded by the app is not unloaded by the worker.
 
 A user-facing request is not gated by the nightly window. Background agent tasks are.
