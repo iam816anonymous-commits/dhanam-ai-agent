@@ -136,6 +136,7 @@ abstract class FinanceDatabase : RoomDatabase() {
                 db.execSQL("""CREATE TABLE IF NOT EXISTS agent_messages (
                     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                     session_id TEXT NOT NULL,
+                    message_key TEXT NOT NULL,
                     from_agent TEXT NOT NULL,
                     to_agent TEXT NOT NULL,
                     message_type TEXT NOT NULL,
@@ -144,6 +145,7 @@ abstract class FinanceDatabase : RoomDatabase() {
                 )""")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_agent_messages_session_id_created_at_epoch_millis ON agent_messages(session_id, created_at_epoch_millis)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_agent_messages_created_at_epoch_millis ON agent_messages(created_at_epoch_millis)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_agent_messages_message_key ON agent_messages(message_key)")
             }
         }
 
