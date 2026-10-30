@@ -195,12 +195,15 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
                         Text("• $reason", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     }
                 }
-                if (state.isDownloading) {
+                if (state.isDownloading || (!state.isVerified && state.downloadedBytes > 0L)) {
                     LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth())
                     Text(
                         "${(state.progress * 100).toInt()}% · ${formatBytes(state.downloadedBytes)} / ${formatBytes(state.totalBytes)}",
                         style = MaterialTheme.typography.bodySmall
                     )
+                    if (!state.isDownloading && !state.isVerified) {
+                        Text("Saved progress is kept on this device. Tap Resume download to continue.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    }
                 }
                 if (state.isVerified) {
                     Text("Verified model file is installed.", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
@@ -215,7 +218,9 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
                         OutlinedButton(onClick = viewModel::cancelDownload) { Text("Cancel") }
                     } else if (!state.isVerified) {
                         if (eligibility?.allowed == true) {
-                            Button(onClick = viewModel::download) { Text("Download model") }
+                            Button(onClick = viewModel::download) {
+                                Text(if (state.downloadedBytes > 0L) "Resume download" else "Download model")
+                            }
                         } else if (eligibility != null) {
                             Text(
                                 "Download unavailable on this device. Resource checks must pass first.",
