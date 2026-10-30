@@ -15,7 +15,7 @@ Repository: `iam816anonymous-commits/dhanam-ai`
 | Budget management and spending insights | Present; deterministic calculations and monthly/category views | Present, with new ledger-backed analysis |
 | Lending/borrowing and repayment ledger | Present; person-level balances and repayment validation | Present; original contact/call actions are not yet restored in the new Khata UI |
 | PDF reports and CSV import/export | PDF export and finance CSV import/export are present | Core export/import present; verify old report options and historical migration on device |
-| Voice agent with English/Telugu preference | New Agent screen is currently text-entry only | Missing parity; restore offline-preferred voice input and language selection |
+| Voice agent with English/Telugu preference | Agent screen has English/Telugu voice capture. Android 12+ uses the dedicated on-device recognizer; Android 8–11 use the system recognizer with offline preference | Partial parity; offline preference is not a guarantee on Android 8.1. Test the Tecno handset and persist language selection |
 | Floating Jarvis overlay | Not present | Missing legacy UX; evaluate whether it belongs in a finance-only product |
 | Biometric unlock | New app has a PIN lock gate but no equivalent biometric prompt | Missing parity; add biometric unlock as an optional second factor, not a replacement for PIN recovery |
 | Repayment/budget notifications | New finance reminder section and WorkManager scheduling exist | Partial parity; verify exact schedules, notification channels and OEM behaviour |
