@@ -87,7 +87,8 @@ object FinancialAnalysisEngine {
                     title = "Review the increase in ${movement.category}",
                     evidence = "Recorded ${movement.currentMonthPaise} paise in the first ${today.dayOfMonth} day(s) of this month versus ${movement.previousMonthPaise} paise in the same number of days last month; increase ${movement.changePercent ?: 0}%.",
                     suggestedAction = "Review the largest transactions in this category and test a small, reversible reduction. Do not cut essential spending without checking the underlying need.",
-                    estimatedMonthlySavingsPaise = movement.changePaise / 10L,
+                    // An increase alone does not establish a safe reduction target or a savings amount.
+                    estimatedMonthlySavingsPaise = null,
                     confidence = InsightConfidence.MEDIUM
                 )
             }
