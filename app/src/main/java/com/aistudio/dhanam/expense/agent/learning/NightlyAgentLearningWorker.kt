@@ -250,7 +250,7 @@ class NightlyAgentLearningWorker(
                     fromAgent = "FINANCIAL_INTELLIGENCE",
                     toAgent = "SKILL_IMPROVEMENT",
                     messageType = "ANALYSIS_HANDOFF",
-                    summary = (deterministicIntelligence + "\\n" + modelInsightSummary).take(900),
+                    summary = (deterministicIntelligence + "\n" + modelInsightSummary).take(900),
                     createdAtEpochMillis = updatedAt + 1
                 )
             )
