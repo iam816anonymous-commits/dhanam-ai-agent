@@ -20,7 +20,6 @@ fun AgentSpeechFeedback(
     messageId: String?,
     message: String?,
     enabled: Boolean,
-    languageTag: String
 ) {
     val context = LocalContext.current
     var initialized by remember { mutableStateOf(false) }
@@ -41,7 +40,7 @@ fun AgentSpeechFeedback(
         }
     }
 
-    LaunchedEffect(messageId, message, enabled, languageTag, initialized) {
+    LaunchedEffect(messageId, message, enabled, initialized) {
         if (messageId == null || message.isNullOrBlank()) return@LaunchedEffect
         if (!enabled) {
             lastSpokenId = messageId
