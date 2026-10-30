@@ -17,17 +17,29 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class LocalInferenceDeviceSmokeTest {
     @Test(timeout = 180_000)
-    fun verifiedModelLoadsAndGeneratesWithinTwoGiBProcessPeak() {
+    fun verifiedInstalledModelLoadsAndGeneratesWithinItsDeclaredProcessPeakBudget() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val model = ModelCatalog.models.single()
-        val file = ModelCatalog.modelFile(context, model)
-        assumeTrue("Download the model in Dhanam Settings before running this device test.", file.isFile)
-        assumeTrue("The model file is not the reviewed artifact.", ModelFileVerifier.isValid(file, model.expectedBytes, model.sha256))
-        val eligibility = ModelCatalog.runtimeEligibility(context, model)
+
+        // The catalogue now intentionally contains multiple models. Select a model
+        // the user has already downloaded and verified instead of assuming one entry.
+        val model = ModelCatalog.models.firstOrNull { candidate ->
+            val candidateFile = ModelCatalog.modelFile(context, candidate)
+            candidateFile.isFile &&
+                ModelFileVerifier.isValid(candidateFile, candidate.expectedBytes, candidate.sha256)
+        }
+        assumeTrue("Download a catalogue model in Dhanam Settings before running this device test.", model != null)
+        val selectedModel = model ?: return
+        val file = ModelCatalog.modelFile(context, selectedModel)
+
+        val eligibility = ModelCatalog.runtimeEligibility(context, selectedModel)
         assumeTrue("The device does not meet runtime resource thresholds.", eligibility.allowed)
+
         val initialPeak = ProcessMemoryBudget.readPeakResidentBytes()
         assumeTrue("Cannot read this process's peak RSS; refusing to run the memory-qualified test.", initialPeak != null)
-        assumeTrue("Process has already reached the 2 GiB memory budget.", initialPeak!! < ModelCatalog.MAX_PROCESS_PEAK_BYTES)
+        assumeTrue(
+            "Process has already reached this model's declared peak-memory budget.",
+            initialPeak!! < selectedModel.maxProcessPeakBytes
+        )
 
         val engine = Engine(
             EngineConfig(
@@ -41,7 +53,10 @@ class LocalInferenceDeviceSmokeTest {
         try {
             val peakAfterLoad = ProcessMemoryBudget.readPeakResidentBytes()
             assertTrue("Could not measure process peak RSS after load.", peakAfterLoad != null)
-            assertTrue("Model load exceeded the 2 GiB process peak budget.", peakAfterLoad!! < ModelCatalog.MAX_PROCESS_PEAK_BYTES)
+            assertTrue(
+                "Model load exceeded its declared process peak budget.",
+                peakAfterLoad!! < selectedModel.maxProcessPeakBytes
+            )
             val conversation = engine.createConversation(
                 ConversationConfig(systemInstruction = Contents.of("Answer briefly and clearly."))
             )
@@ -50,7 +65,10 @@ class LocalInferenceDeviceSmokeTest {
                 assertTrue("The model returned an empty response.", reply.toString().isNotBlank())
                 val peakAfterGeneration = ProcessMemoryBudget.readPeakResidentBytes()
                 assertTrue("Could not measure process peak RSS after generation.", peakAfterGeneration != null)
-                assertTrue("Inference exceeded the 2 GiB process peak budget.", peakAfterGeneration!! < ModelCatalog.MAX_PROCESS_PEAK_BYTES)
+                assertTrue(
+                    "Inference exceeded its declared process peak budget.",
+                    peakAfterGeneration!! < selectedModel.maxProcessPeakBytes
+                )
             } finally {
                 conversation.close()
             }

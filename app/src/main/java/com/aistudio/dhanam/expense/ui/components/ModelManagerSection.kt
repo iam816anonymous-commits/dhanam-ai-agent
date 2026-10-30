@@ -40,6 +40,36 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        if (inferenceState.isReady || inferenceState.isLoading || inferenceState.isGenerating) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        if (inferenceState.isGenerating) "The current model is generating."
+                        else if (inferenceState.isLoading) "The current model is loading."
+                        else "A model is currently loaded into memory.",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "Only one LiteRT-LM model can be loaded at a time. Unload it before selecting another model; installed model files remain available.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    OutlinedButton(
+                        onClick = inferenceViewModel::unloadModel,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            if (inferenceState.isGenerating) "Stop and unload current model"
+                            else if (inferenceState.isLoading) "Cancel model load"
+                            else "Unload current model to switch"
+                        )
+                    }
+                }
+            }
+        }
         val deviceResources = state.eligibilityByModel.values.firstOrNull() ?: state.eligibility
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -111,7 +141,15 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
                             onClick = { viewModel.selectModel(candidate.id) },
                             enabled = canSwitchModel || candidate.id == model.id,
                             modifier = Modifier.fillMaxWidth()
-                        ) { Text(if (candidate.id == model.id) "Selected" else "Select model") }
+                        ) {
+                            Text(
+                                when {
+                                    candidate.id == model.id -> "Selected"
+                                    !canSwitchModel -> "Unload current model first"
+                                    else -> "Select model"
+                                }
+                            )
+                        }
                     }
                 }
             }
