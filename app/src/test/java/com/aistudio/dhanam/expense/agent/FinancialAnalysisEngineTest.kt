@@ -40,6 +40,7 @@ class FinancialAnalysisEngineTest {
         assertEquals(50_000L, result.monthToDateComparablePaise)
         assertEquals(20_000L, result.budgetOverruns["Food"])
         assertTrue(result.opportunities.any { it.id.startsWith("increase-food") })
+        assertEquals(null, result.opportunities.first { it.id.startsWith("increase-food") }.estimatedMonthlySavingsPaise)
         assertTrue(result.opportunities.any { it.id.startsWith("budget-overrun-food") })
     }
 
