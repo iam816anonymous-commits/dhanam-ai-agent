@@ -114,7 +114,9 @@ object AgentActionPlanner {
             "analyze", "analysis", "reduce my spending", "reduce expenses", "save money",
             "save on", "overspend", "spending pattern", "spending trend", "financial summary",
             "cash flow", "how much did i spend", "what are my biggest expenses",
-            "where is my money going", "how can i save", "how can i reduce"
+            "where is my money going", "how can i save", "how can i reduce",
+            "how much have i lent", "who owes me", "how much do i owe",
+            "khata summary", "lending summary", "outstanding loan"
         )
         if (queryPhrases.none { lower.contains(it) }) return null
         return PlannerResult(
