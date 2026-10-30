@@ -190,6 +190,11 @@ abstract class FinanceDatabase : RoomDatabase() {
         /** Prevent duplicate handoff rows when WorkManager retries a nightly session. */
         val MIGRATION_10_11 = object : Migration(10, 11) {
             override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""DELETE FROM agent_messages
+                    WHERE id NOT IN (
+                        SELECT MAX(id) FROM agent_messages
+                        GROUP BY session_id, from_agent, to_agent, message_type
+                    )""")
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_agent_messages_session_id_from_agent_to_agent_message_type ON agent_messages(session_id, from_agent, to_agent, message_type)")
             }
         }
