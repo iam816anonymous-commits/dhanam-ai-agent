@@ -134,8 +134,9 @@ class AgentActionPlannerTest {
             createdAtEpochMillis = 1L
         )
         val result = AgentActionPlanner.parseWithLearnedSkills("I spent 80 on Metro Card", listOf(skill))
-        assertEquals(null, result.action)
-        assertTrue(result.needsClarification)
+        val action = result.action as PlannedFinanceAction.AddExpense
+        assertEquals("Other", action.category)
+        assertEquals("Metro Card", action.title)
     }
 
     @Test fun learnedSkillDoesNotMatchInsideALongerWord() {
