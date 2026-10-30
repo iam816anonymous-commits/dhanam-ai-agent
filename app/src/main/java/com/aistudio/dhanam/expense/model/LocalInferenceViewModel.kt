@@ -83,9 +83,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
     suspend fun loadModelAndAwait(): Boolean {
         if (_state.value.isReady) return true
         if (!_state.value.isLoading) loadModel()
-        val started = _state.first { it.isLoading || it.isReady || it.error != null }
-        val completed = if (started.isLoading) _state.first { !it.isLoading } else started
-        return completed.isReady
+        return _state.first { it.isReady || (!it.isLoading && it.error != null) }.isReady
     }
 
     suspend fun unloadModelIfIdle(): Boolean = withContext(dispatcher) {
@@ -96,6 +94,9 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
 
     fun loadModel() {
         if (_state.value.isLoading || _state.value.isReady) return
+        // Publish the loading transition synchronously so concurrent UI/worker callers await
+        // the same in-flight load rather than observing a stale previous error.
+        _state.update { it.copy(isLoading = true, error = null, status = "Checking model integrity and device resources…") }
         loadJob = scope.launch {
             _state.update { it.copy(isLoading = true, error = null, status = "Checking model integrity and device resources…") }
             try {
