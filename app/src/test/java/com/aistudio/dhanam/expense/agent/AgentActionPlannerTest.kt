@@ -46,6 +46,7 @@ class AgentActionPlannerTest {
         val result = AgentActionPlanner.parse("How can I reduce my expenses?")
         assertTrue(result.action is PlannedFinanceAction.AnalyzeSpending)
         assertTrue(result.message.contains("read-only"))
+        assertTrue(AgentActionPlanner.parse("who owes me money?").action is PlannedFinanceAction.AnalyzeSpending)
         assertEquals(null, AgentActionPlanner.parse("I spent 500 on lunch").action?.takeIf {
             it is PlannedFinanceAction.AnalyzeSpending
         })
