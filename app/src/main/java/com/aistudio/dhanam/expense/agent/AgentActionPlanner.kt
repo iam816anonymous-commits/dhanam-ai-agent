@@ -397,6 +397,7 @@ object AgentActionPlanner {
             )
         return try {
             when (action) {
+                is PlannedFinanceAction.AnalyzeSpending -> null
                 is PlannedFinanceAction.AddExpense -> {
                     val category = categoryWord?.let { categories[it] } ?: action.category
                     when {
