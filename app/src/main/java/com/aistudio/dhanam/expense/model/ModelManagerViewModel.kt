@@ -14,6 +14,9 @@ import kotlinx.coroutines.withContext
 
 data class ModelManagerState(
     val eligibility: DeviceEligibility? = null,
+    val eligibilityByModel: Map<String, DeviceEligibility> = emptyMap(),
+    val runtimeEligibilityByModel: Map<String, DeviceEligibility> = emptyMap(),
+    val installedModelIds: Set<String> = emptySet(),
     val isDownloading: Boolean = false,
     val progress: Float = 0f,
     val downloadedBytes: Long = 0L,
@@ -45,9 +48,10 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
     fun selectModel(modelId: String) {
         if (downloadJob?.isActive == true) return
         if (ModelCatalog.models.none { it.id == modelId }) return
+        val selectedEligibility = _state.value.eligibilityByModel[modelId]
         _state.value = _state.value.copy(
             selectedModelId = modelId,
-            eligibility = null,
+            eligibility = selectedEligibility,
             isVerified = false,
             progress = 0f,
             downloadedBytes = 0L,
@@ -57,23 +61,41 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
         refresh()
     }
 
+    /** Refresh every catalogue entry so users can see why each model is or is not runnable. */
     fun refresh() {
-        val selected = model
+        val selectedId = _state.value.selectedModelId
         viewModelScope.launch {
-            val eligibility = withContext(Dispatchers.IO) { ModelCatalog.eligibility(getApplication(), selected) }
-            val file = ModelCatalog.modelFile(getApplication(), selected)
-            val verified = withContext(Dispatchers.IO) {
-                file.isFile && file.length() == selected.expectedBytes &&
-                    ModelFileVerifier.isValid(file, selected.expectedBytes, selected.sha256)
+            val snapshot = withContext(Dispatchers.IO) {
+                val downloadChecks = ModelCatalog.models.associate { candidate ->
+                    candidate.id to ModelCatalog.eligibility(getApplication(), candidate)
+                }
+                val runtimeChecks = ModelCatalog.models.associate { candidate ->
+                    candidate.id to ModelCatalog.runtimeEligibility(getApplication(), candidate)
+                }
+                val installed = ModelCatalog.models.filter { candidate ->
+                    val file = ModelCatalog.modelFile(getApplication(), candidate)
+                    file.isFile && file.length() == candidate.expectedBytes
+                }.map { it.id }.toSet()
+                val selected = ModelCatalog.models.first { it.id == selectedId }
+                val selectedFile = ModelCatalog.modelFile(getApplication(), selected)
+                val selectedVerified = ModelFileVerifier.isValid(
+                    selectedFile, selected.expectedBytes, selected.sha256
+                )
+                CatalogSnapshot(downloadChecks, runtimeChecks, installed, selectedVerified)
             }
-            if (_state.value.selectedModelId != selected.id) return@launch
+            if (_state.value.selectedModelId != selectedId) return@launch
             val preferred = preferences.getString(KEY_PREFERRED, null)
-            if (!verified && preferred == selected.id) preferences.edit().remove(KEY_PREFERRED).apply()
+            if (!snapshot.selectedVerified && preferred == selectedId) {
+                preferences.edit().remove(KEY_PREFERRED).apply()
+            }
             _state.value = _state.value.copy(
-                eligibility = eligibility,
-                isVerified = verified,
-                preferredModelId = preferred,
-                message = if (verified) "Model file is present and SHA-256 verified." else _state.value.message
+                eligibility = snapshot.downloadEligibility[selectedId],
+                eligibilityByModel = snapshot.downloadEligibility,
+                runtimeEligibilityByModel = snapshot.runtimeEligibility,
+                installedModelIds = snapshot.installedModelIds,
+                isVerified = snapshot.selectedVerified,
+                preferredModelId = if (snapshot.selectedVerified) preferred else null,
+                message = if (snapshot.selectedVerified) "Selected model is installed and SHA-256 verified." else _state.value.message
             )
         }
     }
@@ -81,17 +103,24 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
     fun download() {
         if (downloadJob?.isActive == true) return
         val selected = model
-        val eligibility = _state.value.eligibility ?: return
-        if (!eligibility.allowed) {
-            _state.value = _state.value.copy(message = "Download blocked because this device does not meet the resource checks.")
-            return
-        }
         downloadJob = viewModelScope.launch {
-            _state.value = _state.value.copy(
-                isDownloading = true, progress = 0f, downloadedBytes = 0L,
-                totalBytes = selected.expectedBytes, message = "Downloading from the pinned HTTPS source…"
-            )
             try {
+                val freshEligibility = withContext(Dispatchers.IO) {
+                    ModelCatalog.eligibility(getApplication(), selected)
+                }
+                _state.value = _state.value.copy(
+                    eligibility = freshEligibility,
+                    eligibilityByModel = _state.value.eligibilityByModel + (selected.id to freshEligibility)
+                )
+                check(freshEligibility.allowed) {
+                    freshEligibility.reasons.joinToString(" ").ifBlank {
+                        "Download blocked because this device does not meet the resource checks."
+                    }
+                }
+                _state.value = _state.value.copy(
+                    isDownloading = true, progress = 0f, downloadedBytes = 0L,
+                    totalBytes = selected.expectedBytes, message = "Downloading from the pinned HTTPS source…"
+                )
                 val file = downloader.download(selected) { received, total ->
                     _state.value = _state.value.copy(
                         downloadedBytes = received,
@@ -105,6 +134,7 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
                 check(verified) { "Final model verification failed." }
                 _state.value = _state.value.copy(
                     isDownloading = false, progress = 1f, isVerified = true,
+                    installedModelIds = _state.value.installedModelIds + selected.id,
                     message = "Download complete. File size and SHA-256 verified. Set it as preferred, then load it for local inference."
                 )
                 refresh()
@@ -139,6 +169,7 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
             preferences.edit().putString(KEY_PREFERRED, selected.id).apply()
             _state.value = _state.value.copy(
                 preferredModelId = selected.id,
+                isVerified = true,
                 message = "Preferred model saved. Load it below to run a local inference test."
             )
         }
@@ -152,6 +183,7 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
             if (preferences.getString(KEY_PREFERRED, null) == selected.id) preferences.edit().remove(KEY_PREFERRED).apply()
             _state.value = _state.value.copy(
                 isVerified = false,
+                installedModelIds = _state.value.installedModelIds - selected.id,
                 preferredModelId = preferences.getString(KEY_PREFERRED, null), progress = 0f,
                 downloadedBytes = 0L, totalBytes = 0L, message = "Model file removed from app storage."
             )
@@ -163,6 +195,13 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
         downloadJob?.cancel()
         super.onCleared()
     }
+
+    private data class CatalogSnapshot(
+        val downloadEligibility: Map<String, DeviceEligibility>,
+        val runtimeEligibility: Map<String, DeviceEligibility>,
+        val installedModelIds: Set<String>,
+        val selectedVerified: Boolean
+    )
 
     private companion object { const val KEY_PREFERRED = "preferred_model_id" }
 }
