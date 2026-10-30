@@ -1,6 +1,7 @@
 package com.aistudio.dhanam.expense.agent.learning
 
 import android.content.Context
+import android.app.Application
 import android.os.SystemClock
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -16,6 +17,7 @@ import com.aistudio.dhanam.expense.data.FinanceDatabase
 import com.aistudio.dhanam.expense.domain.MoneyParser
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.Duration
 import kotlinx.coroutines.flow.first
 
 /**
@@ -128,6 +130,65 @@ class NightlyAgentLearningWorker(
                 }
             }
 
+            val modelOwner = LocalInferenceRuntimeRegistry.getOrCreate(applicationContext.applicationContext as Application)
+            val modelWasReady = modelOwner.state.value.isReady
+            val minutesLeft = Duration.between(java.time.LocalTime.now(), java.time.LocalTime.of(6, 0)).toMinutes()
+            val modelReady = modelWasReady || (minutesLeft >= 10 && modelOwner.loadModelAndAwait())
+            var modelInsightSummary = "The verified preferred model was not available or there was insufficient time remaining in the 01:00–06:00 window. Deterministic finance analysis and skill tests still ran."
+            var modelSkillSummary = "No model-based skill review was run; no untested skill was activated."
+            var operationsSummaryWithModel = operationsSummary
+            if (modelReady && NightlyAgentLearningScheduler.isWithinWindow(java.time.LocalTime.now())) {
+                try {
+                    val operationsPrompt = "Review this local financial ledger integrity summary. Identify only finance-record checks or inconsistencies worth reviewing. Do not invent data or propose writes.\n$operationsSummary"
+                    val operationsReview = modelOwner.sharedAgentCoordinator.run(
+                        AgentTaskRequest(DhanamAgentRole.FINANCE_OPERATIONS, operationsPrompt,
+                            AgentTaskPriority.BACKGROUND, requiresNightWindow = true)
+                    ).output.take(900)
+                    operationsSummaryWithModel += "\n\nOn-device operations review (advisory): $operationsReview"
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    operationsSummaryWithModel += "\n\nModel operations review not completed: ${error.message ?: "runtime unavailable"}."
+                }
+                try {
+                    val categoryEvidence = snapshot.categoryMovements.take(7).joinToString("\n") {
+                        "${it.category}: current ${it.currentMonthPaise} paise; comparable previous ${it.previousMonthPaise} paise; change ${it.changePaise} paise."
+                    }
+                    val financePrompt = buildString {
+                        append("Explain these deterministic local-ledger findings concisely. Do not calculate new totals, invent facts, recommend cutting essential needs, or claim an action was taken. ")
+                        append("Treat supplied values as authoritative evidence and distinguish observations from suggestions.\n")
+                        append("Current month total: ${snapshot.totalSpentPaise} paise. Comparable previous month-to-date total: ${snapshot.monthToDateComparablePaise} paise.\n")
+                        append(categoryEvidence)
+                        append("\nEvidence-backed opportunities:\n")
+                        append(deterministicIntelligence)
+                    }
+                    modelInsightSummary = modelOwner.sharedAgentCoordinator.run(
+                        AgentTaskRequest(DhanamAgentRole.FINANCIAL_INTELLIGENCE, financePrompt,
+                            AgentTaskPriority.BACKGROUND, requiresNightWindow = true)
+                    ).output.take(1_200)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    modelInsightSummary = "Model financial explanation not completed: ${error.message ?: "runtime unavailable"}."
+                }
+                try {
+                    val skillEvidence = skillCandidates.take(12).joinToString("\n") {
+                        "${it.matchText} -> ${it.category}; examples=${it.exampleCount}; holdout=${it.testPassCount}/${it.testTotalCount}."
+                    }
+                    val skillPrompt = "Review these already-tested local finance workflow skill candidates. Suggest finance-only improvements or additional tests. Do not approve, activate, or rewrite rules.\n$skillEvidence"
+                    modelSkillSummary = modelOwner.sharedAgentCoordinator.run(
+                        AgentTaskRequest(DhanamAgentRole.SKILL_IMPROVEMENT, skillPrompt,
+                            AgentTaskPriority.BACKGROUND, requiresNightWindow = true)
+                    ).output.take(1_200)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    modelSkillSummary = "Model skill review not completed: ${error.message ?: "runtime unavailable"}."
+                }
+            }
+            val intelligenceSummary = deterministicIntelligence +
+                if (modelReady) "\n\nOn-device model explanation (advisory; verify against the evidence above):\n$modelInsightSummary" else "\n\n$modelInsightSummary"
+
             val skillSummary = if (newSkillProposals == 0) {
                 "The skill agent tested repeated expense descriptions but found no new category rule that passed leave-one-out validation. No skill was activated. $modelSkillSummary"
             } else {
@@ -146,7 +207,7 @@ class NightlyAgentLearningWorker(
                 AgentLearningReportEntity(
                     reportDateEpochDay = today.toEpochDay(),
                     runStatus = "RULE_LEARNING_ONLY",
-                    operationsSummary = operationsSummary,
+                    operationsSummary = operationsSummaryWithModel,
                     intelligenceSummary = intelligenceSummary,
                     skillSummary = skillSummary,
                     nextImprovements = nextImprovements,
@@ -154,6 +215,7 @@ class NightlyAgentLearningWorker(
                     createdAtEpochMillis = System.currentTimeMillis()
                 )
             )
+            if (!modelWasReady && modelReady) modelOwner.unloadModelIfIdle()
             NightlyAgentLearningScheduler.scheduleNext(applicationContext, forceTomorrow = true)
             Result.success()
         } catch (cancelled: CancellationException) {
