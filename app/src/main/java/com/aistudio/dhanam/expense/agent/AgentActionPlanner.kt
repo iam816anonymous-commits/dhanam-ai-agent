@@ -119,9 +119,14 @@ object AgentActionPlanner {
             "khata summary", "lending summary", "outstanding loan"
         )
         if (queryPhrases.none { lower.contains(it) }) return null
+        val month = if (lower.contains("last month") || lower.contains("previous month")) {
+            YearMonth.now().minusMonths(1)
+        } else {
+            YearMonth.now()
+        }
         return PlannerResult(
-            PlannedFinanceAction.AnalyzeSpending(),
-            "I'll review your recorded expenses, budgets and Khata balances. This is read-only; no financial records will be changed."
+            PlannedFinanceAction.AnalyzeSpending(month),
+            "I'll review your recorded expenses, budgets and Khata balances for $month. This is read-only; no financial records will be changed."
         )
     }
 
