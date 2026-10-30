@@ -334,7 +334,7 @@ object AgentActionPlanner {
                     else -> null
                 }
                 is PlannedFinanceAction.AddLoan -> {
-                    val personMatch = Regex("""(?i)(?:to|from|person)\\s+(.+)$""").find(input)
+                    val personMatch = Regex("""(?i)(?:to|from|person)\s+(.+)$""").find(input)
                     when {
                         amountIntent && amountMatch != null -> {
                             val validated = KhataValidator.validate(
