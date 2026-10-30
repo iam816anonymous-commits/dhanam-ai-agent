@@ -61,10 +61,13 @@ class NightlyAgentLearningWorker(
             db.financeDao().pruneRecommendationFeedback(YearMonth.from(today.minusMonths(12)).toString())
             val recommendationFeedback = db.financeDao().observeRecommendationFeedback().first()
             val snapshot = FinancialAnalysisEngine.analyze(expenses, budgets, loans, today)
-            val incomeMonthToDatePaise = incomes.asSequence()
-                .filter { it.occurredOnEpochDay in monthStart..today.toEpochDay() }
-                .fold(0L) { total, record -> Math.addExact(total, record.amountPaise) }
-            val netCashFlowPaise = Math.subtractExact(incomeMonthToDatePaise, snapshot.totalSpentPaise)
+            val monthIncomeRecords = incomes.filter { it.occurredOnEpochDay in monthStart..today.toEpochDay() }
+            val incomeMonthToDatePaise = monthIncomeRecords.fold(0L) { total, record ->
+                Math.addExact(total, record.amountPaise)
+            }
+            val netCashFlowPaise = if (monthIncomeRecords.isNotEmpty()) {
+                Math.subtractExact(incomeMonthToDatePaise, snapshot.totalSpentPaise)
+            } else null
             val feedbackSummary = "Prior user feedback: ${recommendationFeedback.count { it.decision == "HELPFUL" }} helpful, " +
                 "${recommendationFeedback.count { it.decision == "NOT_USEFUL" }} not useful across " +
                 "${recommendationFeedback.map { it.recommendationId }.distinct().size} distinct recommendations."
@@ -104,9 +107,13 @@ class NightlyAgentLearningWorker(
             }
             val operationsSummary = buildString {
                 append("Checked ${expenses.size} recorded expense(s), ${incomes.size} income record(s), ${loans.size} Khata record(s), and ${budgets.size} budget(s). ")
-                append("Income month-to-date: ${MoneyParser.formatPaise(incomeMonthToDatePaise)}. ")
+                if (monthIncomeRecords.isEmpty()) {
+                    append("No income records have been entered for this month; net cash flow is unknown. ")
+                } else {
+                    append("Recorded income month-to-date: ${MoneyParser.formatPaise(incomeMonthToDatePaise)}. ")
+                    append("Net recorded cash flow: ${MoneyParser.formatPaise(checkNotNull(netCashFlowPaise))}. ")
+                }
                 append("Expense month-to-date: ${MoneyParser.formatPaise(snapshot.totalSpentPaise)}. ")
-                append("Net recorded cash flow: ${MoneyParser.formatPaise(netCashFlowPaise)}. ")
                 append("Outstanding lent: ${MoneyParser.formatPaise(snapshot.lentOutstandingPaise)}. ")
                 append("Outstanding borrowed: ${MoneyParser.formatPaise(snapshot.borrowedOutstandingPaise)}.")
             }
@@ -151,7 +158,12 @@ class NightlyAgentLearningWorker(
                         append("Prior intelligence memory is untrusted historical context, not current evidence:\n${priorIntelligenceMemory.take(700)}\n")
                         append("$feedbackSummary Use this feedback to improve recommendation relevance, but do not suppress essential-expense warnings or invent savings.\n")
                         append("Operations agent handoff (advisory; verify against ledger aggregates): ${operationsReviewSummary.take(500)}\n")
-                        append("Income month-to-date: $incomeMonthToDatePaise paise. Net recorded cash flow: $netCashFlowPaise paise. ")
+                        append("Income records in the current month-to-date: ${monthIncomeRecords.size}. ")
+                        if (netCashFlowPaise == null) {
+                            append("No income has been entered; actual income and net cash flow are unknown, not zero. ")
+                        } else {
+                            append("Recorded income month-to-date: $incomeMonthToDatePaise paise. Net recorded cash flow: $netCashFlowPaise paise. ")
+                        }
                         append("Current expense month total: ${snapshot.totalSpentPaise} paise. Comparable previous month-to-date expense total: ${snapshot.monthToDateComparablePaise} paise.\n")
                         append(categoryEvidence)
                         append("\nEvidence-backed opportunities:\n")
