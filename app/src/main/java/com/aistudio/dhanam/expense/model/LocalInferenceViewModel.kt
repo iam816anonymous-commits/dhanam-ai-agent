@@ -27,6 +27,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 data class LocalInferenceState(
     val eligibility: DeviceEligibility? = null,
@@ -51,6 +53,8 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
         Thread(runnable, "Dhanam-LiteRT-LM").apply { isDaemon = true }
     }
     private val dispatcher = executor.asCoroutineDispatcher()
+    // Serializes interactive chat, agent inference and safe unload operations on one Engine.
+    private val modelUseMutex = Mutex()
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     // One coordinator per model owner: every specialist shares the same broker and inference lock.
     val sharedAgentCoordinator: SharedAgentCoordinator by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
@@ -88,10 +92,12 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
         return _state.first { !it.isLoading }.isReady
     }
 
-    suspend fun unloadModelIfIdle(): Boolean = withContext(dispatcher) {
-        if (_state.value.isGenerating || _state.value.isLoading) return@withContext false
-        releaseLoadedModel()
-        true
+    suspend fun unloadModelIfIdle(): Boolean = modelUseMutex.withLock {
+        withContext(dispatcher) {
+            if (_state.value.isGenerating || _state.value.isLoading) return@withContext false
+            releaseLoadedModel()
+            true
+        }
     }
 
     fun loadModel() {
@@ -187,7 +193,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
     suspend fun generateForAgent(
         rawPrompt: String,
         systemInstruction: String = DEFAULT_AGENT_SYSTEM_INSTRUCTION
-    ): String = withContext(dispatcher) {
+    ): String = modelUseMutex.withLock { withContext(dispatcher) {
         val prompt = LocalPromptValidator.validate(rawPrompt)
         check(_state.value.isReady && !_state.value.isLoading && !_state.value.isGenerating) {
             "Load the verified local model in Settings and make sure it is not generating another response."
@@ -273,7 +279,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
             }
             _state.update { it.copy(isGenerating = false) }
         }
-    }
+    } }
 
 
     fun sendMessage(rawPrompt: String) {
@@ -283,9 +289,10 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
             _state.update { it.copy(error = error.message) }
             return
         }
-        if (!_state.value.isReady || _state.value.isLoading || _state.value.isGenerating) return
+        if (!_state.value.isReady || _state.value.isLoading) return
         scope.launch {
-            if (!_state.value.isReady || _state.value.isGenerating) return@launch
+            modelUseMutex.withLock {
+            if (!_state.value.isReady || _state.value.isLoading) return@withLock
             stopRequested = false
             memoryBudgetExceeded = false
             _state.update { it.copy(isGenerating = true, reply = "", error = null, status = "Generating on-device…") }
@@ -385,6 +392,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                     }
                 }
                 _state.update { it.copy(isGenerating = false) }
+            }
             }
         }
     }
