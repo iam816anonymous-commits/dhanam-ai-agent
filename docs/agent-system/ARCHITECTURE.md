@@ -64,6 +64,14 @@ The runtime contract:
 - User-initiated operations have priority over background learning. Background tasks yield immediately when the app needs the model for an interactive operation.
 - No parallel model execution and no second KV cache.
 
+## Persistent specialist memory and handoff history
+
+Room schema version 7 adds two local-only tables:
+- `agent_memories`: one bounded latest summary per role/key, with source report date and confidence. Each role reads only its own prior memory before its next nightly task.
+- `agent_messages`: structured, bounded handoff summaries between different specialist roles. Records are retained for 90 days and displayed in Settings.
+
+Memory is historical context, not a source of current balances or transaction facts. Each task must re-read current aggregates from the financial ledger. Model-generated summaries are explicitly marked untrusted when supplied to a later agent. Raw prompts and raw transaction descriptions are not persisted in these tables.
+
 ## Nightly learning window
 
 Background agent inference is allowed only from 01:00 inclusive to 06:00 exclusive in the device's local time.
