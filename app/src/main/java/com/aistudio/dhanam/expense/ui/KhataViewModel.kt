@@ -45,6 +45,32 @@ class KhataViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateLoan(id: Long, person: String, direction: String, amount: String, opened: String, due: String, note: String, phoneNumber: String = "") {
+        viewModelScope.launch {
+            try {
+                val existing = dao.findLoan(id) ?: error("This Khata record no longer exists. Refresh and try again.")
+                require(direction == existing.direction) { "The lending/borrowing direction cannot be changed when editing a saved record." }
+                val input = KhataValidator.validate(person, direction, amount, opened, due, note, phoneNumber)
+                require(input.principalPaise >= existing.paidPaise) {
+                    "Principal cannot be lower than repayments already recorded."
+                }
+                val updated = existing.copy(
+                    personName = input.personName,
+                    principalPaise = input.principalPaise,
+                    openedOnEpochDay = input.openedOn.toEpochDay(),
+                    dueOnEpochDay = input.dueOn?.toEpochDay(),
+                    note = input.note,
+                    phoneNumber = input.phoneNumber,
+                    isSettled = input.principalPaise == existing.paidPaise,
+                    updatedAtEpochMillis = System.currentTimeMillis()
+                )
+                check(dao.updateLoan(updated) == 1) { "Khata record changed before it could be updated. Refresh and try again." }
+                _message.value = "Khata record updated."
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { _message.value = e.message ?: "Could not update the Khata record." }
+        }
+    }
+
     fun recordRepayment(loanId: Long, amount: String, date: String, note: String, requestId: String = UUID.randomUUID().toString()) {
         viewModelScope.launch {
             try {
