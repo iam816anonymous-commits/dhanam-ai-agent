@@ -1,5 +1,6 @@
 package com.aistudio.dhanam.expense.agent
 
+import com.aistudio.dhanam.expense.data.AgentSkillEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -96,6 +97,45 @@ class AgentActionPlannerTest {
     @Test fun spendingQueriesAreNotMistakenForNewExpenses() {
         assertEquals(null, AgentActionPlanner.parse("how much did I spend on lunch 250").action)
         assertEquals(null, AgentActionPlanner.parse("show food history 250").action)
+    }
+
+    @Test fun approvedExactDescriptionSkillCategorizesAnExpense() {
+        val skill = AgentSkillEntity(
+            skillKey = "a".repeat(64),
+            version = 1,
+            title = "Category rule: metro card",
+            matchText = "metro card",
+            category = "Transport",
+            exampleCount = 4,
+            testPassCount = 4,
+            testTotalCount = 4,
+            status = "ACTIVE",
+            createdAtEpochMillis = 1L,
+            approvedAtEpochMillis = 2L
+        )
+        val result = AgentActionPlanner.parseWithLearnedSkills("I spent 80 on Metro Card", listOf(skill))
+        val action = result.action as PlannedFinanceAction.AddExpense
+        assertEquals("metro card", action.title)
+        assertEquals("Transport", action.category)
+        assertEquals(8_000L, action.amountPaise)
+    }
+
+    @Test fun proposedSkillCannotAffectExpenseClassification() {
+        val skill = AgentSkillEntity(
+            skillKey = "b".repeat(64),
+            version = 1,
+            title = "Category rule: metro card",
+            matchText = "metro card",
+            category = "Transport",
+            exampleCount = 4,
+            testPassCount = 4,
+            testTotalCount = 4,
+            status = "PROPOSED",
+            createdAtEpochMillis = 1L
+        )
+        val result = AgentActionPlanner.parseWithLearnedSkills("I spent 80 on Metro Card", listOf(skill))
+        assertEquals(null, result.action)
+        assertTrue(result.needsClarification)
     }
 
 }
