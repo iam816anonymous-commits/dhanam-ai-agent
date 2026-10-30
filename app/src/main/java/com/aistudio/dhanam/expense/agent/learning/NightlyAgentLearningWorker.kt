@@ -14,6 +14,7 @@ import com.aistudio.dhanam.expense.model.LocalInferenceRuntimeRegistry
 import com.aistudio.dhanam.expense.model.LocalInferenceViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
 import com.aistudio.dhanam.expense.data.AgentLearningReportEntity
 import com.aistudio.dhanam.expense.data.FinanceDatabase
@@ -85,7 +86,7 @@ class NightlyAgentLearningWorker(
             } else {
                 snapshot.opportunities.take(8).joinToString("\n") { opportunity ->
                     "${opportunity.title}: ${opportunity.evidence} Next step: ${opportunity.suggestedAction}"
-                }.take(4_000)
+                }.take(2_200)
             }
             val operationsSummary = buildString {
                 append("Checked ${expenses.size} recorded expense(s), ${loans.size} Khata record(s), and ${budgets.size} budget(s). ")
@@ -112,6 +113,8 @@ class NightlyAgentLearningWorker(
                     ).output.take(900)
                     operationsSummaryWithModel += "\n\nOn-device operations review (advisory): $operationsReview"
                     modelAgentTasksCompleted++
+                } catch (timeout: TimeoutCancellationException) {
+                    operationsSummaryWithModel += "\n\nOperations review timed out at the nightly window boundary."
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
@@ -135,6 +138,8 @@ class NightlyAgentLearningWorker(
                     ).output.take(1_200)
                     modelInsightCompleted = true
                     modelAgentTasksCompleted++
+                } catch (timeout: TimeoutCancellationException) {
+                    modelInsightSummary = "Financial explanation timed out at the nightly window boundary."
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
@@ -152,6 +157,8 @@ class NightlyAgentLearningWorker(
                             AgentTaskPriority.BACKGROUND, requiresNightWindow = true)
                     ).output.take(1_200)
                     modelAgentTasksCompleted++
+                } catch (timeout: TimeoutCancellationException) {
+                    modelSkillSummary = "Skill review timed out at the nightly window boundary."
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
