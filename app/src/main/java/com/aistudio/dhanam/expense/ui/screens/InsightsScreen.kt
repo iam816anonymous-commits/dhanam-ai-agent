@@ -53,9 +53,9 @@ fun InsightsScreen() {
     val recommendationFeedback by db.financeDao().observeRecommendationFeedback().collectAsState(initial = emptyList())
     val budgets by db.financeDao().observeBudgetsForMonth(month.atDay(1).toEpochDay()).collectAsState(initial = emptyList())
     val loans by db.financeDao().observeLoans().collectAsState(initial = emptyList())
-    val intelligenceBudgets by db.financeDao().observeBudgetsForMonth(YearMonth.now().atDay(1).toEpochDay()).collectAsState(initial = emptyList())
-    val financialSnapshot = remember(expenses, intelligenceBudgets, loans) {
-        FinancialAnalysisEngine.analyze(expenses, intelligenceBudgets, loans, LocalDate.now())
+    val analysisDate = if (month == YearMonth.now()) LocalDate.now() else month.atEndOfMonth()
+    val financialSnapshot = remember(expenses, budgets, loans, month) {
+        FinancialAnalysisEngine.analyze(expenses, budgets, loans, analysisDate)
     }
     val summary = remember(expenses, budgets, month) {
         FinanceCalculations.monthlySummary(expenses, budgets, month, LocalDate.now())
@@ -106,7 +106,10 @@ fun InsightsScreen() {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             TextButton(onClick = { month = month.minusMonths(1); message = null }) { Text("‹ Previous") }
             Text(month.toString(), modifier = Modifier.padding(top = 12.dp), fontWeight = FontWeight.SemiBold)
-            TextButton(onClick = { month = month.plusMonths(1); message = null }) { Text("Next ›") }
+            TextButton(
+                onClick = { month = month.plusMonths(1); message = null },
+                enabled = month < YearMonth.now()
+            ) { Text("Next ›") }
         }
         SummaryCard("Spent this month", MoneyParser.formatPaise(summary.totalSpentPaise),
             "${summary.transactionCount} recorded transaction(s)")
@@ -186,7 +189,11 @@ fun InsightsScreen() {
         }
         Text("Category spending movement", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         Text(
-            "Compares this month's recorded spending so far with the same number of days in the previous month. It is not a full-month comparison.",
+            if (month == YearMonth.now()) {
+                "Compares this month's recorded spending so far with the same number of days in the previous month."
+            } else {
+                "Compares the selected completed month with the previous month using the full-month totals."
+            },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
