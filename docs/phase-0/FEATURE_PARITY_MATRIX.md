@@ -76,7 +76,7 @@ Legacy migration reads `dhanam_expense_database` read-only and only runs after p
 
 | Feature | Target implementation | Remaining acceptance work |
 |---|---|---|
-| Income records | Separate Room income ledger, validated add/edit/delete UI within the existing Expenses destination, integer-paise storage | CSV import, migration fixture tests and Android 8.1 device verification |
+| Income records | Separate Room income ledger, validated add/edit/delete UI within the existing Expenses destination, integer-paise storage, previewed idempotent CSV import/export | Migration fixture tests and Android 8.1 device verification |
 | Cash-flow overview | Monthly income, expense and net recorded cash-flow cards; nightly agent receives income/expense aggregates | Multi-month cash-flow trend, sparse-history warnings and scenario tests |
 | Income backup | Income rows included in the full finance ledger CSV export | Round-trip income import and duplicate-source idempotency |
 
