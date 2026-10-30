@@ -332,7 +332,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         val budgets = dao.observeBudgetsForMonth(month.atDay(1).toEpochDay()).first()
         val loans = dao.observeLoans().first()
         val incomes = dao.incomeSince(month.atDay(1).toEpochDay())
-            .filter { it.occurredOnEpochDay <= month.atEndOfMonth().toEpochDay() }
+            .filter { it.occurredOnEpochDay <= today.toEpochDay() }
         val snapshot = FinancialAnalysisEngine.analyze(expenses, budgets, loans, today)
         val monthStart = month.atDay(1).toEpochDay()
         val monthEnd = today.toEpochDay()
