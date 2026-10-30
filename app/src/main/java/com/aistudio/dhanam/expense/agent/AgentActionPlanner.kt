@@ -65,6 +65,7 @@ object AgentActionPlanner {
         val input = text.trim().replace(Regex("""\s+"""), " ").take(1000)
         val lower = input.lowercase()
         if (input.isEmpty() || lower.contains("budget") || lower.contains("repayment") ||
+            parseIncomeCommand(input) != null ||
             listOf("how much", "what did i spend", "show ", "list ", "history", "what is").any { lower.startsWith(it) }) {
             return parse(text)
         }
