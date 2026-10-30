@@ -59,10 +59,11 @@ fun FinanceDataSection() {
                     val loans = db.financeDao().observeLoans().first()
                     val repayments = db.financeDao().allRepayments()
                     val budgets = db.financeDao().allBudgets()
-                    FinanceLedgerCsvExporter.export(loans, repayments, budgets)
+                    val income = db.financeDao().incomeSince(Long.MIN_VALUE)
+                    FinanceLedgerCsvExporter.export(loans, repayments, budgets, income)
                 }
                 withContext(Dispatchers.IO) { FinanceCsvTransfer.writeText(context.contentResolver, uri, text) }
-                message = "Khata, repayment and budget history exported."
+                message = "Khata, repayment, budget and income history exported."
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { message = e.message ?: "Ledger export failed." }
         }
@@ -90,7 +91,7 @@ fun FinanceDataSection() {
                 Text("Export expenses to CSV")
             }
             Button(onClick = { ledgerExportLauncher.launch("dhanam-khata-ledger.csv") }, modifier = Modifier.fillMaxWidth()) {
-                Text("Export Khata, repayments and budgets")
+                Text("Export full finance ledger (Khata, budgets, income)")
             }
             Button(onClick = { importLauncher.launch(arrayOf("text/*", "application/csv", "application/vnd.ms-excel")) },
                 enabled = !busy, modifier = Modifier.fillMaxWidth()) {
