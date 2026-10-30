@@ -2,6 +2,7 @@ package com.aistudio.dhanam.expense.ui.theme
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.material3.Typography
 import androidx.compose.ui.graphics.Color
@@ -29,7 +30,28 @@ private val DhanamDarkColors = darkColorScheme(
     onErrorContainer = Color(0xFFFEE2E2)
 )
 
+private val DhanamLightColors = lightColorScheme(
+    primary = EmeraldPrimaryLight,
+    onPrimary = OnEmeraldPrimaryLight,
+    primaryContainer = EmeraldPrimaryContainerLight,
+    onPrimaryContainer = OnEmeraldPrimaryContainerLight,
+    secondary = AmberSecondaryLight,
+    onSecondary = OnAmberSecondaryLight,
+    secondaryContainer = AmberSecondaryContainerLight,
+    onSecondaryContainer = OnAmberSecondaryContainerLight,
+    tertiary = IndigoTertiaryLight,
+    background = SurfaceLight,
+    onBackground = OnSurfaceLight,
+    surface = SurfaceLight,
+    onSurface = OnSurfaceLight,
+    surfaceVariant = SurfaceVariantLight,
+    onSurfaceVariant = OnSurfaceVariantLight,
+    outline = OutlineLight,
+    error = AlertRed
+)
+
 @Composable
-fun DhanamTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = DhanamDarkColors, typography = Typography(), content = content)
+fun DhanamTheme(darkTheme: Boolean = true, content: @Composable () -> Unit) {
+    val colors = if (darkTheme) DhanamDarkColors else DhanamLightColors
+    MaterialTheme(colorScheme = colors, typography = Typography(), content = content)
 }
