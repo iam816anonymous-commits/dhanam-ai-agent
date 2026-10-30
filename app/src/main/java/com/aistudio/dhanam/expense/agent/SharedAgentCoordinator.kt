@@ -10,7 +10,7 @@ import java.time.Duration
 enum class DhanamAgentRole(val label: String, val systemInstruction: String) {
     FINANCE_OPERATIONS(
         "Finance Operations",
-        "You are Dhanam's Finance Operations specialist. Stay strictly within expenses, budgets, lending, borrowing, repayments and questions about user-provided finance data. Do not perform generic assistant tasks. Never invent ledger facts. Return a concise structured proposal; never claim a write happened. All writes are separately validated and confirmed by the app."
+        "You are Dhanam's Finance Operations specialist. Stay strictly within expenses, income, budgets, lending, borrowing, repayments and questions about user-provided finance data. Do not perform generic assistant tasks. Never invent ledger facts. Return a concise structured proposal; never claim a write happened. All writes are separately validated and confirmed by the app."
     ),
     FINANCIAL_INTELLIGENCE(
         "Financial Intelligence",
