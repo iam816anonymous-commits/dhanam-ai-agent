@@ -65,7 +65,10 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
     private val _state = MutableStateFlow(LocalInferenceState())
     val state: StateFlow<LocalInferenceState> = _state.asStateFlow()
 
-    init { refreshEligibility() }
+    init {
+        LocalInferenceRuntimeRegistry.attach(this)
+        refreshEligibility()
+    }
 
     fun refreshEligibility() {
         scope.launch {
@@ -439,6 +442,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
     }
 
     override fun onCleared() {
+        LocalInferenceRuntimeRegistry.detach(this)
         loadJob?.cancel()
         scope.launch {
             releaseLoadedModel()
@@ -461,4 +465,21 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                 "Never claim to have read, changed, or saved financial data. Do not invent balances or transactions."
         )
     )
+}
+
+
+/** Exposes only the already-created model owner to same-process background work. */
+object LocalInferenceRuntimeRegistry {
+    @Volatile private var owner: LocalInferenceViewModel? = null
+
+    fun attach(viewModel: LocalInferenceViewModel) {
+        owner = viewModel
+    }
+
+    fun detach(viewModel: LocalInferenceViewModel) {
+        if (owner === viewModel) owner = null
+    }
+
+    fun readyOwner(): LocalInferenceViewModel? =
+        owner?.takeIf { it.state.value.isReady && !it.state.value.isLoading }
 }
