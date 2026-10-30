@@ -47,11 +47,7 @@ fun OfflineVoiceInput(
     var language by remember {
         mutableStateOf(voicePreferences.getString("recognition_language", "en-IN") ?: "en-IN")
     }
-    fun selectLanguage(code: String) {
-        language = code
-        voicePreferences.edit().putString("recognition_language", code).apply()
-        status = "Voice language set to ${when (code) { "te-IN" -> "Telugu"; "hi-IN" -> "Hindi"; else -> "English" }}."
-    }
+
     var status by remember {
         mutableStateOf(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -60,6 +56,11 @@ fun OfflineVoiceInput(
                 "Android 8–11 use the system speech service with offline preference; the service may ignore it."
             }
         )
+    }
+    fun selectLanguage(code: String) {
+        language = code
+        voicePreferences.edit().putString("recognition_language", code).apply()
+        status = "Voice language updated."
     }
     var recognizer by remember { mutableStateOf<SpeechRecognizer?>(null) }
 
