@@ -23,7 +23,7 @@ fun AgentSpeechFeedback(
 ) {
     val context = LocalContext.current
     var initialized by remember { mutableStateOf(false) }
-    var lastSpokenId by remember { mutableStateOf<String?>(messageId) }
+    var lastSpokenId by remember { mutableStateOf<String?>(null) }
     val engine = remember(context, enabled) {
         initialized = false
         if (enabled) {
@@ -46,12 +46,16 @@ fun AgentSpeechFeedback(
     }
 
     LaunchedEffect(messageId, message, enabled, initialized, engine) {
+        if (messageId == null || message.isNullOrBlank()) return@LaunchedEffect
         if (!enabled) {
-            if (messageId != null) lastSpokenId = messageId
+            lastSpokenId = messageId
             return@LaunchedEffect
         }
-        if (engine == null || !initialized) return@LaunchedEffect
-        if (messageId == null || message.isNullOrBlank() || lastSpokenId == messageId) return@LaunchedEffect
+        if (engine == null || !initialized || lastSpokenId == messageId) return@LaunchedEffect
+        if (lastSpokenId == null && message.startsWith("Hi, I'm Dhanam.")) {
+            lastSpokenId = messageId
+            return@LaunchedEffect
+        }
 
         // Speak the script actually returned by the assistant. Never send English text
         // through a Telugu/Hindi voice merely because that is the selected input language.
