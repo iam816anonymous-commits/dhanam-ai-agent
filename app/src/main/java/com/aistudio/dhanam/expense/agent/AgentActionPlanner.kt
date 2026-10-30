@@ -106,6 +106,7 @@ object AgentActionPlanner {
 
     private fun parseIncomeCommand(input: String): PlannerResult? {
         val lower = input.lowercase()
+        if (listOf("how much", "what is", "show ", "list ", "history", "total ").any { lower.startsWith(it) }) return null
         val categoryAliases = mapOf(
             "salary" to "Salary", "payroll" to "Salary",
             "business" to "Business",
