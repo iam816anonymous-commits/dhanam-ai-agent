@@ -50,7 +50,7 @@ The candidate is stored as a versioned data-only rule. It cannot contain code, r
 - Room schema version 6 adds versioned `agent_skills`.
 - Room schema version 7 adds bounded role-specific `agent_memories` and structured `agent_messages` handoff history.
 - Migrations 4→5, 5→6 and 6→7 are additive. Existing expense, budget, Khata and repayment records are preserved.
-- Room schema version 8 adds a separate `income_records` ledger; income is included in the monthly cash-flow dashboard, nightly aggregate context and full-ledger CSV export. CSV income import remains outstanding.
+- Room schema version 9 adds a separate `income_records` ledger with unique import source keys. Income is included in the monthly cash-flow dashboard, nightly aggregate context and full-ledger CSV export; a dedicated income CSV import/export path validates and previews rows before transactional idempotent import.
 - Financial amounts remain integer paise. LLM outputs are never used for financial arithmetic or direct writes.
 
 ## Current limitations / next phases
