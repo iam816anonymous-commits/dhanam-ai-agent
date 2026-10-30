@@ -17,6 +17,9 @@ interface FinanceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertRecommendationFeedback(feedback: RecommendationFeedbackEntity): Long
 
+    @Query("DELETE FROM recommendation_feedback WHERE period_month < :cutoffMonth")
+    suspend fun pruneRecommendationFeedback(cutoffMonth: String): Int
+
     @Query("SELECT * FROM agent_skills ORDER BY status, created_at_epoch_millis DESC")
     fun observeAgentSkills(): Flow<List<AgentSkillEntity>>
 
