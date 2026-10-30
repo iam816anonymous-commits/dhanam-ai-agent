@@ -12,6 +12,8 @@ Implemented in the current codebase:
 - Monthly/category spending movement, budget-overrun checks, recurring-expense candidates and Khata outstanding analysis.
 - One process-wide LiteRT-LM model owner shared by the UI and all three specialist agents.
 - A serialized inference gate so the model is never used concurrently by separate agents or interactive chat.
+- Role-isolated deterministic agent memories, structured specialist handoff history with 90-day retention, and a user-controlled clear-memory action.
+- User-controlled disable/restore for approved learned skills.
 - Finance Operations, Financial Intelligence and Skill Improvement specialist roles.
 - Nightly WorkManager scheduling between 01:00 and 06:00 local time, subject to Android battery/idle policies.
 - Versioned exact-description category skill proposals, leave-one-out validation and explicit user approval.
@@ -23,7 +25,7 @@ This is an implementation milestone, not a claim of release completion. Physical
 
 | Agent | Responsibility |
 |---|---|
-| Finance Operations | Expenses, income/finance records where supported, budgets, Khata, repayments and validated actions |
+| Finance Operations | Expenses, budgets, Khata lending/borrowing, repayments and validated actions |
 | Financial Intelligence | Spending patterns, category changes, recurring candidates, budget overruns and savings recommendations |
 | Skill Improvement | Learn and test finance-specific local rules; suggest improvements without executing arbitrary code |
 
@@ -74,4 +76,4 @@ The debug APK is generated at `app/build/outputs/apk/debug/app-debug.apk`. GitHu
 - Measure model load peak RAM, thermal behaviour, battery impact and actual inference duration on the target handset.
 - Verify WorkManager execution across reboot, Doze, force-stop and battery restrictions.
 - Complete remaining feature-parity, security, backup/restore and release-signing work.
-- Add persistent per-agent memory and richer inter-agent task/event history; current cross-agent coordination is through the shared ledger, skill registry and sequential nightly reports.
+- Add recommendation feedback, richer multi-month financial evaluation and regression metrics for long-term agent improvement.
