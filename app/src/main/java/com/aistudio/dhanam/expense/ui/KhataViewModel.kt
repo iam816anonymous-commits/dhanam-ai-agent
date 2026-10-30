@@ -64,7 +64,9 @@ class KhataViewModel(application: Application) : AndroidViewModel(application) {
                     isSettled = input.principalPaise == existing.paidPaise,
                     updatedAtEpochMillis = System.currentTimeMillis()
                 )
-                check(dao.updateLoan(updated) == 1) { "Khata record changed before it could be updated. Refresh and try again." }
+                check(dao.updateLoanIfUnchanged(updated, existing.paidPaise)) {
+                    "Khata record changed before it could be updated. Refresh and try again."
+                }
                 _message.value = "Khata record updated."
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { _message.value = e.message ?: "Could not update the Khata record." }
