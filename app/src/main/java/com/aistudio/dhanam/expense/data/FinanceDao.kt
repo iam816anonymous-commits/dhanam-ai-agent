@@ -26,6 +26,12 @@ interface FinanceDao {
     @Query("UPDATE agent_skills SET status = 'REJECTED' WHERE id = :id AND status = 'PROPOSED'")
     suspend fun rejectAgentSkill(id: Long): Int
 
+    @Query("UPDATE agent_skills SET status = 'DISABLED', approved_at_epoch_millis = NULL WHERE id = :id AND status = 'ACTIVE'")
+    suspend fun deactivateAgentSkill(id: Long): Int
+
+    @Query("UPDATE agent_skills SET status = 'ACTIVE', approved_at_epoch_millis = :approvedAt WHERE id = :id AND status = 'DISABLED' AND test_total_count >= 3 AND test_pass_count * 100 >= test_total_count * 90")
+    suspend fun reactivateAgentSkill(id: Long, approvedAt: Long): Int
+
     @Query("SELECT * FROM agent_learning_reports ORDER BY report_date_epoch_day DESC LIMIT 30")
     fun observeAgentLearningReports(): Flow<List<AgentLearningReportEntity>>
 
@@ -41,7 +47,7 @@ interface FinanceDao {
     @Query("SELECT * FROM agent_messages ORDER BY created_at_epoch_millis DESC LIMIT 100")
     fun observeAgentMessages(): Flow<List<AgentMessageEntity>>
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAgentMessage(message: AgentMessageEntity): Long
 
     @Query("DELETE FROM agent_messages WHERE created_at_epoch_millis < :cutoffEpochMillis")
