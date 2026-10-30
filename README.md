@@ -14,7 +14,7 @@ Implemented in the current codebase:
 - A serialized inference gate so the model is never used concurrently by separate agents or interactive chat.
 - Finance Operations, Financial Intelligence and Skill Improvement specialist roles.
 - Nightly WorkManager scheduling between 01:00 and 06:00 local time, subject to Android battery/idle policies.
-- Versioned exact-description category skill proposals, leave-one-out validation and explicit user approval.
+- Versioned exact-description category skill proposals, leave-one-out validation, explicit approval/rejection and user-controlled disable/restore.
 - Local daily agent reports, role-isolated bounded memories, auditable inter-agent handoffs and skill review in Settings.
 - Income records are stored separately from expenses and included in monthly cash-flow summaries and full-ledger CSV export.
 
@@ -24,7 +24,7 @@ This is an implementation milestone, not a claim of release completion. Physical
 
 | Agent | Responsibility |
 |---|---|
-| Finance Operations | Expenses, income/finance records where supported, budgets, Khata, repayments and validated actions |
+| Finance Operations | Expenses, income, budgets, Khata lending/borrowing, repayments and validated actions |
 | Financial Intelligence | Spending patterns, category changes, recurring candidates, budget overruns and savings recommendations |
 | Skill Improvement | Learn and test finance-specific local rules; suggest improvements without executing arbitrary code |
 
@@ -46,7 +46,7 @@ Android background execution is best-effort. Doze, OEM battery management, force
 - No cloud inference or automatic financial transfers.
 - No generic device-control or AccessibilityService automation.
 - Model output cannot directly write financial records or alter permissions.
-- Learned skills are data-only exact-description category rules, never executable code. They require successful validation and user approval before use.
+- Learned skills are data-only exact-description category rules, never executable code. They require successful validation and user approval before use; approved rules can be disabled and restored only if they still pass the validation gate.
 - No neural-network weight fine-tuning is performed. Capability improvement is through validated local rules, persistent reports and advisory model suggestions.
 
 ## Platform and build
@@ -75,4 +75,4 @@ The debug APK is generated at `app/build/outputs/apk/debug/app-debug.apk`. GitHu
 - Measure model load peak RAM, thermal behaviour, battery impact and actual inference duration on the target handset.
 - Verify WorkManager execution across reboot, Doze, force-stop and battery restrictions.
 - Complete remaining feature-parity, security, backup/restore and release-signing work.
-- Expand persistent per-agent memory from latest verified summaries into evaluated trend memory, and add broader recommendation feedback and rollback workflows.
+- Expand persistent per-agent memory into evaluated longitudinal trend memory and add recommendation feedback (accepted, dismissed, achieved) with regression metrics.
