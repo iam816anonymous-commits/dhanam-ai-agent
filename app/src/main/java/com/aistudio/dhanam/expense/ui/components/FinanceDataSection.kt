@@ -60,7 +60,7 @@ fun FinanceDataSection() {
                     val loans = db.financeDao().observeLoans().first()
                     val repayments = db.financeDao().allRepayments()
                     val budgets = db.financeDao().allBudgets()
-                    val income = db.financeDao().incomeSince(Long.MIN_VALUE)
+                    val income = db.financeDao().allIncome()
                     FinanceLedgerCsvExporter.export(loans, repayments, budgets, income)
                 }
                 withContext(Dispatchers.IO) { FinanceCsvTransfer.writeText(context.contentResolver, uri, text) }
