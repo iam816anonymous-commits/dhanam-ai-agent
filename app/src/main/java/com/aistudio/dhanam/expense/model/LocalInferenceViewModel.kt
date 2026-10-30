@@ -9,6 +9,7 @@ import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.aistudio.dhanam.expense.agent.SharedAgentCoordinator
+import com.aistudio.dhanam.expense.agent.learning.NightlyAgentLearningScheduler
 import java.util.concurrent.Executors
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -290,6 +291,15 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
             return
         }
         if (!_state.value.isReady || _state.value.isLoading) return
+        if (!NightlyAgentLearningScheduler.isWithinWindow(LocalTime.now())) {
+            _state.update {
+                it.copy(
+                    error = "Shared model inference is reserved for the 01:00–06:00 agent window.",
+                    status = "Daytime financial commands and local analysis remain available."
+                )
+            }
+            return
+        }
         scope.launch {
             modelUseMutex.withLock {
             if (!_state.value.isReady || _state.value.isLoading) return@withLock
