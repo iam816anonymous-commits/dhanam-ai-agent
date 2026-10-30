@@ -95,6 +95,18 @@ interface FinanceDao {
     @Query("DELETE FROM agent_messages WHERE created_at_epoch_millis < :cutoffEpochMillis")
     suspend fun pruneAgentMessages(cutoffEpochMillis: Long): Int
 
+    @Query("DELETE FROM agent_memories")
+    suspend fun clearAgentMemories(): Int
+
+    @Query("DELETE FROM agent_messages")
+    suspend fun clearAgentMessages(): Int
+
+    @Transaction
+    suspend fun clearAgentMemoryAndHandoffs() {
+        clearAgentMemories()
+        clearAgentMessages()
+    }
+
     @Query("SELECT * FROM income_records ORDER BY occurred_on_epoch_day DESC, id DESC")
     fun observeIncome(): Flow<List<IncomeEntity>>
 
