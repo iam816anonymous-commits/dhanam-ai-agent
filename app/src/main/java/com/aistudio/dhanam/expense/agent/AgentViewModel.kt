@@ -7,8 +7,10 @@ import com.aistudio.dhanam.expense.data.ExpenseEntity
 import com.aistudio.dhanam.expense.data.KhataLoanEntity
 import com.aistudio.dhanam.expense.data.AgentSkillEntity
 import com.aistudio.dhanam.expense.data.RepaymentEntity
+import com.aistudio.dhanam.expense.data.IncomeEntity
 import com.aistudio.dhanam.expense.data.FinanceDatabase
 import com.aistudio.dhanam.expense.domain.MoneyParser
+import com.aistudio.dhanam.expense.domain.IncomeInputValidator
 import com.aistudio.dhanam.expense.domain.KhataValidator
 import com.aistudio.dhanam.expense.model.LocalInferenceViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +25,7 @@ import java.time.LocalDate
 
 data class AgentChatMessage(val id: String = UUID.randomUUID().toString(), val role: String, val text: String)
 data class AgentState(
-    val messages: List<AgentChatMessage> = listOf(AgentChatMessage(role = "assistant", text = "Hi, I'm Dhanam. I can prepare expenses, budgets, lending, borrowing and repayments for your review. I will never save a financial change without your confirmation.")),
+    val messages: List<AgentChatMessage> = listOf(AgentChatMessage(role = "assistant", text = "Hi, I'm Dhanam. I can prepare expenses, income, budgets, lending, borrowing and repayments for your review. I will never save a financial change without your confirmation.")),
     val pendingAction: PlannedFinanceAction? = null,
     val busy: Boolean = false,
     val activity: String = "idle",
@@ -197,6 +199,34 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                             "Expense save could not be verified. Check the Expenses list before retrying."
                         }
                         appendAssistant("Verified: expense “${saved.title}” saved as record #${saved.id} for ${MoneyParser.formatPaise(saved.amountPaise)}.")
+                    }
+                    is PlannedFinanceAction.AddIncome -> {
+                        val validated = IncomeInputValidator.validate(
+                            action.title,
+                            BigDecimal.valueOf(action.amountPaise, 2).toPlainString(),
+                            action.category,
+                            action.date.toString(),
+                            action.note
+                        )
+                        val now = System.currentTimeMillis()
+                        val id = dao.insertIncome(
+                            IncomeEntity(
+                                title = validated.title,
+                                amountPaise = validated.amountPaise,
+                                category = validated.category,
+                                occurredOnEpochDay = validated.occurredOn.toEpochDay(),
+                                note = validated.note,
+                                createdAtEpochMillis = now,
+                                updatedAtEpochMillis = now
+                            )
+                        )
+                        val saved = dao.findIncome(id)
+                        check(saved != null && saved.title == validated.title &&
+                            saved.amountPaise == validated.amountPaise &&
+                            saved.category == validated.category) {
+                            "Income save could not be verified. Check Expenses → Income before retrying."
+                        }
+                        appendAssistant("Verified: income “${saved.title}” saved as record #${saved.id} for ${MoneyParser.formatPaise(saved.amountPaise)}.")
                     }
                     is PlannedFinanceAction.AddLoan -> {
                         val validated = KhataValidator.validate(
