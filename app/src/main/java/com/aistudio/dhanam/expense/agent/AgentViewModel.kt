@@ -165,8 +165,8 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         val inference = localInference
-        val modelWindowOpen = NightlyAgentLearningScheduler.isWithinWindow(LocalTime.now())
-        if (inference?.state?.value?.isReady == true && modelWindowOpen) {
+        // Foreground requests are user work, not background learning: a loaded model must be usable 24/7.
+        if (inference?.state?.value?.isReady == true) {
             _state.value = _state.value.copy(busy = true)
             viewModelScope.launch {
                 try {
@@ -178,7 +178,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                             role = DhanamAgentRole.FINANCE_OPERATIONS,
                             prompt = AgentActionPlanner.modelPrompt(input),
                             priority = AgentTaskPriority.USER_REQUEST,
-                            requiresNightWindow = true
+                            requiresNightWindow = false
                         )
                     ).output
                     val proposal = AgentActionPlanner.parseModelProposal(proposalText)
@@ -194,11 +194,8 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         } else {
-            val modelAvailabilityMessage = if (!modelWindowOpen) {
-                "The shared AI model is reserved for all three agents between 01:00 and 06:00. I can still record supported expenses, income, budgets, lending and repayments, and calculate spending/Khata summaries at any time. Model-assisted interpretation will be available in the next nightly window."
-            } else {
+            val modelAvailabilityMessage =
                 "Load and activate a compatible verified on-device model in Settings for flexible phrasing. Built-in financial commands and local spending/Khata analysis work without it."
-            }
             _state.value = _state.value.copy(
                 messages = _state.value.messages + AgentChatMessage(role = "assistant", text = result.message + " " + modelAvailabilityMessage),
                 pendingAction = null,
