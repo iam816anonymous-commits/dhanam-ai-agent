@@ -1,6 +1,8 @@
 package com.aistudio.dhanam.expense.security
 
+import androidx.biometric.BiometricManager
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -13,11 +15,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -27,6 +31,7 @@ import androidx.compose.ui.unit.dp
 fun PinSettingsSection() {
     val context = LocalContext.current
     var configured by remember { mutableStateOf(PinSecurity.isConfigured(context)) }
+    var biometricEnabled by remember { mutableStateOf(PinSecurity.isBiometricEnabled(context)) }
     var currentPin by remember { mutableStateOf("") }
     var newPin by remember { mutableStateOf("") }
     var confirmPin by remember { mutableStateOf("") }
@@ -59,9 +64,36 @@ fun PinSettingsSection() {
                 } catch (e: Exception) { message = e.message ?: "Could not save PIN." }
             }, modifier = Modifier.fillMaxWidth()) { Text(if (configured) "Change PIN" else "Enable PIN lock") }
             if (configured) {
+                val biometricAvailable = BiometricManager.from(context)
+                    .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("Biometric unlock", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            if (biometricAvailable) "Fingerprint or face unlock; PIN remains the fallback."
+                            else "No enrolled strong biometric is available. PIN unlock remains active.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = biometricEnabled,
+                        onCheckedChange = {
+                            biometricEnabled = it
+                            PinSecurity.setBiometricEnabled(context, it)
+                        },
+                        enabled = biometricAvailable || biometricEnabled
+                    )
+                }
+            }
+            if (configured) {
                 TextButton(onClick = {
                     if (PinSecurity.clearPin(context, currentPin)) {
-                        configured = false; currentPin = ""; newPin = ""; confirmPin = ""
+                        configured = false; biometricEnabled = false; currentPin = ""; newPin = ""; confirmPin = ""
                         message = "PIN lock disabled."
                     } else message = "Current PIN is incorrect or temporarily locked."
                 }) { Text("Disable PIN lock") }
