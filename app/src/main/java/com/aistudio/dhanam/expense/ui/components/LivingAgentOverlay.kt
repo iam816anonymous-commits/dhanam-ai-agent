@@ -36,6 +36,7 @@ fun LivingAgentOverlay(
     activity: String,
     status: String?,
     onNavigate: (AppDestination) -> Unit,
+    onVoiceRecognized: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -69,6 +70,11 @@ fun LivingAgentOverlay(
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OfflineVoiceInput(
+                        enabled = activity !in setOf("thinking", "acting"),
+                        onRecognized = onVoiceRecognized,
+                        modifier = Modifier.padding(top = 6.dp)
                     )
                     TextButton(onClick = { onNavigate(AppDestination.AGENT); expanded = false }) { Text("Open assistant") }
                     TextButton(onClick = { onNavigate(AppDestination.EXPENSES); expanded = false }) { Text("Expenses") }
