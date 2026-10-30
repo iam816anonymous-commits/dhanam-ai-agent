@@ -8,6 +8,7 @@ import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
+import com.aistudio.dhanam.expense.agent.SharedAgentCoordinator
 import java.util.concurrent.Executors
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -50,6 +51,10 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
     }
     private val dispatcher = executor.asCoroutineDispatcher()
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
+    // One coordinator per model owner: every specialist shares the same broker and inference lock.
+    val sharedAgentCoordinator: SharedAgentCoordinator by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        SharedAgentCoordinator(this)
+    }
     private var engine: Engine? = null
     private var conversation: Conversation? = null
     @Volatile private var activeAgentConversation: Conversation? = null
