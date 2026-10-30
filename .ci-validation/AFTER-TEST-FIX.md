@@ -1,0 +1,1 @@
+Temporary validation marker only; this branch tracks current main and must not be merged.
