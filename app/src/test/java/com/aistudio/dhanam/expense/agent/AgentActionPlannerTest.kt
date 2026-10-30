@@ -172,7 +172,7 @@ class AgentActionPlannerTest {
     }
 
     @Test fun spendingQueriesAreNotMistakenForNewExpenses() {
-        assertEquals(null, AgentActionPlanner.parse("how much did I spend on lunch 250").action)
+        assertTrue(AgentActionPlanner.parse("how much did I spend on lunch 250").action is PlannedFinanceAction.AnalyzeSpending)
         assertEquals(null, AgentActionPlanner.parse("show food history 250").action)
     }
 
