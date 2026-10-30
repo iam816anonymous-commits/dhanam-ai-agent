@@ -231,7 +231,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
             var chunksSinceUiUpdate = 0
             agentConversation.sendMessageAsync(
                 prompt,
-                maxOutputToken = if (model.id == "phi4-mini-reasoning-int4-4096") 2048 else 512,
+                maxOutputToken = 512,
                 thinkingConfig = ThinkingConfig(enableThinking = false, thinkingTokenBudget = 0)
             ).collect { chunk ->
                 val peakBytes = ProcessMemoryBudget.readPeakResidentBytes()
@@ -378,6 +378,28 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                         )
                     }
                     memoryBudgetExceeded = false
+                } else if (model.id == "phi4-mini-reasoning-int4-4096") {
+                    // The published Phi-4 Mini reasoning bundle documents a LiteRT-LM 0.18.x
+                    // multi-turn KV-cache issue. Keep this model strictly one-turn per conversation.
+                    try {
+                        val oldConversation = conversation
+                        conversation = null
+                        oldConversation?.close()
+                        conversation = checkNotNull(engine).createConversation(createConversationConfig())
+                        _state.update {
+                            it.copy(
+                                status = "Response complete. Phi-4 uses an isolated one-turn conversation to avoid its published LiteRT-LM multi-turn cache issue.",
+                                error = null
+                            )
+                        }
+                    } catch (error: Exception) {
+                        conversation = null
+                        try { engine?.close() } catch (_: Exception) { }
+                        engine = null
+                        _state.update {
+                            it.copy(isReady = false, status = "Phi-4 conversation reset failed. Reload the model.", error = error.message)
+                        }
+                    }
                 } else if (stopRequested) {
                     // LiteRT-LM does not support reusing a Conversation after cancelProcess().
                     // Wait for the stream to end, then replace that conversation.
