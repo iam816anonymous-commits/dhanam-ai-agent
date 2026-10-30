@@ -48,7 +48,7 @@ object SkillLearningEngine {
                     val category = categoryCounts.maxByOrNull { it.value }?.key ?: return@mapNotNull null
                     SkillCandidate(
                         skillKey = sha256(normalizedTitle),
-                        title = "Category rule: $normalizedTitle",
+                        title = "Category rule: $normalizedTitle".take(120),
                         matchText = normalizedTitle,
                         category = category,
                         exampleCount = rows.size,
