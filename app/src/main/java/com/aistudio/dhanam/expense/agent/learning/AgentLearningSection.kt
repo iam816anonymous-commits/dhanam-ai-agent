@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aistudio.dhanam.expense.data.FinanceDatabase
 import java.time.LocalDate
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 @Composable
@@ -99,10 +100,29 @@ fun AgentLearningSection() {
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = {
-                                scope.launch { db.financeDao().approveAgentSkill(skill.id, System.currentTimeMillis()) }
+                                scope.launch {
+                                    try {
+                                        val updated = db.financeDao().approveAgentSkill(skill.id, System.currentTimeMillis())
+                                        skillActionMessage = if (updated == 1) "Approved ${skill.title} version ${skill.version}."
+                                            else "This skill proposal is no longer eligible for approval."
+                                    } catch (error: CancellationException) {
+                                        throw error
+                                    } catch (error: Exception) {
+                                        skillActionMessage = error.message ?: "Could not approve this skill."
+                                    }
+                                }
                             }, modifier = Modifier.weight(1f)) { Text("Approve skill") }
                             OutlinedButton(onClick = {
-                                scope.launch { db.financeDao().rejectAgentSkill(skill.id) }
+                                scope.launch {
+                                    try {
+                                        val updated = db.financeDao().rejectAgentSkill(skill.id)
+                                        skillActionMessage = if (updated == 1) "Rejected ${skill.title}." else "This proposal was already resolved."
+                                    } catch (error: CancellationException) {
+                                        throw error
+                                    } catch (error: Exception) {
+                                        skillActionMessage = error.message ?: "Could not reject this skill."
+                                    }
+                                }
                             }, modifier = Modifier.weight(1f)) { Text("Reject") }
                         }
                     }
@@ -130,10 +150,16 @@ fun AgentLearningSection() {
                     if (hasPreviousVersion) {
                         OutlinedButton(onClick = {
                             scope.launch {
-                                skillActionMessage = if (db.financeDao().rollbackAgentSkill(skill.skillKey, System.currentTimeMillis())) {
-                                    "Rolled back ${skill.title} to its previous validated version."
-                                } else {
-                                    "No previous validated version was available."
+                                try {
+                                    skillActionMessage = if (db.financeDao().rollbackAgentSkill(skill.skillKey, System.currentTimeMillis())) {
+                                        "Rolled back ${skill.title} to its previous validated version."
+                                    } else {
+                                        "No previous validated version was available."
+                                    }
+                                } catch (error: CancellationException) {
+                                    throw error
+                                } catch (error: Exception) {
+                                    skillActionMessage = error.message ?: "Could not roll back this skill."
                                 }
                             }
                         }, modifier = Modifier.fillMaxWidth()) { Text("Roll back to previous version") }
