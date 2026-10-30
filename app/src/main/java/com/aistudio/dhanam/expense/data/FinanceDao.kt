@@ -11,6 +11,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FinanceDao {
+    @Query("SELECT * FROM agent_learning_reports ORDER BY report_date_epoch_day DESC LIMIT 30")
+    fun observeAgentLearningReports(): Flow<List<AgentLearningReportEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAgentLearningReport(report: AgentLearningReportEntity): Long
+
     @Query("SELECT * FROM expenses ORDER BY occurred_on_epoch_day DESC, id DESC")
     fun observeExpenses(): Flow<List<ExpenseEntity>>
 
