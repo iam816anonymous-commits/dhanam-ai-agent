@@ -86,11 +86,17 @@ interface FinanceDao {
     @Query("SELECT * FROM agent_messages ORDER BY created_at_epoch_millis DESC LIMIT 100")
     fun observeAgentMessages(): Flow<List<AgentMessageEntity>>
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAgentMessage(message: AgentMessageEntity): Long
 
     @Query("DELETE FROM agent_messages WHERE created_at_epoch_millis < :cutoffEpochMillis")
     suspend fun pruneAgentMessages(cutoffEpochMillis: Long): Int
+
+    @Query("DELETE FROM agent_memories")
+    suspend fun clearAgentMemories(): Int
+
+    @Query("DELETE FROM agent_messages")
+    suspend fun clearAgentMessages(): Int
 
     @Query("SELECT * FROM income_records ORDER BY occurred_on_epoch_day DESC, id DESC")
     fun observeIncome(): Flow<List<IncomeEntity>>
