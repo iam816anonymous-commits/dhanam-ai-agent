@@ -41,6 +41,7 @@ fun AgentLearningSection() {
     val memories by db.financeDao().observeAgentMemories().collectAsState(initial = emptyList())
     val messages by db.financeDao().observeAgentMessages().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
+    var skillActionMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(enabled) {
         if (enabled) NightlyAgentLearningScheduler.scheduleNext(context)
@@ -111,6 +112,43 @@ fun AgentLearningSection() {
         val activeCount = skills.count { it.status == "ACTIVE" }
         Text("Active approved skills: $activeCount", style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+        val activeSkills = skills.filter { it.status == "ACTIVE" }
+        activeSkills.forEach { skill ->
+            val hasPreviousVersion = skills.any {
+                it.skillKey == skill.skillKey && it.version < skill.version && it.status == "SUPERSEDED"
+            }
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(skill.title, fontWeight = FontWeight.SemiBold)
+                    Text("Active version ${skill.version} · ${skill.category}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (hasPreviousVersion) {
+                        OutlinedButton(onClick = {
+                            scope.launch {
+                                skillActionMessage = if (db.financeDao().rollbackAgentSkill(skill.skillKey, System.currentTimeMillis())) {
+                                    "Rolled back ${skill.title} to its previous validated version."
+                                } else {
+                                    "No previous validated version was available."
+                                }
+                            }
+                        }, modifier = Modifier.fillMaxWidth()) { Text("Roll back to previous version") }
+                    } else {
+                        Text("No previous approved version is available to restore.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+        if (skillActionMessage != null) {
+            Text(skillActionMessage.orEmpty(), color = MaterialTheme.colorScheme.primary)
+            TextButton(onClick = { skillActionMessage = null }) { Text("Dismiss") }
+        }
 
         Text("Shared agent memory", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Text(
