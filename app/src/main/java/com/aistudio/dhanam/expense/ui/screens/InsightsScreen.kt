@@ -86,7 +86,13 @@ fun InsightsScreen() {
             val snapshot = summary
             scope.launch {
                 try {
-                    withContext(Dispatchers.IO) { FinancePdfReportExporter.write(context.contentResolver, uri, snapshot) }
+                    withContext(Dispatchers.IO) {
+                        FinancePdfReportExporter.write(
+                            context.contentResolver, uri, snapshot,
+                            incomeTotalPaise = incomeTotalPaise.takeIf { hasIncomeRecords },
+                            netCashFlowPaise = netCashFlowPaise
+                        )
+                    }
                     message = "PDF report saved."
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { message = e.message ?: "PDF export failed." }
