@@ -24,7 +24,7 @@ object SkillLearningEngine {
 
     fun propose(expenses: List<ExpenseEntity>): List<SkillCandidate> {
         return expenses.asSequence()
-            .filter { it.amountPaise > 0 && it.title.isNotBlank() }
+            .filter { it.amountPaise > 0 && it.title.isNotBlank() && it.category in setOf("Food", "Transport", "Shopping", "Bills", "Health", "Education", "Other") }
             .groupBy { normalize(it.title) }
             .filter { (title, rows) ->
                 title.length in 3..120 &&
@@ -68,5 +68,5 @@ object SkillLearningEngine {
     private fun sha256(value: String): String =
         MessageDigest.getInstance("SHA-256")
             .digest(value.toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
 }
