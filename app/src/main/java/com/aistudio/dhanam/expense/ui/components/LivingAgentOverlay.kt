@@ -71,11 +71,6 @@ fun LivingAgentOverlay(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    OfflineVoiceInput(
-                        enabled = activity !in setOf("thinking", "acting"),
-                        onRecognized = onVoiceRecognized,
-                        modifier = Modifier.padding(top = 6.dp)
-                    )
                     TextButton(onClick = { onNavigate(AppDestination.AGENT); expanded = false }) { Text("Open assistant") }
                     TextButton(onClick = { onNavigate(AppDestination.EXPENSES); expanded = false }) { Text("Expenses") }
                     TextButton(onClick = { onNavigate(AppDestination.KHATA); expanded = false }) { Text("Khata") }
@@ -106,6 +101,14 @@ fun LivingAgentOverlay(
                 }
             }
         }
+
+        OfflineVoiceInput(
+            enabled = activity !in setOf("thinking", "acting"),
+            onRecognized = onVoiceRecognized,
+            showLanguageSelector = expanded,
+            showStatus = expanded,
+            modifier = Modifier.padding(end = 4.dp)
+        )
 
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
