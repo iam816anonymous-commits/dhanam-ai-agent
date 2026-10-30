@@ -73,6 +73,7 @@ fun AgentScreen(viewModel: AgentViewModel = viewModel()) {
             QuickCommand("◷ Budget", "set food budget to 3000"),
             QuickCommand("↩ Repayment", "record repayment 500 from Ravi"),
             QuickCommand("📊 Spending analysis", "How can I reduce my expenses?"),
+            QuickCommand("♙ Khata summary", "who owes me money?"),
             QuickCommand("✦ Help", "help")
         )
     }
