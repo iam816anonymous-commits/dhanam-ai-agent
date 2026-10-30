@@ -36,7 +36,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
     fun attachLocalInference(viewModel: LocalInferenceViewModel) {
         localInference = viewModel
-        sharedCoordinator = SharedAgentCoordinator(viewModel)
+        sharedCoordinator = viewModel.sharedAgentCoordinator
     }
 
 
@@ -122,14 +122,17 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             _state.value = _state.value.copy(busy = true)
             viewModelScope.launch {
                 try {
-                    val proposalText = sharedCoordinator?.run(
+                    val coordinator = checkNotNull(sharedCoordinator) {
+                        "The shared financial model coordinator is not attached."
+                    }
+                    val proposalText = coordinator.run(
                         AgentTaskRequest(
                             role = DhanamAgentRole.FINANCE_OPERATIONS,
                             prompt = AgentActionPlanner.modelPrompt(input),
                             priority = AgentTaskPriority.USER_REQUEST,
                             requiresNightWindow = false
                         )
-                    )?.output ?: inference.generateForAgent(AgentActionPlanner.modelPrompt(input))
+                    ).output
                     val proposal = AgentActionPlanner.parseModelProposal(proposalText)
                     _state.value = _state.value.copy(
                         messages = _state.value.messages + AgentChatMessage(role = "assistant", text = proposal.message),
