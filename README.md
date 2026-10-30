@@ -7,15 +7,15 @@ A finance-only, local-first Android personal-finance application. The original [
 The existing five-destination Compose UI (Agent, Expenses, Khata, Insights, Settings) and dark emerald / warm-gold design are retained. The finance foundation is extended with a coordinated three-agent system and nightly learning workflow.
 
 Implemented in the current codebase:
-- Local expense, budget, lending/borrowing and repayment workflows with validated financial writes.
+- Local expense, income, budget, lending/borrowing and repayment workflows with validated financial writes.
 - Integer-paise calculations and deterministic ledger-backed insights.
-- Monthly/category spending movement, budget-overrun checks, recurring-expense candidates and Khata outstanding analysis.
+- Monthly/category spending movement, income-versus-expense cash-flow summaries, budget-overrun checks, recurring-expense candidates and Khata outstanding analysis.
 - One process-wide LiteRT-LM model owner shared by the UI and all three specialist agents.
 - A serialized inference gate so the model is never used concurrently by separate agents or interactive chat.
 - Finance Operations, Financial Intelligence and Skill Improvement specialist roles.
 - Nightly WorkManager scheduling between 01:00 and 06:00 local time, subject to Android battery/idle policies.
 - Versioned exact-description category skill proposals, leave-one-out validation and explicit user approval.
-- Local daily agent reports, role-isolated bounded memories, auditable inter-agent handoffs and skill review in Settings.
+- Local daily agent reports, role-isolated bounded memories, auditable inter-agent handoffs and skill review in Settings.\n- Income records are stored separately from expenses and included in monthly cash-flow summaries and full-ledger CSV export.
 
 This is an implementation milestone, not a claim of release completion. Physical-device qualification, remaining finance-parity items and extended migration/security tests are still required.
 
