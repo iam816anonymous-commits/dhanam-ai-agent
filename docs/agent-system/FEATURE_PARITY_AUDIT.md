@@ -56,7 +56,7 @@ The Dhanam model manager now follows this approach for six LiteRT-LM artifacts. 
 
 | Tier | Model options | Download size | Runtime note |
 |---|---|---:|---|
-| Compact | SmolLM2 360M Instruct; Qwen3 0.6B INT4 No-Think | 374 MB; 347 MB | Intended for lower-memory phones; Qwen3 has a 1,280-token context |
+| Compact | SmolLM2 360M Instruct; Qwen3 0.6B INT8 No-Think | 374 MB; 347 MB | Intended for lower-memory phones; Qwen3 has a 1,280-token context |
 | Balanced | Qwen3 1.7B INT4; Qwen2.5 1.5B INT8 | 977 MB; 1.60 GB | Higher memory reserve and larger context |
 | Advanced | Qwen3 4B Mixed INT4; Phi-4 Mini Reasoning INT4 | 2.66 GB; 2.78 GB | Requires high physical and currently free RAM; Phi is reset to a fresh conversation after each answer because its publisher documents a LiteRT-LM 0.18.x multi-turn cache issue |
 
