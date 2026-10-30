@@ -1,6 +1,7 @@
 package com.aistudio.dhanam.expense.agent
 
 import com.aistudio.dhanam.expense.domain.ExpenseInputValidator
+import com.aistudio.dhanam.expense.data.AgentSkillEntity
 import com.aistudio.dhanam.expense.domain.KhataValidator
 import com.aistudio.dhanam.expense.domain.MoneyParser
 import java.time.LocalDate
@@ -29,6 +30,45 @@ object AgentActionPlanner {
         "shopping" to "Shopping", "clothes" to "Shopping", "bill" to "Bills", "bills" to "Bills", "electricity" to "Bills", "rent" to "Bills",
         "health" to "Health", "medicine" to "Health", "medical" to "Health", "education" to "Education", "fee" to "Education", "other" to "Other"
     )
+
+    /** Uses only explicitly approved, exact-description category rules. */
+    fun parseWithLearnedSkills(text: String, activeSkills: List<AgentSkillEntity>): PlannerResult {
+        if (activeSkills.isEmpty()) return parse(text)
+        val input = text.trim().replace(Regex("""\\s+"""), " ").take(1000)
+        val lower = input.lowercase()
+        if (input.isEmpty() || lower.contains("budget") || lower.contains("repayment") ||
+            listOf("how much", "what did i spend", "show ", "list ", "history", "what is").any { lower.startsWith(it) }) {
+            return parse(text)
+        }
+        val skill = activeSkills.asSequence()
+            .filter { it.status == "ACTIVE" }
+            .sortedByDescending { it.matchText.length }
+            .firstOrNull { lower.contains(it.matchText.lowercase()) }
+            ?: return parse(text)
+        val amount = amountPattern.findAll(input).lastOrNull()?.groupValues?.get(1) ?: return parse(text)
+        val hasExpenseVerb = listOf("spent", "spend", "expense", "bought", "buy", "paid", "purchase", "purchased", "add", "record", "log", "note", "cost")
+            .any { lower.contains(it) }
+        val remainder = lower
+            .replace(amountPattern.findAll(input).last().value.lowercase(), " ")
+            .replace(Regex("""[₹,]"""), " ")
+            .replace(Regex("""\\b(?:i|my|spent|spend|expense|add|record|log|note|bought|buy|paid|purchase|purchased|for|on|to|the|a|an|rupees|rs)\\b"""), " ")
+            .replace(Regex("""\\s+"""), " ")
+            .trim()
+        if (!hasExpenseVerb && remainder != skill.matchText.lowercase()) return parse(text)
+        return try {
+            val validated = ExpenseInputValidator.validate(
+                skill.matchText, amount, skill.category, LocalDate.now().toString(), ""
+            )
+            PlannerResult(
+                PlannedFinanceAction.AddExpense(
+                    validated.title, validated.amountPaise, validated.category, validated.occurredOn
+                ),
+                "I matched “${skill.matchText}” using your approved local category skill. Review the expense before saving."
+            )
+        } catch (error: Exception) {
+            PlannerResult(message = error.message ?: "I could not validate this learned expense entry.", needsClarification = true)
+        }
+    }
 
     fun parse(text: String): PlannerResult {
         val input = text.trim().replace(Regex("""\s+"""), " ").take(1000)
