@@ -9,7 +9,7 @@ The existing five-destination Compose UI (Agent, Expenses, Khata, Insights, Sett
 Implemented in the current codebase:
 - Local expense, income, budget, lending/borrowing and repayment workflows with validated financial writes.
 - Integer-paise calculations and deterministic ledger-backed insights.
-- Monthly/category spending movement, income-versus-expense cash-flow summaries, budget-overrun checks, recurring-expense candidates and Khata outstanding analysis.
+- Monthly/category spending movement, income-versus-expense cash-flow summaries, budget-overrun checks, recurring-expense candidates and Khata outstanding analysis. The finance agent can answer read-only spending-reduction and lending-summary questions directly from the local ledger.
 - One process-wide LiteRT-LM model owner shared by the UI and all three specialist agents.
 - A serialized inference gate so the model is never used concurrently by separate agents or interactive chat.
 - Finance Operations, Financial Intelligence and Skill Improvement specialist roles.
