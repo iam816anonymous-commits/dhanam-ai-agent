@@ -24,6 +24,32 @@ class FinanceLedgerCsvExporterTest {
         assertTrue(rows.all { it.split(",").size == 23 })
     }
 
+    @Test fun everyRecordTypeMatchesTheExtendedLedgerHeaderWidth() {
+        val date = LocalDate.parse("2026-10-30").toEpochDay()
+        val loan = KhataLoanEntity(
+            id = 1, personName = "Ravi", direction = "LENT", principalPaise = 10_000,
+            paidPaise = 0, openedOnEpochDay = date, dueOnEpochDay = null, note = "",
+            createdAtEpochMillis = 1, updatedAtEpochMillis = 1
+        )
+        val repayment = RepaymentEntity(
+            id = 1, loanId = 1, amountPaise = 1_000, paidOnEpochDay = date,
+            note = "", requestId = "request", createdAtEpochMillis = 1
+        )
+        val budget = BudgetEntity(
+            id = 1, category = "Food", monthEpochDay = date, amountPaise = 50_000,
+            createdAtEpochMillis = 1, updatedAtEpochMillis = 1
+        )
+        val income = IncomeEntity(
+            id = 1, title = "Salary", amountPaise = 100_000, category = "Salary",
+            occurredOnEpochDay = date, note = "", createdAtEpochMillis = 1, updatedAtEpochMillis = 1
+        )
+        val rows = FinanceCsvTransfer.parseRows(
+            FinanceLedgerCsvExporter.export(listOf(loan), listOf(repayment), listOf(budget), listOf(income))
+        )
+        assertEquals(5, rows.size)
+        rows.forEach { assertEquals(23, it.size) }
+    }
+
     @Test fun exportsLoansRepaymentsAndBudgetsWithTypedRowsAndExactMoney() {
         val loan = KhataLoanEntity(
             id = 1, personName = "Ravi, Kumar", direction = "LENT", principalPaise = 10050, paidPaise = 500,
