@@ -1,5 +1,7 @@
 package com.aistudio.dhanam.expense.agent
 
+import com.aistudio.dhanam.expense.data.AgentSkillEntity
+import com.aistudio.dhanam.expense.domain.KhataValidator
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -96,6 +98,96 @@ class AgentActionPlannerTest {
     @Test fun spendingQueriesAreNotMistakenForNewExpenses() {
         assertEquals(null, AgentActionPlanner.parse("how much did I spend on lunch 250").action)
         assertEquals(null, AgentActionPlanner.parse("show food history 250").action)
+    }
+
+    @Test fun approvedExactDescriptionSkillCategorizesAnExpense() {
+        val skill = AgentSkillEntity(
+            skillKey = "a".repeat(64),
+            version = 1,
+            title = "Category rule: metro card",
+            matchText = "metro card",
+            category = "Transport",
+            exampleCount = 4,
+            testPassCount = 4,
+            testTotalCount = 4,
+            status = "ACTIVE",
+            createdAtEpochMillis = 1L,
+            approvedAtEpochMillis = 2L
+        )
+        val result = AgentActionPlanner.parseWithLearnedSkills("I spent 80 on Metro Card", listOf(skill))
+        val action = result.action as PlannedFinanceAction.AddExpense
+        assertEquals("metro card", action.title)
+        assertEquals("Transport", action.category)
+        assertEquals(8_000L, action.amountPaise)
+    }
+
+    @Test fun proposedSkillCannotAffectExpenseClassification() {
+        val skill = AgentSkillEntity(
+            skillKey = "b".repeat(64),
+            version = 1,
+            title = "Category rule: metro card",
+            matchText = "metro card",
+            category = "Transport",
+            exampleCount = 4,
+            testPassCount = 4,
+            testTotalCount = 4,
+            status = "PROPOSED",
+            createdAtEpochMillis = 1L
+        )
+        val result = AgentActionPlanner.parseWithLearnedSkills("I spent 80 on Metro Card", listOf(skill))
+        val action = result.action as PlannedFinanceAction.AddExpense
+        assertEquals("Other", action.category)
+        assertEquals("Metro Card", action.title)
+    }
+
+    @Test fun learnedSkillDoesNotMatchInsideALongerWord() {
+        val skill = AgentSkillEntity(
+            skillKey = "c".repeat(64),
+            version = 1,
+            title = "Category rule: metro card",
+            matchText = "metro card",
+            category = "Transport",
+            exampleCount = 4,
+            testPassCount = 4,
+            testTotalCount = 4,
+            status = "ACTIVE",
+            createdAtEpochMillis = 1L,
+            approvedAtEpochMillis = 2L
+        )
+        val result = AgentActionPlanner.parseWithLearnedSkills("I spent 80 on Metro Cardigan", listOf(skill))
+        val action = result.action as PlannedFinanceAction.AddExpense
+        assertEquals("Other", action.category)
+        assertEquals("Metro Cardigan", action.title)
+    }
+
+    @Test fun lendingCommandCreatesValidatedKhataPreview() {
+        val result = AgentActionPlanner.parse("I lent 500 to Ravi")
+        val action = result.action as PlannedFinanceAction.AddLoan
+        assertEquals("Ravi", action.personName)
+        assertEquals(KhataValidator.LENT, action.direction)
+        assertEquals(50_000L, action.principalPaise)
+    }
+
+    @Test fun borrowingCommandCreatesValidatedKhataPreview() {
+        val result = AgentActionPlanner.parse("I borrowed 300 from Ravi")
+        val action = result.action as PlannedFinanceAction.AddLoan
+        assertEquals("Ravi", action.personName)
+        assertEquals(KhataValidator.BORROWED, action.direction)
+        assertEquals(30_000L, action.principalPaise)
+    }
+
+    @Test fun incompleteLendingCommandAsksForThePersonInsteadOfCreatingAnExpense() {
+        val result = AgentActionPlanner.parse("I lent 500")
+        assertEquals(null, result.action)
+        assertTrue(result.needsClarification)
+    }
+
+    @Test fun khataDraftAmountCanBeCorrectedBeforeConfirmation() {
+        val initial = AgentActionPlanner.parse("I lent 500 to Ravi").action as PlannedFinanceAction.AddLoan
+        val corrected = AgentActionPlanner.applyCorrection(initial, "actually change amount to 750")
+        val action = corrected?.action as PlannedFinanceAction.AddLoan
+        assertEquals(75_000L, action.principalPaise)
+        assertEquals("Ravi", action.personName)
     }
 
 }

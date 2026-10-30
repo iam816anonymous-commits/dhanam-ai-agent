@@ -1,6 +1,6 @@
 # Implementation phases, dependencies and acceptance gates
 
-Each phase is delivered as coherent, reviewable batches. Later phases are started only when explicitly requested.
+Each phase is delivered as a coherent, reviewable batch with its own tests and acceptance gate. The user has requested continued phase-by-phase implementation through release readiness; do not stop for routine feature approval.
 
 ## Phase 0 — Audit/specification
 Repository findings, feature matrix, architecture/tool contract, privacy/threat model, dependency/runtime plan and acceptance tests.
@@ -67,3 +67,34 @@ Security/privacy review, API 27/low-resource tests, accessibility, performance, 
 - Update ADRs before implementation if research changes architecture/security.
 - CI does not imply physical-device validation.
 - Stop at phase acceptance gates; no later phase begins automatically.
+
+
+## Phase 8 — Finance-only coordinated agents
+
+- Finance Operations, Financial Intelligence and Skill Improvement have separate responsibilities and share one process-wide LiteRT-LM model owner.
+- Serialize every model interaction, including interactive chat, against the shared Engine.
+- Keep deterministic paise arithmetic and validated repository operations outside the LLM.
+- Add local-ledger spending analysis, recurring candidates, budget-overrun checks and savings recommendations.
+- Add exact-description skill proposals with holdout validation and explicit user approval.
+
+Acceptance: role-boundary tests, deterministic finance-analysis tests, skill-learning tests, no generic tools, no concurrent Engine access and no direct LLM financial writes.
+
+## Phase 9 — Nightly agent work and learning history
+
+- Schedule best-effort WorkManager work between 01:00 and 06:00 local time with battery/idle constraints.
+- Run all three specialists sequentially through the same selected, verified model when device resources and time permit.
+- Fall back to deterministic local analysis if the model is not selected, downloaded, compatible or available.
+- Persist daily agent reports and proposed improvements locally; expose them in the existing Settings UI.
+- Version learned rules and require explicit approval before activation.
+
+Acceptance: exact time-window boundary tests, report persistence/migration tests, model load/unload recovery, idempotent retries, and physical-device overnight tests. Android does not guarantee exact execution timing.
+
+## Phase 10 — Persistent agent memory, evaluation and release qualification
+
+- Add bounded, role-specific local memories and structured inter-agent task/event history.
+- Use previous verified reports as context without treating model-generated text as trusted instructions.
+- Add feedback on recommendations, regression evaluation and rollback for skill versions.
+- Complete remaining feature parity, backup/restore, security review, APK/release signing and Android 8.1 acceptance.
+- Measure real-device RAM, thermal, battery and model inference behaviour.
+
+Acceptance: memory isolation tests, privacy/retention tests, recommendation evaluation, complete migration fixtures, CI green and documented physical-device evidence.

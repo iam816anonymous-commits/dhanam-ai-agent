@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.aistudio.dhanam.expense.data.ExpenseEntity
+import com.aistudio.dhanam.expense.data.KhataLoanEntity
+import com.aistudio.dhanam.expense.data.AgentSkillEntity
 import com.aistudio.dhanam.expense.data.RepaymentEntity
 import com.aistudio.dhanam.expense.data.FinanceDatabase
 import com.aistudio.dhanam.expense.domain.MoneyParser
@@ -13,13 +15,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.util.UUID
+import java.math.BigDecimal
 import java.time.LocalDate
 
 data class AgentChatMessage(val id: String = UUID.randomUUID().toString(), val role: String, val text: String)
 data class AgentState(
-    val messages: List<AgentChatMessage> = listOf(AgentChatMessage(role = "assistant", text = "Hi, I'm Dhanam. I can prepare an expense or budget change for your review. I will never save a financial change without your confirmation.")),
+    val messages: List<AgentChatMessage> = listOf(AgentChatMessage(role = "assistant", text = "Hi, I'm Dhanam. I can prepare expenses, budgets, lending, borrowing and repayments for your review. I will never save a financial change without your confirmation.")),
     val pendingAction: PlannedFinanceAction? = null,
     val busy: Boolean = false,
     val activity: String = "idle",
@@ -31,12 +35,21 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     private val dao = db.financeDao()
     private var localInference: LocalInferenceViewModel? = null
     private var sharedCoordinator: SharedAgentCoordinator? = null
+    @Volatile private var activeSkills: List<AgentSkillEntity> = emptyList()
     private val _state = MutableStateFlow(AgentState())
     val state: StateFlow<AgentState> = _state.asStateFlow()
 
+    init {
+        viewModelScope.launch {
+            dao.observeAgentSkills().collect { skills ->
+                activeSkills = skills.filter { it.status == "ACTIVE" }
+            }
+        }
+    }
+
     fun attachLocalInference(viewModel: LocalInferenceViewModel) {
         localInference = viewModel
-        sharedCoordinator = SharedAgentCoordinator(viewModel)
+        sharedCoordinator = viewModel.sharedAgentCoordinator
     }
 
 
@@ -76,24 +89,30 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         // so the old confirmation cannot be tapped while the new request is being resolved.
         _state.value = _state.value.copy(pendingAction = null)
 
-        val repayment = Regex("""(?i)^record repayment\s+([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s+from\s+(.+)$""").matchEntire(input)
+        val repayment = Regex("""(?i)^record repayment\s+([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s+(from|to)\s+(.+)$""").matchEntire(input)
         if (repayment != null) {
             _state.value = _state.value.copy(busy = true)
             viewModelScope.launch {
                 try {
                     val amountPaise = MoneyParser.parseRupeesToPaise(repayment.groupValues[1])
-                    val person = repayment.groupValues[2].trim()
+                    val repaymentDirection = if (repayment.groupValues[2].equals("from", ignoreCase = true)) {
+                        KhataValidator.LENT
+                    } else {
+                        KhataValidator.BORROWED
+                    }
+                    val person = repayment.groupValues[3].trim()
                     val matches = dao.observeLoans().first().filter {
                         it.personName.equals(person, ignoreCase = true) &&
-                            it.direction == KhataValidator.LENT && it.outstandingPaise > 0
+                            it.direction == repaymentDirection && it.outstandingPaise > 0
                     }
                     if (matches.size != 1) {
-                        appendAssistant(if (matches.isEmpty()) "I couldn't find an open loan for “$person” that you lent them. Check the name and Khata records; no change was made." else "More than one open Khata record matches “$person”. Open Khata and resolve the exact record first; no change was made.")
+                        val relation = if (repaymentDirection == KhataValidator.LENT) "you lent them" else "you borrowed from them"
+                        appendAssistant(if (matches.isEmpty()) "I couldn't find an open loan for “$person” that $relation. Check the name and Khata records; no change was made." else "More than one open Khata record matches “$person”. Open Khata and resolve the exact record first; no change was made.")
                         _state.value = _state.value.copy(activity = "idle", busy = false)
                     } else {
                         val loan = matches.single()
                         require(amountPaise <= loan.outstandingPaise) { "Repayment exceeds the outstanding amount of ${MoneyParser.formatPaise(loan.outstandingPaise)}." }
-                        val action = PlannedFinanceAction.RecordRepayment(person, amountPaise, loan.id, LocalDate.now(), UUID.randomUUID().toString())
+                        val action = PlannedFinanceAction.RecordRepayment(person, amountPaise, loan.id, LocalDate.now(), UUID.randomUUID().toString(), repaymentDirection)
                         _state.value = _state.value.copy(
                             messages = _state.value.messages + AgentChatMessage(role = "assistant", text = "I found one matching open Khata record. Review it below; nothing is saved yet."),
                             pendingAction = action, activity = "awaiting_confirmation", busy = false
@@ -107,7 +126,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        val result = AgentActionPlanner.parse(input)
+        val result = AgentActionPlanner.parseWithLearnedSkills(input, activeSkills)
         if (result.action != null || !result.needsClarification) {
             _state.value = _state.value.copy(
                 messages = _state.value.messages + AgentChatMessage(role = "assistant", text = result.message),
@@ -122,14 +141,17 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             _state.value = _state.value.copy(busy = true)
             viewModelScope.launch {
                 try {
-                    val proposalText = sharedCoordinator?.run(
+                    val coordinator = checkNotNull(sharedCoordinator) {
+                        "The shared financial model coordinator is not attached."
+                    }
+                    val proposalText = coordinator.run(
                         AgentTaskRequest(
                             role = DhanamAgentRole.FINANCE_OPERATIONS,
                             prompt = AgentActionPlanner.modelPrompt(input),
                             priority = AgentTaskPriority.USER_REQUEST,
                             requiresNightWindow = false
                         )
-                    )?.output ?: inference.generateForAgent(AgentActionPlanner.modelPrompt(input))
+                    ).output
                     val proposal = AgentActionPlanner.parseModelProposal(proposalText)
                     _state.value = _state.value.copy(
                         messages = _state.value.messages + AgentChatMessage(role = "assistant", text = proposal.message),
@@ -176,6 +198,40 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                         }
                         appendAssistant("Verified: expense “${saved.title}” saved as record #${saved.id} for ${MoneyParser.formatPaise(saved.amountPaise)}.")
                     }
+                    is PlannedFinanceAction.AddLoan -> {
+                        val validated = KhataValidator.validate(
+                            action.personName,
+                            action.direction,
+                            BigDecimal.valueOf(action.principalPaise, 2).toPlainString(),
+                            action.openedOn.toString(),
+                            action.dueOn?.toString().orEmpty(),
+                            action.note,
+                            action.phoneNumber
+                        )
+                        val now = System.currentTimeMillis()
+                        val id = dao.insertLoan(
+                            KhataLoanEntity(
+                                personName = validated.personName,
+                                direction = validated.direction,
+                                principalPaise = validated.principalPaise,
+                                paidPaise = 0L,
+                                openedOnEpochDay = validated.openedOn.toEpochDay(),
+                                dueOnEpochDay = validated.dueOn?.toEpochDay(),
+                                note = validated.note,
+                                createdAtEpochMillis = now,
+                                updatedAtEpochMillis = now,
+                                phoneNumber = validated.phoneNumber
+                            )
+                        )
+                        val saved = dao.findLoan(id)
+                        check(saved != null && saved.personName == validated.personName &&
+                            saved.direction == validated.direction && saved.principalPaise == validated.principalPaise &&
+                            saved.outstandingPaise == validated.principalPaise) {
+                            "Khata save could not be verified. Check Khata before retrying."
+                        }
+                        val relation = if (saved.direction == KhataValidator.LENT) "lent to" else "borrowed from"
+                        appendAssistant("Verified: recorded ${MoneyParser.formatPaise(saved.principalPaise)} $relation ${saved.personName} in Khata.")
+                    }
                     is PlannedFinanceAction.SetBudget -> {
                         val monthEpochDay = action.month.atDay(1).toEpochDay()
                         dao.saveBudget(action.category, monthEpochDay, action.amountPaise, System.currentTimeMillis())
@@ -187,7 +243,8 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     is PlannedFinanceAction.RecordRepayment -> {
                         val loan = dao.findLoan(action.loanId) ?: error("The Khata record no longer exists.")
-                        check(loan.personName.equals(action.personName, ignoreCase = true) && loan.outstandingPaise >= action.amountPaise && !loan.isSettled) {
+                        check(loan.personName.equals(action.personName, ignoreCase = true) &&
+                            loan.direction == action.direction && loan.outstandingPaise >= action.amountPaise && !loan.isSettled) {
                             "The Khata record changed or no longer has enough outstanding balance. Review it before retrying."
                         }
                         val inserted = dao.recordRepayment(RepaymentEntity(
@@ -220,7 +277,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             messages = listOf(
                 AgentChatMessage(
                     role = "assistant",
-                    text = "Hi, I'm Dhanam. I can prepare expenses, category budgets, and matched Khata repayments. I'll show a preview and ask before saving."
+                    text = "Hi, I'm Dhanam. I can prepare expenses, budgets, lending, borrowing and repayments. I'll show a preview and ask before saving."
                 )
             ),
             pendingAction = null,

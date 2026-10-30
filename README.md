@@ -1,47 +1,77 @@
 # Dhanam AI Agent
 
-A local-first Android financial assistant. The original [Dhanam AI repository](https://github.com/iam816anonymous-commits/dhanam-ai) remains the behavioral and visual reference.
+A finance-only, local-first Android personal-finance application. The original [Dhanam AI application](https://github.com/iam816anonymous-commits/dhanam-ai) is the behavioural and visual reference; this repository is the separate agent-enabled application.
 
-## Project status
+## Current implementation status
 
-**Current phase: Phase 1 — Android foundation and navigation.**
+The existing five-destination Compose UI (Agent, Expenses, Khata, Insights, Settings) and dark emerald / warm-gold design are retained. The finance foundation is extended with a coordinated three-agent system and nightly learning workflow.
 
-- [Phase 0 audit and repository findings](docs/phase-0/README.md)
-- [Architecture decisions](docs/phase-0/ARCHITECTURE_DECISIONS.md)
-- [Feature parity and source mapping](docs/phase-0/FEATURE_PARITY_MATRIX.md)
-- [Security, privacy and threat model](docs/phase-0/SECURITY_PRIVACY.md)
-- [Implementation phases and acceptance criteria](docs/phase-0/IMPLEMENTATION_PLAN.md)
-- [Phase 1 implementation notes](docs/phase-1/README.md)
+Implemented in the current codebase:
+- Local expense, budget, lending/borrowing and repayment workflows with validated financial writes.
+- Integer-paise calculations and deterministic ledger-backed insights.
+- Monthly/category spending movement, budget-overrun checks, recurring-expense candidates and Khata outstanding analysis.
+- One process-wide LiteRT-LM model owner shared by the UI and all three specialist agents.
+- A serialized inference gate so the model is never used concurrently by separate agents or interactive chat.
+- Finance Operations, Financial Intelligence and Skill Improvement specialist roles.
+- Nightly WorkManager scheduling between 01:00 and 06:00 local time, subject to Android battery/idle policies.
+- Versioned exact-description category skill proposals, leave-one-out validation and explicit user approval.
+- Local daily agent reports and skill review in Settings.
 
-## Current foundation
+This is an implementation milestone, not a claim of release completion. Physical-device qualification, remaining finance-parity items and extended migration/security tests are still required.
 
-- Native Kotlin + Jetpack Compose + Material 3.
-- Five working in-app destinations: Agent, Expenses, Khata, Insights and Settings.
-- Dark emerald / warm-gold visual system inspired by the original app.
-- Android API 27 minimum; Gradle wrapper and CI build pipeline.
-- No sample financial data, no fabricated balances and no fake agent success responses.
-- No network, microphone or other sensitive permissions in Phase 1.
+## Agent boundaries
 
-## Product constraints
+| Agent | Responsibility |
+|---|---|
+| Finance Operations | Expenses, income/finance records where supported, budgets, Khata, repayments and validated actions |
+| Financial Intelligence | Spending patterns, category changes, recurring candidates, budget overruns and savings recommendations |
+| Skill Improvement | Learn and test finance-specific local rules; suggest improvements without executing arbitrary code |
 
-- Finance-only scope; no general-purpose Android control or AccessibilityService automation.
-- No cloud inference or uploading financial records.
-- Model downloads will be explicit, optional and verified; model inference must work offline.
-- A model may propose a tool call, but trusted finance code validates, authorizes, executes and verifies financial actions.
-- Expense storage, full finance parity, agent execution and model runtime are not claimed complete yet; they belong to later phases.
+All agents share the same local model runtime. The nightly worker invokes them sequentially; each task is restricted to the finance domain. The LLM is advisory: trusted Kotlin/Room code owns monetary arithmetic, validation and database writes.
 
-## Build
+## Nightly learning
 
-Requires JDK 17 and Android SDK platform/build tools for API 35.
+1. Enable **Nightly agent preparation** in Settings.
+2. Select and download a compatible model using the existing model manager. The worker only uses the user's verified preferred model and repeats device-resource checks before loading it.
+3. WorkManager schedules eligible work for 01:00–06:00 with battery-not-low and device-idle constraints.
+4. Deterministic analysis and skill validation run even if the model is unavailable. If the model is ready, all three agents use the same engine sequentially.
+5. The daily report records completed work, model status, tested skill proposals and next improvements.
+
+Android background execution is best-effort. Doze, OEM battery management, force-stop, low battery or insufficient time can delay or skip a run. The app does not promise an exact five-hour execution window.
+
+## Privacy and safety
+
+- Financial records and analysis remain local; the Internet permission is used for explicit model downloads only.
+- No cloud inference or automatic financial transfers.
+- No generic device-control or AccessibilityService automation.
+- Model output cannot directly write financial records or alter permissions.
+- Learned skills are data-only exact-description category rules, never executable code. They require successful validation and user approval before use.
+- No neural-network weight fine-tuning is performed. Capability improvement is through validated local rules, persistent reports and advisory model suggestions.
+
+## Platform and build
+
+- Kotlin, Jetpack Compose, Material 3, Room/SQLite, WorkManager and LiteRT-LM.
+- Minimum Android API 27 (Android 8.1).
+- JDK 17 and Android SDK platform/build tools for API 35+.
+
+From the repository root:
 
 ```bash
-./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
 ```
 
 Windows:
 
 ```bat
-gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
 ```
 
-The debug APK is generated at `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions runs the same checks and uploads the APK as a workflow artifact.
+The debug APK is generated at `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions verifies the APK and uploads it as a workflow artifact.
+
+## Remaining acceptance work
+
+- Physical-device smoke tests on Android 8.1, including expense/Khata workflows, migrations, offline mode and nightly scheduling.
+- Measure model load peak RAM, thermal behaviour, battery impact and actual inference duration on the target handset.
+- Verify WorkManager execution across reboot, Doze, force-stop and battery restrictions.
+- Complete remaining feature-parity, security, backup/restore and release-signing work.
+- Add persistent per-agent memory and richer inter-agent task/event history; current cross-agent coordination is through the shared ledger, skill registry and sequential nightly reports.

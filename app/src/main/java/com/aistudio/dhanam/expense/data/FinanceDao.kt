@@ -11,8 +11,32 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FinanceDao {
+    @Query("SELECT * FROM agent_skills ORDER BY status, created_at_epoch_millis DESC")
+    fun observeAgentSkills(): Flow<List<AgentSkillEntity>>
+
+    @Query("SELECT * FROM agent_skills WHERE skill_key = :skillKey ORDER BY version DESC LIMIT 1")
+    suspend fun latestAgentSkill(skillKey: String): AgentSkillEntity?
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAgentSkillIfMissing(skill: AgentSkillEntity): Long
+
+    @Query("UPDATE agent_skills SET status = 'ACTIVE', approved_at_epoch_millis = :approvedAt WHERE id = :id AND status = 'PROPOSED' AND test_total_count >= 3 AND test_pass_count * 100 >= test_total_count * 90")
+    suspend fun approveAgentSkill(id: Long, approvedAt: Long): Int
+
+    @Query("UPDATE agent_skills SET status = 'REJECTED' WHERE id = :id AND status = 'PROPOSED'")
+    suspend fun rejectAgentSkill(id: Long): Int
+
+    @Query("SELECT * FROM agent_learning_reports ORDER BY report_date_epoch_day DESC LIMIT 30")
+    fun observeAgentLearningReports(): Flow<List<AgentLearningReportEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAgentLearningReport(report: AgentLearningReportEntity): Long
+
     @Query("SELECT * FROM expenses ORDER BY occurred_on_epoch_day DESC, id DESC")
     fun observeExpenses(): Flow<List<ExpenseEntity>>
+
+    @Query("SELECT * FROM expenses WHERE occurred_on_epoch_day >= :startEpochDay ORDER BY occurred_on_epoch_day DESC, id DESC")
+    suspend fun expensesSince(startEpochDay: Long): List<ExpenseEntity>
 
     @Query("SELECT * FROM expenses WHERE id = :id LIMIT 1")
     suspend fun findExpense(id: Long): ExpenseEntity?

@@ -8,6 +8,7 @@ import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
+import com.aistudio.dhanam.expense.agent.SharedAgentCoordinator
 import java.util.concurrent.Executors
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -22,9 +23,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 data class LocalInferenceState(
     val eligibility: DeviceEligibility? = null,
@@ -49,7 +53,13 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
         Thread(runnable, "Dhanam-LiteRT-LM").apply { isDaemon = true }
     }
     private val dispatcher = executor.asCoroutineDispatcher()
+    // Serializes interactive chat, agent inference and safe unload operations on one Engine.
+    private val modelUseMutex = Mutex()
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
+    // One coordinator per model owner: every specialist shares the same broker and inference lock.
+    val sharedAgentCoordinator: SharedAgentCoordinator by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        SharedAgentCoordinator(this)
+    }
     private var engine: Engine? = null
     private var conversation: Conversation? = null
     @Volatile private var activeAgentConversation: Conversation? = null
@@ -60,7 +70,10 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
     private val _state = MutableStateFlow(LocalInferenceState())
     val state: StateFlow<LocalInferenceState> = _state.asStateFlow()
 
-    init { refreshEligibility() }
+    init {
+        LocalInferenceRuntimeRegistry.attach(this)
+        refreshEligibility()
+    }
 
     fun refreshEligibility() {
         scope.launch {
@@ -71,8 +84,27 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
+    suspend fun loadModelAndAwait(): Boolean {
+        if (_state.value.isReady) return true
+        if (!_state.value.isLoading) loadModel()
+        // loadModel publishes isLoading synchronously; waiting for its completion also
+        // handles cancellation and a failed preferred-model/resource check without hanging.
+        return _state.first { !it.isLoading }.isReady
+    }
+
+    suspend fun unloadModelIfIdle(): Boolean = modelUseMutex.withLock {
+        withContext(dispatcher) {
+            if (_state.value.isGenerating || _state.value.isLoading) return@withContext false
+            releaseLoadedModel()
+            true
+        }
+    }
+
     fun loadModel() {
         if (_state.value.isLoading || _state.value.isReady) return
+        // Publish the loading transition synchronously so concurrent UI/worker callers await
+        // the same in-flight load rather than observing a stale previous error.
+        _state.update { it.copy(isLoading = true, error = null, status = "Checking model integrity and device resources…") }
         loadJob = scope.launch {
             _state.update { it.copy(isLoading = true, error = null, status = "Checking model integrity and device resources…") }
             try {
@@ -161,7 +193,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
     suspend fun generateForAgent(
         rawPrompt: String,
         systemInstruction: String = DEFAULT_AGENT_SYSTEM_INSTRUCTION
-    ): String = withContext(dispatcher) {
+    ): String = modelUseMutex.withLock { withContext(dispatcher) {
         val prompt = LocalPromptValidator.validate(rawPrompt)
         check(_state.value.isReady && !_state.value.isLoading && !_state.value.isGenerating) {
             "Load the verified local model in Settings and make sure it is not generating another response."
@@ -247,7 +279,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
             }
             _state.update { it.copy(isGenerating = false) }
         }
-    }
+    } }
 
 
     fun sendMessage(rawPrompt: String) {
@@ -257,9 +289,10 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
             _state.update { it.copy(error = error.message) }
             return
         }
-        if (!_state.value.isReady || _state.value.isLoading || _state.value.isGenerating) return
+        if (!_state.value.isReady || _state.value.isLoading) return
         scope.launch {
-            if (!_state.value.isReady || _state.value.isGenerating) return@launch
+            modelUseMutex.withLock {
+            if (!_state.value.isReady || _state.value.isLoading) return@withLock
             stopRequested = false
             memoryBudgetExceeded = false
             _state.update { it.copy(isGenerating = true, reply = "", error = null, status = "Generating on-device…") }
@@ -360,6 +393,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                 }
                 _state.update { it.copy(isGenerating = false) }
             }
+            }
         }
     }
 
@@ -434,6 +468,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
     }
 
     override fun onCleared() {
+        LocalInferenceRuntimeRegistry.detach(this)
         loadJob?.cancel()
         scope.launch {
             releaseLoadedModel()
@@ -456,4 +491,29 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                 "Never claim to have read, changed, or saved financial data. Do not invent balances or transactions."
         )
     )
+}
+
+
+/** Exposes only the already-created model owner to same-process background work. */
+object LocalInferenceRuntimeRegistry {
+    @Volatile private var owner: LocalInferenceViewModel? = null
+
+    @Synchronized
+    fun getOrCreate(application: Application): LocalInferenceViewModel =
+        owner ?: LocalInferenceViewModel(application).also { owner = it }
+
+    @Synchronized
+    fun attach(viewModel: LocalInferenceViewModel) {
+        owner = viewModel
+    }
+
+    @Synchronized
+    fun detach(viewModel: LocalInferenceViewModel) {
+        if (owner === viewModel) owner = null
+    }
+
+    fun currentOwner(): LocalInferenceViewModel? = owner
+
+    fun readyOwner(): LocalInferenceViewModel? =
+        owner?.takeIf { it.state.value.isReady && !it.state.value.isLoading }
 }

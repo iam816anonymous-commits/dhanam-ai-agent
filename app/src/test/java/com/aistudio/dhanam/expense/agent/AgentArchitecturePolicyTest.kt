@@ -35,5 +35,9 @@ class AgentArchitecturePolicyTest {
         assertEquals(java.time.LocalTime.of(1, 0), SharedAgentCoordinator.NIGHT_START)
         assertEquals(java.time.LocalTime.of(6, 0), SharedAgentCoordinator.NIGHT_END)
         assertTrue(SharedAgentCoordinator.NIGHT_START.isBefore(SharedAgentCoordinator.NIGHT_END))
+        assertTrue(SharedAgentCoordinator.isWithinNightWindow(java.time.LocalTime.of(1, 0)))
+        assertTrue(SharedAgentCoordinator.isWithinNightWindow(java.time.LocalTime.of(5, 59, 59)))
+        assertFalse(SharedAgentCoordinator.isWithinNightWindow(java.time.LocalTime.of(6, 0)))
+        assertFalse(SharedAgentCoordinator.isWithinNightWindow(java.time.LocalTime.MIDNIGHT))
     }
 }
