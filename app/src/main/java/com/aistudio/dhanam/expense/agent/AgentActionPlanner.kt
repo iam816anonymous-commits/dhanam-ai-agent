@@ -107,16 +107,20 @@ object AgentActionPlanner {
         val lower = input.lowercase()
         val categoryAliases = mapOf(
             "salary" to "Salary", "payroll" to "Salary",
-            "business" to "Business", "sales" to "Business",
+            "business" to "Business",
             "freelance" to "Freelance", "freelancing" to "Freelance",
             "investment" to "Investment", "interest" to "Investment", "dividend" to "Investment",
             "gift" to "Gift", "other" to "Other"
         )
         val categoryTerm = categoryAliases.keys.sortedByDescending { it.length }
             .firstOrNull { Regex("""\b${Regex.escape(it)}\b""").containsMatchIn(lower) }
-        val hasIncomeIntent = categoryTerm != null || Regex("""\b(?:income|earned|salary credited|credited salary)\b""")
+        val hasExpenseVerb = listOf("spent", "spend", "expense", "bought", "buy", "paid", "purchase", "purchased")
+            .any { lower.contains(it) }
+        if (hasExpenseVerb) return null
+        val hasIncomeVerb = Regex("""\b(?:income|earned|received|got paid|salary credited|credited salary)\b""")
             .containsMatchIn(lower)
-        if (!hasIncomeIntent) return null
+        val isBareIncomeSource = categoryTerm != null && lower.startsWith(categoryTerm)
+        if (!hasIncomeVerb && !isBareIncomeSource) return null
         val amount = amountPattern.findAll(input).lastOrNull()?.groupValues?.get(1)
             ?: return PlannerResult(message = "What amount of income should I record?", needsClarification = true)
         val category = categoryTerm?.let { categoryAliases.getValue(it) }
