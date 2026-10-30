@@ -30,11 +30,13 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     private val db = FinanceDatabase.getInstance(application)
     private val dao = db.financeDao()
     private var localInference: LocalInferenceViewModel? = null
+    private var sharedCoordinator: SharedAgentCoordinator? = null
     private val _state = MutableStateFlow(AgentState())
     val state: StateFlow<AgentState> = _state.asStateFlow()
 
     fun attachLocalInference(viewModel: LocalInferenceViewModel) {
         localInference = viewModel
+        sharedCoordinator = SharedAgentCoordinator(viewModel)
     }
 
 
@@ -120,7 +122,14 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             _state.value = _state.value.copy(busy = true)
             viewModelScope.launch {
                 try {
-                    val proposalText = inference.generateForAgent(AgentActionPlanner.modelPrompt(input))
+                    val proposalText = sharedCoordinator?.run(
+                        AgentTaskRequest(
+                            role = DhanamAgentRole.FINANCE_OPERATIONS,
+                            prompt = AgentActionPlanner.modelPrompt(input),
+                            priority = AgentTaskPriority.USER_REQUEST,
+                            requiresNightWindow = false
+                        )
+                    )?.output ?: inference.generateForAgent(AgentActionPlanner.modelPrompt(input))
                     val proposal = AgentActionPlanner.parseModelProposal(proposalText)
                     _state.value = _state.value.copy(
                         messages = _state.value.messages + AgentChatMessage(role = "assistant", text = proposal.message),

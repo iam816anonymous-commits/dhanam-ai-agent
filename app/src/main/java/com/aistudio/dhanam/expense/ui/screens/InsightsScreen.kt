@@ -32,6 +32,7 @@ import com.aistudio.dhanam.expense.data.FinancePdfReportExporter
 import com.aistudio.dhanam.expense.domain.ExpenseInputValidator
 import com.aistudio.dhanam.expense.domain.FinanceCalculations
 import com.aistudio.dhanam.expense.domain.MoneyParser
+import com.aistudio.dhanam.expense.agent.FinancialAnalysisEngine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -48,6 +49,11 @@ fun InsightsScreen() {
     var month by remember { mutableStateOf(YearMonth.now()) }
     val expenses by db.expenseDao().observeAll().collectAsState(initial = emptyList())
     val budgets by db.financeDao().observeBudgetsForMonth(month.atDay(1).toEpochDay()).collectAsState(initial = emptyList())
+    val loans by db.financeDao().observeLoans().collectAsState(initial = emptyList())
+    val intelligenceBudgets by db.financeDao().observeBudgetsForMonth(YearMonth.now().atDay(1).toEpochDay()).collectAsState(initial = emptyList())
+    val financialSnapshot = remember(expenses, intelligenceBudgets, loans) {
+        FinancialAnalysisEngine.analyze(expenses, intelligenceBudgets, loans, LocalDate.now())
+    }
     val summary = remember(expenses, budgets, month) {
         FinanceCalculations.monthlySummary(expenses, budgets, month, LocalDate.now())
     }
@@ -92,6 +98,34 @@ fun InsightsScreen() {
         SummaryCard("Safe to spend today", summary.safeToSpendTodayPaise?.let(MoneyParser::formatPaise) ?: "Not available",
             if (month == YearMonth.now()) "Remaining budget divided across today and the remaining days of this month."
             else "Available only for the current month with a positive overall budget.")
+
+        SummaryCard("Money owed to you", MoneyParser.formatPaise(financialSnapshot.lentOutstandingPaise),
+            "Outstanding principal in your recorded Khata lending entries.")
+        SummaryCard("Money you owe", MoneyParser.formatPaise(financialSnapshot.borrowedOutstandingPaise),
+            "Outstanding principal in your recorded Khata borrowing entries.")
+
+        Text("Expense intelligence", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        Text("These checks use recorded transactions only. They are signals to review, not automatic cuts or guaranteed savings.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (financialSnapshot.opportunities.isEmpty()) {
+            Text("Not enough evidence for a savings recommendation yet. Keep recording expenses and revisit after more history is available.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            financialSnapshot.opportunities.forEach { opportunity ->
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(opportunity.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(opportunity.evidence, style = MaterialTheme.typography.bodySmall)
+                        Text(opportunity.suggestedAction, style = MaterialTheme.typography.bodyMedium)
+                        Text("Confidence: ${opportunity.confidence.name.lowercase()} · Estimated monthly saving: " +
+                            (opportunity.estimatedMonthlySavingsPaise?.let(MoneyParser::formatPaise) ?: "Not estimated"),
+                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+        }
+        Text("Data coverage: ${financialSnapshot.dataCoverageDays} day(s) since the earliest recorded expense. Sparse history can make comparisons unreliable.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
