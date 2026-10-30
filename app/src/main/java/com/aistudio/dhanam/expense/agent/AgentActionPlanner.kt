@@ -3,6 +3,7 @@ package com.aistudio.dhanam.expense.agent
 import com.aistudio.dhanam.expense.domain.ExpenseInputValidator
 import com.aistudio.dhanam.expense.data.AgentSkillEntity
 import com.aistudio.dhanam.expense.domain.KhataValidator
+import com.aistudio.dhanam.expense.domain.IncomeInputValidator
 import com.aistudio.dhanam.expense.domain.MoneyParser
 import java.time.LocalDate
 import java.time.YearMonth
@@ -11,6 +12,15 @@ sealed interface PlannedFinanceAction {
     val summary: String
     data class AddExpense(val title: String, val amountPaise: Long, val category: String, val date: LocalDate, val note: String = "") : PlannedFinanceAction {
         override val summary = "Record expense: $title · ${MoneyParser.formatPaise(amountPaise)} · $category · $date"
+    }
+    data class AddIncome(
+        val title: String,
+        val amountPaise: Long,
+        val category: String,
+        val date: LocalDate,
+        val note: String = ""
+    ) : PlannedFinanceAction {
+        override val summary = "Record income: $title · ${MoneyParser.formatPaise(amountPaise)} · $category · $date"
     }
     data class SetBudget(val category: String, val amountPaise: Long, val month: YearMonth) : PlannedFinanceAction {
         override val summary = "Set ${category} budget to ${MoneyParser.formatPaise(amountPaise)} for ${month}"
@@ -93,6 +103,46 @@ object AgentActionPlanner {
         }
     }
 
+    private fun parseIncomeCommand(input: String): PlannerResult? {
+        val lower = input.lowercase()
+        val categoryAliases = mapOf(
+            "salary" to "Salary", "payroll" to "Salary",
+            "business" to "Business", "sales" to "Business",
+            "freelance" to "Freelance", "freelancing" to "Freelance",
+            "investment" to "Investment", "interest" to "Investment", "dividend" to "Investment",
+            "gift" to "Gift", "other" to "Other"
+        )
+        val categoryTerm = categoryAliases.keys.sortedByDescending { it.length }
+            .firstOrNull { Regex("""\\b${Regex.escape(it)}\\b""").containsMatchIn(lower) }
+        val hasIncomeIntent = categoryTerm != null || Regex("""\\b(?:income|earned|salary credited|credited salary)\\b""")
+            .containsMatchIn(lower)
+        if (!hasIncomeIntent) return null
+        val amount = amountPattern.findAll(input).lastOrNull()?.groupValues?.get(1)
+            ?: return PlannerResult(message = "What amount of income should I record?", needsClarification = true)
+        val category = categoryTerm?.let { categoryAliases.getValue(it) }
+            ?: return PlannerResult(
+                message = "Which income source is this: Salary, Business, Freelance, Investment, Gift or Other?",
+                needsClarification = true
+            )
+        val title = when (category) {
+            "Salary" -> "Salary"
+            "Business" -> "Business income"
+            "Freelance" -> "Freelance income"
+            "Investment" -> "Investment income"
+            "Gift" -> "Gift"
+            else -> "Other income"
+        }
+        return try {
+            val validated = IncomeInputValidator.validate(title, amount, category, LocalDate.now().toString(), "")
+            PlannerResult(
+                PlannedFinanceAction.AddIncome(validated.title, validated.amountPaise, validated.category, validated.occurredOn),
+                "Review this income entry before saving."
+            )
+        } catch (error: Exception) {
+            PlannerResult(message = error.message ?: "I could not validate this income entry.", needsClarification = true)
+        }
+    }
+
     private fun parseLoanCommand(input: String): PlannerResult? {
         val pattern = Regex("""(?i)^(?:i\s+)?(lent|loaned|gave|borrowed|took)\s+(?:₹\s*)?([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s+(to|from)\s+(.+)$""")
         val match = pattern.matchEntire(input) ?: return null
@@ -135,12 +185,13 @@ object AgentActionPlanner {
         val lower = input.lowercase()
         parseTelugu(input)?.let { return it }
         parseLoanCommand(input)?.let { return it }
+        parseIncomeCommand(input)?.let { return it }
         if (lower.startsWith("i lent") || lower.startsWith("lent ") ||
             lower.startsWith("i borrowed") || lower.startsWith("borrowed ")) {
             return PlannerResult(message = "I can record this in Khata. Specify both the amount and the person's name, for example “I lent 500 to Ravi” or “I borrowed 500 from Ravi”.", needsClarification = true)
         }
         if (lower in setOf("help", "what can you do", "commands")) {
-            return PlannerResult(message = "Try “Lunch 250”, “I spent 250 on lunch”, “I lent 500 to Ravi”, “I borrowed 300 from Ravi”, “set food budget to 3000”, “record repayment 500 from Ravi”, or “record repayment 300 to Ravi”. I'll preview every change before saving.")
+            return PlannerResult(message = "Try “Lunch 250”, “I spent 250 on lunch”, “salary 50000”, “I lent 500 to Ravi”, “I borrowed 300 from Ravi”, “set food budget to 3000”, “record repayment 500 from Ravi”, or “record repayment 300 to Ravi”. I'll preview every change before saving.")
         }
         if (lower.contains("budget")) {
             val amount = amountPattern.findAll(input).lastOrNull()?.groupValues?.get(1)
