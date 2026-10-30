@@ -66,7 +66,7 @@ Security/privacy review, API 27/low-resource tests, accessibility, performance, 
 - Record adopted/rejected patterns, tests, CI and device evidence.
 - Update ADRs before implementation if research changes architecture/security.
 - CI does not imply physical-device validation.
-- Stop at phase acceptance gates; no later phase begins automatically.
+- Continue phase-by-phase implementation through release readiness without waiting for routine user approval; preserve acceptance gates and never claim unverified completion.
 
 
 ## Phase 8 — Finance-only coordinated agents
@@ -91,8 +91,8 @@ Acceptance: exact time-window boundary tests, report persistence/migration tests
 
 ## Phase 10 — Persistent agent memory, evaluation and release qualification
 
-- Add bounded, role-specific local memories and structured inter-agent task/event history.
-- Use previous verified reports as context without treating model-generated text as trusted instructions.
+- Add bounded, role-specific local memories and structured inter-agent task/event history. (Implemented in Room v7: one latest bounded memory per role and 90-day handoff history, displayed in Settings.)
+- Use previous verified reports as context without treating model-generated text as trusted instructions. (Implemented for bounded prior role summaries; longitudinal evaluation remains.)
 - Add feedback on recommendations, regression evaluation and rollback for skill versions.
 - Complete remaining feature parity, backup/restore, security review, APK/release signing and Android 8.1 acceptance.
 - Measure real-device RAM, thermal, battery and model inference behaviour.
