@@ -53,6 +53,7 @@ class AgentActionPlannerTest {
         assertEquals("Freelance", freelance.category)
 
         assertTrue(AgentActionPlanner.parse("income 25000").needsClarification)
+        assertEquals(null, AgentActionPlanner.parse("how much income did I receive").action)
         assertEquals(null, AgentActionPlanner.parse("write code 50000").action)
     }
 
