@@ -43,6 +43,36 @@ class FinanceCsvTransferTest {
         assertEquals("Unknown", parsed.expenses.single().paymentMode)
     }
 
+    @Test fun incomeCsvRoundTripsAndUsesStableSourceKeys() {
+        val source = listOf(
+            IncomeEntity(
+                title = "Salary, October",
+                amountPaise = 4_250_075L,
+                category = "Salary",
+                occurredOnEpochDay = LocalDate.parse("2026-10-30").toEpochDay(),
+                note = "Payroll \"verified\"\nOctober",
+                createdAtEpochMillis = 1L,
+                updatedAtEpochMillis = 1L
+            )
+        )
+        val csv = FinanceCsvTransfer.exportIncomeCsv(source)
+        val first = FinanceCsvTransfer.parseIncomeCsv(csv, 2L)
+        val second = FinanceCsvTransfer.parseIncomeCsv(csv, 3L)
+        assertTrue(first.errors.isEmpty())
+        assertEquals(1, first.income.size)
+        assertEquals("Salary, October", first.income.single().title)
+        assertEquals(4_250_075L, first.income.single().amountPaise)
+        assertEquals("Payroll \"verified\"\nOctober", first.income.single().note)
+        assertEquals(first.income.single().sourceRecordKey, second.income.single().sourceRecordKey)
+    }
+
+    @Test fun invalidIncomeCsvRowIsReportedWithoutProducingARecord() {
+        val csv = "description,amount_rupees,category,date,note\nSalary,0,Salary,2026-10-30,\n"
+        val parsed = FinanceCsvTransfer.parseIncomeCsv(csv, 2L)
+        assertEquals(1, parsed.errors.size)
+        assertTrue(parsed.income.isEmpty())
+    }
+
     @Test fun invalidRowBlocksWholeImport() {
         val csv = "description,amount_rupees,category,date,note\nCoffee,0,Food,2026-10-01,\n"
         val parsed = FinanceCsvTransfer.parseCsv(csv, 2)
