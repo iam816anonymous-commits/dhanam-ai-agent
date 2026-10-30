@@ -11,6 +11,7 @@ import com.aistudio.dhanam.expense.data.IncomeEntity
 import com.aistudio.dhanam.expense.data.FinanceDatabase
 import com.aistudio.dhanam.expense.domain.MoneyParser
 import com.aistudio.dhanam.expense.domain.IncomeInputValidator
+import com.aistudio.dhanam.expense.agent.learning.NightlyAgentLearningScheduler
 import com.aistudio.dhanam.expense.domain.KhataValidator
 import com.aistudio.dhanam.expense.model.LocalInferenceViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +24,7 @@ import java.util.UUID
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.LocalTime
 
 data class AgentChatMessage(val id: String = UUID.randomUUID().toString(), val role: String, val text: String)
 data class AgentState(
@@ -163,7 +165,8 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         val inference = localInference
-        if (inference?.state?.value?.isReady == true) {
+        val modelWindowOpen = NightlyAgentLearningScheduler.isWithinWindow(LocalTime.now())
+        if (inference?.state?.value?.isReady == true && modelWindowOpen) {
             _state.value = _state.value.copy(busy = true)
             viewModelScope.launch {
                 try {
@@ -175,7 +178,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                             role = DhanamAgentRole.FINANCE_OPERATIONS,
                             prompt = AgentActionPlanner.modelPrompt(input),
                             priority = AgentTaskPriority.USER_REQUEST,
-                            requiresNightWindow = false
+                            requiresNightWindow = true
                         )
                     ).output
                     val proposal = AgentActionPlanner.parseModelProposal(proposalText)
@@ -191,8 +194,13 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         } else {
+            val modelAvailabilityMessage = if (!modelWindowOpen) {
+                "The shared AI model is reserved for all three agents between 01:00 and 06:00. I can still record supported expenses, income, budgets, lending and repayments, and calculate spending/Khata summaries at any time. Model-assisted interpretation will be available in the next nightly window."
+            } else {
+                "Load and activate a compatible verified on-device model in Settings for flexible phrasing. Built-in financial commands and local spending/Khata analysis work without it."
+            }
             _state.value = _state.value.copy(
-                messages = _state.value.messages + AgentChatMessage(role = "assistant", text = result.message + " For more flexible phrasing, load the verified on-device model in Settings; without it I use only the built-in command patterns."),
+                messages = _state.value.messages + AgentChatMessage(role = "assistant", text = result.message + " " + modelAvailabilityMessage),
                 pendingAction = null,
                 activity = "idle"
             )
