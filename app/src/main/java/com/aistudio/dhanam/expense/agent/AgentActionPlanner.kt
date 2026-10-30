@@ -109,7 +109,6 @@ object AgentActionPlanner {
 
     private fun parseFinancialQuery(input: String): PlannerResult? {
         val lower = input.lowercase()
-        if (lower.contains("budget")) return null
         val queryPhrases = listOf(
             "analyze", "analysis", "reduce my spending", "reduce expenses", "save money",
             "save on", "overspend", "spending pattern", "spending trend", "financial summary",
