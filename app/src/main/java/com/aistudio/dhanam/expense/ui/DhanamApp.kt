@@ -35,7 +35,11 @@ import com.aistudio.dhanam.expense.ui.screens.SettingsScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DhanamApp(agentViewModel: AgentViewModel = viewModel()) {
+fun DhanamApp(
+    agentViewModel: AgentViewModel = viewModel(),
+    isDarkTheme: Boolean = true,
+    onThemeChange: (Boolean) -> Unit = {}
+) {
     val context = LocalContext.current
     val inferenceViewModel = remember(context) {
         LocalInferenceRuntimeRegistry.getOrCreate(context.applicationContext as Application)
@@ -94,7 +98,7 @@ fun DhanamApp(agentViewModel: AgentViewModel = viewModel()) {
             composable(AppDestination.EXPENSES.route) { ExpensesScreen() }
             composable(AppDestination.KHATA.route) { KhataScreen() }
             composable(AppDestination.INSIGHTS.route) { InsightsScreen() }
-            composable(AppDestination.SETTINGS.route) { SettingsScreen(inferenceViewModel) }
+            composable(AppDestination.SETTINGS.route) { SettingsScreen(inferenceViewModel, isDarkTheme, onThemeChange) }
         }
     }
 }
