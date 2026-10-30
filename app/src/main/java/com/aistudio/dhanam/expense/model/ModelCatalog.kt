@@ -66,7 +66,7 @@ object ModelCatalog {
             displayName = "Qwen3 0.6B · INT8",
             tier = ModelTier.COMPACT,
             fileName = "Qwen3-0.6B.litertlm",
-            downloadUrl = "https://huggingface.co/litert-community/Qwen3-0.6B-int4/resolve/6aa2daf8aba4aa456797fb8040b36a3948bcfda7/qwen3_0.6b_nothink_q4_block32_ekv1280.litertlm",
+            downloadUrl = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/e6687177e00897731e7716267eebd4eba0dde7c2/Qwen3-0.6B.litertlm",
             expectedBytes = 347_251_840L,
             sha256 = "2df6821ec12702dafd33915e7a1a1adc7c4b053f3672fd9555dfaf3a114c4139",
             license = "Apache-2.0",
