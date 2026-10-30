@@ -46,7 +46,11 @@ fun AgentSpeechFeedback(
     }
 
     LaunchedEffect(messageId, message, enabled, initialized, engine) {
-        if (!enabled || engine == null || !initialized) return@LaunchedEffect
+        if (!enabled) {
+            if (messageId != null) lastSpokenId = messageId
+            return@LaunchedEffect
+        }
+        if (engine == null || !initialized) return@LaunchedEffect
         if (messageId == null || message.isNullOrBlank() || lastSpokenId == messageId) return@LaunchedEffect
 
         // Speak the script actually returned by the assistant. Never send English text
