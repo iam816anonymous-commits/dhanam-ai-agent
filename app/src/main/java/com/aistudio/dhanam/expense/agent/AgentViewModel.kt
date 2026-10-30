@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.aistudio.dhanam.expense.data.ExpenseEntity
+import com.aistudio.dhanam.expense.data.AgentSkillEntity
 import com.aistudio.dhanam.expense.data.RepaymentEntity
 import com.aistudio.dhanam.expense.data.FinanceDatabase
 import com.aistudio.dhanam.expense.domain.MoneyParser
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.util.UUID
 import java.time.LocalDate
@@ -31,8 +33,17 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     private val dao = db.financeDao()
     private var localInference: LocalInferenceViewModel? = null
     private var sharedCoordinator: SharedAgentCoordinator? = null
+    @Volatile private var activeSkills: List<AgentSkillEntity> = emptyList()
     private val _state = MutableStateFlow(AgentState())
     val state: StateFlow<AgentState> = _state.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            dao.observeAgentSkills().collect { skills ->
+                activeSkills = skills.filter { it.status == "ACTIVE" }
+            }
+        }
+    }
 
     fun attachLocalInference(viewModel: LocalInferenceViewModel) {
         localInference = viewModel
@@ -107,7 +118,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        val result = AgentActionPlanner.parse(input)
+        val result = AgentActionPlanner.parseWithLearnedSkills(input, activeSkills)
         if (result.action != null || !result.needsClarification) {
             _state.value = _state.value.copy(
                 messages = _state.value.messages + AgentChatMessage(role = "assistant", text = result.message),
