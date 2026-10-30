@@ -89,7 +89,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         // so the old confirmation cannot be tapped while the new request is being resolved.
         _state.value = _state.value.copy(pendingAction = null)
 
-        val repayment = Regex("""(?i)^record repayment\s+([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s+from\s+(.+)$""").matchEntire(input)
+        val repayment = Regex("""(?i)^record repayment\s+([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s+(from|to)\s+(.+)$""").matchEntire(input)
         if (repayment != null) {
             _state.value = _state.value.copy(busy = true)
             viewModelScope.launch {
