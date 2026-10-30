@@ -101,7 +101,7 @@ object ModelCatalog {
             tier = ModelTier.BALANCED,
             fileName = "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
             downloadUrl = "https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct/resolve/19edb84c69a0212f29a6ef17ba0d6f278b6a1614/Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
-            expectedBytes = 1_598_603_264L,
+            expectedBytes = 1_597_931_520L,
             sha256 = "2ac49902133f729199bbd23ad6714df32b20585c786f2546d2293cc371f35278",
             license = "Apache-2.0",
             contextTokens = 4096,
