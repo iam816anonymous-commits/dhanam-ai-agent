@@ -50,6 +50,8 @@ class AgentActionPlannerTest {
         assertTrue(AgentActionPlanner.parse("who owes me money?").action is PlannedFinanceAction.AnalyzeSpending)
         val lastMonth = AgentActionPlanner.parse("analyze my expenses for last month").action as PlannedFinanceAction.AnalyzeSpending
         assertEquals(YearMonth.now().minusMonths(1), lastMonth.month)
+        val food = AgentActionPlanner.parse("How much did I spend on food?").action as PlannedFinanceAction.AnalyzeSpending
+        assertEquals("Food", food.category)
         assertEquals(null, AgentActionPlanner.parse("I spent 500 on lunch").action?.takeIf {
             it is PlannedFinanceAction.AnalyzeSpending
         })
