@@ -56,6 +56,24 @@ class AgentActionPlannerTest {
         assertEquals(null, AgentActionPlanner.parse("write code 50000").action)
     }
 
+    @Test fun learnedExpenseSkillsCannotReclassifySalaryAsAnExpense() {
+        val skill = AgentSkillEntity(
+            skillKey = "c".repeat(64),
+            version = 1,
+            title = "Category rule: salary",
+            matchText = "salary",
+            category = "Other",
+            exampleCount = 4,
+            testPassCount = 4,
+            testTotalCount = 4,
+            status = "ACTIVE",
+            createdAtEpochMillis = 1L,
+            approvedAtEpochMillis = 2L
+        )
+        val action = AgentActionPlanner.parseWithLearnedSkills("salary 50000", listOf(skill)).action
+        assertTrue(action is PlannedFinanceAction.AddIncome)
+    }
+
     @Test fun strictModelIncomeProposalIsValidated() {
         val result = AgentActionPlanner.parseModelProposal(
             """{"intent":"income","amount":"12500.50","title":"Monthly salary","category":"Salary","date":"2026-10-30","message":""}"""
