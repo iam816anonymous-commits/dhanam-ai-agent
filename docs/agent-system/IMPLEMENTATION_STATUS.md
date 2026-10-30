@@ -54,6 +54,16 @@ The candidate is stored as a versioned data-only rule. It cannot contain code, r
 - Room schema version 10 adds month-scoped recommendation feedback; the worker retains the latest 12 months and supplies aggregate helpful/not-useful feedback to Financial Intelligence. Version 11 normalizes old active skill versions and makes nightly inter-agent handoff rows idempotent across WorkManager retries. Skill approvals supersede the previous active version and Settings exposes transactional rollback to the prior validated version. The chat agent answers read-only current/previous-month spending, category-specific reduction and Khata outstanding queries from deterministic local analysis.
 - Financial amounts remain integer paise. LLM outputs are never used for financial arithmetic or direct writes.
 
+## Model catalogue and device eligibility
+
+The model manager now offers six pinned LiteRT-LM artifacts in three tiers (two choices per tier): Compact (SmolLM2 360M, Qwen3 0.6B INT4), Balanced (Qwen3 1.7B INT4, Qwen2.5 1.5B INT8), and Advanced (Qwen3 4B Mixed INT4, Phi-4 Mini Reasoning INT4). Every artifact has a pinned revision, expected byte length and SHA-256.
+
+Download eligibility now checks Android-reported physical total RAM and free app storage only. Run-now eligibility additionally checks currently available system RAM. This prevents temporary RAM pressure from hiding a model that can be downloaded for later. The settings UI shows all six entries, each model's independent download/run status, and the exact Android-reported total RAM, available RAM and free app storage. After engine creation, process peak RSS is checked against the selected model's own budget.
+
+The app explicitly disables unbounded thinking and caps generation to 512 output tokens. Phi-4 Mini Reasoning is reset to a fresh conversation after each response because its publisher documents a LiteRT-LM 0.18.x multi-turn cache issue. None of the six models is yet physically qualified on the user's handset; download, initialization, output correctness, peak RSS, heat and battery still require device tests.
+
+See [feature parity audit](FEATURE_PARITY_AUDIT.md) for the original Dhanam and earlier-agent comparison.
+
 ## Latest CI verification
 
 On 2026-10-30, Android CI run #277 completed its build job successfully in 2m57s. It passed `:app:testDebugUnitTest`, `:app:lintDebug`, `:app:assembleDebug`, `:app:assembleDebugAndroidTest` and `:app:assembleRelease`; the workflow also verified all three APK files and uploaded the `dhanam-ai-apk-artifacts` archive. This validates compilation and unit tests, not execution of instrumentation tests on a physical device or emulator.
