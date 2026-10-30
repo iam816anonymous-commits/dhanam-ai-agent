@@ -83,7 +83,9 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
     suspend fun loadModelAndAwait(): Boolean {
         if (_state.value.isReady) return true
         if (!_state.value.isLoading) loadModel()
-        return _state.first { it.isReady || (!it.isLoading && it.error != null) }.isReady
+        // loadModel publishes isLoading synchronously; waiting for its completion also
+        // handles cancellation and a failed preferred-model/resource check without hanging.
+        return _state.first { !it.isLoading }.isReady
     }
 
     suspend fun unloadModelIfIdle(): Boolean = withContext(dispatcher) {
