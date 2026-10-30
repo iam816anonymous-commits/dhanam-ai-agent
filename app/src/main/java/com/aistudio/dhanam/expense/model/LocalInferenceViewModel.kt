@@ -414,24 +414,31 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
     fun resetConversation() {
         if (!_state.value.isReady || _state.value.isGenerating) return
         scope.launch {
-            try {
-                val oldConversation = conversation
-                conversation = null
-                oldConversation?.close()
-                conversation = checkNotNull(engine).createConversation(createConversationConfig())
-                _state.update { it.copy(reply = "", error = null, status = "New local conversation started.") }
-            } catch (error: Exception) {
-                conversation = null
-                try { engine?.close() } catch (_: Exception) { }
-                engine = null
-                _state.update { it.copy(isReady = false, error = error.message ?: "Could not reset the conversation.", status = "Conversation reset failed. Reload the model before continuing.") }
+            modelUseMutex.withLock {
+                if (!_state.value.isReady || _state.value.isGenerating) return@withLock
+                try {
+                    val oldConversation = conversation
+                    conversation = null
+                    oldConversation?.close()
+                    conversation = checkNotNull(engine).createConversation(createConversationConfig())
+                    _state.update { it.copy(reply = "", error = null, status = "New local conversation started.") }
+                } catch (error: Exception) {
+                    conversation = null
+                    try { engine?.close() } catch (_: Exception) { }
+                    engine = null
+                    _state.update { it.copy(isReady = false, error = error.message ?: "Could not reset the conversation.", status = "Conversation reset failed. Reload the model before continuing.") }
+                }
             }
         }
     }
 
     fun unloadModel() {
         if (_state.value.isLoading) loadJob?.cancel()
-        scope.launch { releaseLoadedModel() }
+        scope.launch {
+            modelUseMutex.withLock {
+                releaseLoadedModel()
+            }
+        }
     }
 
     private suspend fun releaseLoadedModel() {
@@ -471,7 +478,9 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
         LocalInferenceRuntimeRegistry.detach(this)
         loadJob?.cancel()
         scope.launch {
-            releaseLoadedModel()
+            modelUseMutex.withLock {
+                releaseLoadedModel()
+            }
             dispatcher.close()
         }.invokeOnCompletion { scope.cancel() }
         super.onCleared()
