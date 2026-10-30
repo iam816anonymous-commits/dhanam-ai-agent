@@ -129,11 +129,9 @@ fun LivingAgentOverlay(
             }
         }
 
-        OfflineVoiceInput(
+        AgentVoiceControl(
             enabled = activity !in setOf("thinking", "acting"),
             onRecognized = onVoiceRecognized,
-            showLanguageSelector = expanded,
-            showStatus = expanded,
             modifier = Modifier.padding(end = 4.dp)
         )
 

@@ -186,6 +186,19 @@ fun AgentScreen(
             }
         }
 
+        if (state.undoDescription != null) {
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Undo available", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        Text(state.undoDescription.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    OutlinedButton(onClick = viewModel::undoLastAction, enabled = !state.busy) { Text("Undo") }
+                }
+            }
+        }
+
         if (state.pendingAction != null) {
             ActionReviewCard(
                 action = state.pendingAction!!,

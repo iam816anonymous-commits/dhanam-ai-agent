@@ -149,6 +149,9 @@ interface FinanceDao {
     @Query("DELETE FROM income_records WHERE id = :id")
     suspend fun deleteIncomeById(id: Long): Int
 
+    @Query("DELETE FROM income_records WHERE id = :id AND updated_at_epoch_millis = :expectedUpdatedAt")
+    suspend fun deleteIncomeIfUnchanged(id: Long, expectedUpdatedAt: Long): Int
+
     @Query("SELECT * FROM expenses ORDER BY occurred_on_epoch_day DESC, id DESC")
     fun observeExpenses(): Flow<List<ExpenseEntity>>
 
@@ -164,6 +167,9 @@ interface FinanceDao {
     @Insert suspend fun insertExpense(expense: ExpenseEntity): Long
     @Update suspend fun updateExpense(expense: ExpenseEntity): Int
     @Delete suspend fun deleteExpense(expense: ExpenseEntity): Int
+
+    @Query("DELETE FROM expenses WHERE id = :id AND updated_at_epoch_millis = :expectedUpdatedAt")
+    suspend fun deleteExpenseIfUnchanged(id: Long, expectedUpdatedAt: Long): Int
 
     @Query("SELECT * FROM budgets WHERE month_epoch_day = :monthEpochDay ORDER BY category")
     fun observeBudgetsForMonth(monthEpochDay: Long): Flow<List<BudgetEntity>>
@@ -267,6 +273,27 @@ interface FinanceDao {
 
     @Query("DELETE FROM khata_loans WHERE id = :id AND NOT EXISTS (SELECT 1 FROM khata_repayments WHERE loan_id = :id)")
     suspend fun deleteLoanIfNoRepayments(id: Long): Int
+
+    @Query("DELETE FROM khata_loans WHERE id = :id AND updated_at_epoch_millis = :expectedUpdatedAt AND NOT EXISTS (SELECT 1 FROM khata_repayments WHERE loan_id = :id)")
+    suspend fun deleteLoanIfUnchanged(id: Long, expectedUpdatedAt: Long): Int
+
+    @Query("DELETE FROM khata_repayments WHERE request_id = :requestId")
+    suspend fun deleteRepaymentByRequestId(requestId: String): Int
+
+    @Transaction
+    suspend fun undoRepayment(requestId: String): Boolean {
+        val repayment = findRepaymentByRequestId(requestId) ?: return false
+        val loan = findLoan(repayment.loanId) ?: return false
+        if (loan.paidPaise < repayment.amountPaise) return false
+        if (deleteRepaymentByRequestId(requestId) != 1) return false
+        val restoredPaid = loan.paidPaise - repayment.amountPaise
+        check(updateLoan(loan.copy(
+            paidPaise = restoredPaid,
+            isSettled = restoredPaid >= loan.principalPaise,
+            updatedAtEpochMillis = System.currentTimeMillis()
+        )) == 1) { "Repayment was removed but the Khata balance could not be restored." }
+        return true
+    }
 
     @Query("SELECT * FROM khata_repayments ORDER BY paid_on_epoch_day DESC, id DESC")
     suspend fun allRepayments(): List<RepaymentEntity>

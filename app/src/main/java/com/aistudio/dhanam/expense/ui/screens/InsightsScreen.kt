@@ -30,6 +30,10 @@ import androidx.compose.ui.unit.dp
 import com.aistudio.dhanam.expense.data.FinanceDatabase
 import com.aistudio.dhanam.expense.data.RecommendationFeedbackEntity
 import com.aistudio.dhanam.expense.data.FinancePdfReportExporter
+import com.aistudio.dhanam.expense.data.FinanceCsvTransfer
+import com.aistudio.dhanam.expense.ui.components.LegacyCategoryDonutChart
+import com.aistudio.dhanam.expense.ui.components.LegacyWeeklySpendChart
+import com.aistudio.dhanam.expense.ui.components.LegacyPaymentModeBreakdown
 import com.aistudio.dhanam.expense.domain.ExpenseInputValidator
 import com.aistudio.dhanam.expense.domain.FinanceCalculations
 import com.aistudio.dhanam.expense.domain.MoneyParser
@@ -82,6 +86,23 @@ fun InsightsScreen() {
             ?.let { "%d.%02d".format(it.amountPaise / 100, it.amountPaise % 100) } ?: "")
     }
     var message by remember { mutableStateOf<String?>(null) }
+    val monthExpenses = remember(expenses, month) {
+        expenses.filter { it.occurredOnEpochDay in month.atDay(1).toEpochDay()..incomeEndEpochDay }
+    }
+    val csvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) {
+            val records = monthExpenses
+            scope.launch {
+                try {
+                    withContext(Dispatchers.IO) {
+                        FinanceCsvTransfer.writeText(context.contentResolver, uri, FinanceCsvTransfer.exportCsv(records))
+                    }
+                    message = "Monthly expense CSV saved."
+                } catch (e: CancellationException) { throw e }
+                catch (e: Exception) { message = e.message ?: "CSV export failed." }
+            }
+        }
+    }
     val pdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
         if (uri != null) {
             val snapshot = summary
@@ -188,6 +209,10 @@ fun InsightsScreen() {
                 }
             }
         }
+        LegacyCategoryDonutChart(summary.categoryTotalsPaise)
+        LegacyWeeklySpendChart(monthExpenses, month)
+        LegacyPaymentModeBreakdown(expenses, month)
+
         Text("Category spending movement", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         Text(
             if (month == YearMonth.now()) {
@@ -291,6 +316,9 @@ fun InsightsScreen() {
                 }
                 Button(onClick = { pdfLauncher.launch("dhanam-report-$month.pdf") }, modifier = Modifier.fillMaxWidth()) {
                     Text("Export monthly report as PDF")
+                }
+                Button(onClick = { csvLauncher.launch("dhanam-expenses-$month.csv") }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Export this month's expenses as CSV")
                 }
             }
         }
