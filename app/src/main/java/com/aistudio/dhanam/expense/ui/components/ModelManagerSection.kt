@@ -41,6 +41,11 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text("Choose a model", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(
+            "You can install multiple model files. Only one model is loaded into RAM at a time because all three agents share one LiteRT runtime; unload it before switching.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         ModelTier.values().forEach { tier ->
             Text(tier.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(tier.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
