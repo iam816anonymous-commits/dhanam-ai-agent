@@ -350,7 +350,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             lines += "Income: no records entered for this month. Net cash flow is unknown, not zero."
         } else {
             lines += "Recorded income: ${MoneyParser.formatPaise(incomeTotalPaise)} across ${incomes.size} record(s)."
-            lines += "Net recorded cash flow: ${MoneyParser.formatPaise(Math.subtractExact(incomeTotalPaise, snapshot.totalSpentPaise))}. This is not a bank balance."
+            lines += "Overall net recorded cash flow: ${MoneyParser.formatPaise(Math.subtractExact(incomeTotalPaise, snapshot.totalSpentPaise))}. This is not a bank balance."
         }
         val relevantMovements = snapshot.categoryMovements.filter {
             category == null || it.category.equals(category, ignoreCase = true)
