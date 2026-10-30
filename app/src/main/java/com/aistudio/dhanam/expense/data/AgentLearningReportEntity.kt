@@ -1,5 +1,6 @@
 package com.aistudio.dhanam.expense.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -11,14 +12,14 @@ import androidx.room.PrimaryKey
 )
 data class AgentLearningReportEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val reportDateEpochDay: Long,
-    val runStatus: String,
-    val operationsSummary: String,
-    val intelligenceSummary: String,
-    val skillSummary: String,
-    val nextImprovements: String,
-    val durationMillis: Long,
-    val createdAtEpochMillis: Long
+    @ColumnInfo(name = "report_date_epoch_day") val reportDateEpochDay: Long,
+    @ColumnInfo(name = "run_status") val runStatus: String,
+    @ColumnInfo(name = "operations_summary") val operationsSummary: String,
+    @ColumnInfo(name = "intelligence_summary") val intelligenceSummary: String,
+    @ColumnInfo(name = "skill_summary") val skillSummary: String,
+    @ColumnInfo(name = "next_improvements") val nextImprovements: String,
+    @ColumnInfo(name = "duration_millis") val durationMillis: Long,
+    @ColumnInfo(name = "created_at_epoch_millis") val createdAtEpochMillis: Long
 ) {
     init {
         require(runStatus.length <= 32)
