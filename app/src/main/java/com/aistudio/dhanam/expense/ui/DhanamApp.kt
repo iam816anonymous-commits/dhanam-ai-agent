@@ -9,12 +9,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
@@ -37,6 +37,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.aistudio.dhanam.expense.agent.AgentViewModel
 import com.aistudio.dhanam.expense.model.LocalInferenceRuntimeRegistry
+import com.aistudio.dhanam.expense.ui.components.AgentStatusPill
+import com.aistudio.dhanam.expense.ui.components.JarvisCoreState
 import com.aistudio.dhanam.expense.ui.components.LivingAgentOverlay
 import com.aistudio.dhanam.expense.ui.components.OfflineVoiceInput
 import com.aistudio.dhanam.expense.ui.screens.AgentScreen
@@ -81,6 +83,19 @@ fun DhanamApp(
         topBar = {
             Column {
                 CenterAlignedTopAppBar(
+                    navigationIcon = {
+                        AgentStatusPill(
+                            state = when (agentState.activity) {
+                                "thinking", "analyzing" -> JarvisCoreState.THINKING
+                                "acting" -> JarvisCoreState.PROCESSING
+                                "awaiting_confirmation" -> JarvisCoreState.NOTING
+                                "complete" -> JarvisCoreState.SPEAKING
+                                else -> JarvisCoreState.IDLE
+                            },
+                            onClick = { navigateTo(AppDestination.AGENT) },
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    },
                     title = {
                         Text(
                             currentTab.label,
