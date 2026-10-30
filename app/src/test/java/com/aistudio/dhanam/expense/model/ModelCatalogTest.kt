@@ -37,7 +37,7 @@ class ModelCatalogTest {
 
     @Test fun qwen03ArtifactRemainsTheSmallDeviceBaseline() {
         val model = ModelCatalog.models.first { it.id == "qwen3-0.6b-int4-nothink-1280" }
-        assertTrue(model.downloadUrl.contains("/resolve/6aa2daf/"))
+        assertTrue(model.downloadUrl.contains("/resolve/6aa2daf8aba4aa456797fb8040b36a3948bcfda7/"))
         assertEquals(347_251_840L, model.expectedBytes)
         assertEquals("2df6821ec12702dafd33915e7a1a1adc7c4b053f3672fd9555dfaf3a114c4139", model.sha256)
         assertEquals("Apache-2.0", model.license)
