@@ -190,6 +190,13 @@ abstract class FinanceDatabase : RoomDatabase() {
         /** Prevent duplicate handoff rows when WorkManager retries a nightly session. */
         val MIGRATION_10_11 = object : Migration(10, 11) {
             override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""UPDATE agent_skills
+                    SET status = 'SUPERSEDED'
+                    WHERE status = 'ACTIVE'
+                    AND version < (
+                        SELECT MAX(other.version) FROM agent_skills AS other
+                        WHERE other.skill_key = agent_skills.skill_key AND other.status = 'ACTIVE'
+                    )""")
                 db.execSQL("""DELETE FROM agent_messages
                     WHERE id NOT IN (
                         SELECT MAX(id) FROM agent_messages
