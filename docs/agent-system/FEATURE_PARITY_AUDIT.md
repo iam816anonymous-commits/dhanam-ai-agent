@@ -71,7 +71,7 @@ Each tier has two distinct model choices. All six entries use pinned HTTPS artif
 
 ## 6. Remaining parity work, ordered
 
-1. Restore voice input to the Agent screen with an offline-preferred recognizer, explicit English/Telugu selection, permission handling and graceful Android 8.1 fallback.
+1. Test persisted English/Telugu/Hindi voice selection on the Tecno Android 8.1 handset. Offline preference is not a guarantee on API 27–30; verify the installed speech service, transcript review and fallback messages.
 2. Test the new optional biometric prompt on enrolled devices, confirm cancellation always leaves PIN entry available, and verify disabling the PIN also disables biometric unlock.
 3. Compare expense filters/sorting and report layouts against the original app; dark/light preference and screenshot privacy are restored.
 4. Run old-versus-new workflows against copied test data and fix any remaining functional gaps.
