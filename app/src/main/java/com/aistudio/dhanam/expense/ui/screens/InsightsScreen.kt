@@ -67,7 +67,10 @@ fun InsightsScreen() {
             .filter { it.occurredOnEpochDay in start..end }
             .fold(0L) { total, record -> Math.addExact(total, record.amountPaise) }
     }
-    val netCashFlowPaise = Math.subtractExact(incomeTotalPaise, summary.totalSpentPaise)
+    val hasIncomeRecords = incomes.any {
+        it.occurredOnEpochDay in month.atDay(1).toEpochDay()..month.atEndOfMonth().toEpochDay()
+    }
+    val netCashFlowPaise = if (hasIncomeRecords) Math.subtractExact(incomeTotalPaise, summary.totalSpentPaise) else null
     var budgetAmount by remember(month, budgets) {
         mutableStateOf(budgets.firstOrNull { it.category == FinanceCalculations.OVERALL_BUDGET_CATEGORY }
             ?.let { "%d.%02d".format(it.amountPaise / 100, it.amountPaise % 100) } ?: "")
@@ -101,10 +104,11 @@ fun InsightsScreen() {
         }
         SummaryCard("Spent this month", MoneyParser.formatPaise(summary.totalSpentPaise),
             "${summary.transactionCount} recorded transaction(s)")
-        SummaryCard("Income this month", MoneyParser.formatPaise(incomeTotalPaise),
+        SummaryCard("Income recorded", if (hasIncomeRecords) MoneyParser.formatPaise(incomeTotalPaise) else "No income records",
             "${incomes.count { it.occurredOnEpochDay in month.atDay(1).toEpochDay()..month.atEndOfMonth().toEpochDay() }} income record(s) · separate from expenses")
-        SummaryCard("Net cash flow", MoneyParser.formatPaise(netCashFlowPaise),
-            "Recorded income minus recorded expenses for ${month}. This is not a bank balance.")
+        SummaryCard("Net cash flow", netCashFlowPaise?.let(MoneyParser::formatPaise) ?: "Not available",
+            if (hasIncomeRecords) "Recorded income minus recorded expenses for ${month}. This is not a bank balance."
+            else "Income has not been recorded for this month; net cash flow cannot be calculated.")
         SummaryCard("Monthly budget", summary.overallBudgetPaise?.let(MoneyParser::formatPaise) ?: "Not set",
             "Set a budget below to calculate remaining funds.")
         SummaryCard("Budget remaining", summary.remainingBudgetPaise?.let {
