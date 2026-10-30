@@ -64,6 +64,7 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
     /** Refresh every catalogue entry so users can see why each model is or is not runnable. */
     fun refresh() {
         val selectedId = _state.value.selectedModelId
+        val selectedModel = ModelCatalog.models.first { it.id == selectedId }
         viewModelScope.launch {
             val snapshot = withContext(Dispatchers.IO) {
                 val downloadChecks = ModelCatalog.models.associate { candidate ->
@@ -97,10 +98,10 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
                 installedModelIds = snapshot.installedModelIds,
                 isVerified = snapshot.selectedVerified,
                 preferredModelId = if (snapshot.selectedVerified) preferred else null,
-                downloadedBytes = if (snapshot.selectedVerified) selected.expectedBytes else snapshot.partialBytes,
-                totalBytes = selected.expectedBytes,
+                downloadedBytes = if (snapshot.selectedVerified) selectedModel.expectedBytes else snapshot.partialBytes,
+                totalBytes = selectedModel.expectedBytes,
                 progress = if (snapshot.selectedVerified) 1f else
-                    (snapshot.partialBytes.toDouble() / selected.expectedBytes.coerceAtLeast(1L)).toFloat().coerceIn(0f, 1f),
+                    (snapshot.partialBytes.toDouble() / selectedModel.expectedBytes.coerceAtLeast(1L)).toFloat().coerceIn(0f, 1f),
                 message = when {
                     snapshot.selectedVerified -> "Selected model is installed and SHA-256 verified."
                     snapshot.partialBytes > 0L -> "Paused download found. ${snapshot.partialBytes} bytes are saved; tap Resume download to continue."
