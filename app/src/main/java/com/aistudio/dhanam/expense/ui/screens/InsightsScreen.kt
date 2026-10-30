@@ -48,6 +48,7 @@ fun InsightsScreen() {
     val scope = rememberCoroutineScope()
     var month by remember { mutableStateOf(YearMonth.now()) }
     val expenses by db.expenseDao().observeAll().collectAsState(initial = emptyList())
+    val incomes by db.financeDao().observeIncome().collectAsState(initial = emptyList())
     val budgets by db.financeDao().observeBudgetsForMonth(month.atDay(1).toEpochDay()).collectAsState(initial = emptyList())
     val loans by db.financeDao().observeLoans().collectAsState(initial = emptyList())
     val intelligenceBudgets by db.financeDao().observeBudgetsForMonth(YearMonth.now().atDay(1).toEpochDay()).collectAsState(initial = emptyList())
@@ -57,6 +58,14 @@ fun InsightsScreen() {
     val summary = remember(expenses, budgets, month) {
         FinanceCalculations.monthlySummary(expenses, budgets, month, LocalDate.now())
     }
+    val incomeTotalPaise = remember(incomes, month) {
+        val start = month.atDay(1).toEpochDay()
+        val end = month.atEndOfMonth().toEpochDay()
+        incomes.asSequence()
+            .filter { it.occurredOnEpochDay in start..end }
+            .fold(0L) { total, record -> Math.addExact(total, record.amountPaise) }
+    }
+    val netCashFlowPaise = Math.subtractExact(incomeTotalPaise, summary.totalSpentPaise)
     var budgetAmount by remember(month, budgets) {
         mutableStateOf(budgets.firstOrNull { it.category == FinanceCalculations.OVERALL_BUDGET_CATEGORY }
             ?.let { "%d.%02d".format(it.amountPaise / 100, it.amountPaise % 100) } ?: "")
@@ -90,6 +99,10 @@ fun InsightsScreen() {
         }
         SummaryCard("Spent this month", MoneyParser.formatPaise(summary.totalSpentPaise),
             "${summary.transactionCount} recorded transaction(s)")
+        SummaryCard("Income this month", MoneyParser.formatPaise(incomeTotalPaise),
+            "${incomes.count { it.occurredOnEpochDay in month.atDay(1).toEpochDay()..month.atEndOfMonth().toEpochDay() }} income record(s) · separate from expenses")
+        SummaryCard("Net cash flow", MoneyParser.formatPaise(netCashFlowPaise),
+            "Recorded income minus recorded expenses for ${month}. This is not a bank balance.")
         SummaryCard("Monthly budget", summary.overallBudgetPaise?.let(MoneyParser::formatPaise) ?: "Not set",
             "Set a budget below to calculate remaining funds.")
         SummaryCard("Budget remaining", summary.remainingBudgetPaise?.let {
