@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [ExpenseEntity::class, BudgetEntity::class, KhataLoanEntity::class, RepaymentEntity::class, AgentLearningReportEntity::class, AgentSkillEntity::class, AgentMemoryEntity::class, AgentMessageEntity::class, IncomeEntity::class, RecommendationFeedbackEntity::class],
-    version = 10,
+    version = 11,
     exportSchema = true
 )
 abstract class FinanceDatabase : RoomDatabase() {
@@ -187,6 +187,15 @@ abstract class FinanceDatabase : RoomDatabase() {
             }
         }
 
+        /** Unique daily handoff keys make specialist messages idempotent across WorkManager retries. */
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE agent_messages ADD COLUMN message_key TEXT NOT NULL DEFAULT ''")
+                db.execSQL("UPDATE agent_messages SET message_key = 'legacy-' || id WHERE message_key = ''")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_agent_messages_message_key ON agent_messages(message_key)")
+            }
+        }
+
         @Volatile private var instance: FinanceDatabase? = null
 
         fun getInstance(context: Context): FinanceDatabase =
@@ -195,7 +204,7 @@ abstract class FinanceDatabase : RoomDatabase() {
                     context.applicationContext,
                     FinanceDatabase::class.java,
                     DATABASE_NAME
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11).build().also { instance = it }
             }
     }
 }
