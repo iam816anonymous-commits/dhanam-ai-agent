@@ -13,7 +13,7 @@ The existing Compose UI and emerald/gold theme remain the application UI. Agent 
 | Agent | Implemented responsibility | Guardrail |
 |---|---|---|
 | Finance Operations | Existing deterministic expense/budget/Khata command planner, validated previews, confirmed writes; nightly ledger integrity review | Never commits a model proposal without app validation and user confirmation |
-| Financial Intelligence | Deterministic local-ledger analysis for month-to-date category movement, budget overruns, lending/borrowing outstanding and recurring expense candidates; local model may explain the evidence | Calculations and evidence come from Kotlin/Room, not LLM arithmetic |
+| Financial Intelligence | Deterministic local-ledger analysis for month-to-date category movement, budget overruns, income/expense cash flow when income is recorded, lending/borrowing outstanding, recurring expense candidates and month-scoped user recommendation feedback; local model may explain the evidence | Calculations and evidence come from Kotlin/Room, not LLM arithmetic |
 | Skill Improvement | Learns exact-description-to-category rules from repeated local expense history using leave-one-out validation; local model can suggest safer tests | A proposal is not active until the user approves it; no generated code or executable tools |
 
 ## One shared model
@@ -49,9 +49,9 @@ The candidate is stored as a versioned data-only rule. It cannot contain code, r
 - Room schema version 5 adds `agent_learning_reports`.
 - Room schema version 6 adds versioned `agent_skills`.
 - Room schema version 7 adds bounded role-specific `agent_memories` and structured `agent_messages` handoff history.
-- Migrations 4→5, 5→6 and 6→7 are additive. Existing expense, budget, Khata and repayment records are preserved.
-- Room schema version 9 adds a separate `income_records` ledger with unique import source keys. Income is included in the monthly cash-flow dashboard, nightly aggregate context and full-ledger CSV export; a dedicated income CSV import/export path validates and previews rows before transactional idempotent import.
-- Room schema version 10 adds month-scoped recommendation feedback. The Financial Intelligence agent receives aggregate helpful/not-useful feedback during its next nightly run. Skill approvals supersede the previous active version and Settings now exposes transactional rollback to the prior validated version.
+- Migrations 4→5 through 10→11 are additive. Existing expense, budget, Khata and repayment records are preserved.
+- Room schema version 8 adds a separate `income_records` ledger; version 9 adds unique import source keys for repeatable CSV imports. Income is included in the monthly cash-flow dashboard, nightly aggregate context and full-ledger CSV export; a dedicated income CSV import/export path validates and previews rows before transactional idempotent import.
+- Room schema version 10 adds month-scoped recommendation feedback; version 11 makes nightly inter-agent handoff rows idempotent across WorkManager retries. The Financial Intelligence agent receives aggregate helpful/not-useful feedback during its next nightly run. Skill approvals supersede the previous active version and Settings now exposes transactional rollback to the prior validated version.
 - Financial amounts remain integer paise. LLM outputs are never used for financial arithmetic or direct writes.
 
 ## Current limitations / next phases
