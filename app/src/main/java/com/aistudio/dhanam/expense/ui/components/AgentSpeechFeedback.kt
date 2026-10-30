@@ -12,41 +12,42 @@ import androidx.compose.ui.platform.LocalContext
 import java.util.Locale
 
 /**
- * Optional local TTS for assistant replies. It never sends text to a remote service.
- * Unsupported installed TTS languages are not silently replaced with another language.
+ * Optional local TTS for assistant replies. It is not initialized until the user enables
+ * voice feedback, and it never sends text to a remote service.
  */
 @Composable
 fun AgentSpeechFeedback(
     messageId: String?,
     message: String?,
-    enabled: Boolean,
+    enabled: Boolean
 ) {
     val context = LocalContext.current
     var initialized by remember { mutableStateOf(false) }
     var lastSpokenId by remember { mutableStateOf<String?>(messageId) }
-    val engine = remember(context) {
-        TextToSpeech(context.applicationContext) { result ->
-            initialized = result == TextToSpeech.SUCCESS
+    val engine = remember(context, enabled) {
+        initialized = false
+        if (enabled) {
+            TextToSpeech(context.applicationContext) { result ->
+                initialized = result == TextToSpeech.SUCCESS
+            }
+        } else {
+            null
         }
     }
 
     DisposableEffect(engine) {
         onDispose {
             try {
-                engine.stop()
-                engine.shutdown()
+                engine?.stop()
+                engine?.shutdown()
             } catch (_: Exception) {
             }
         }
     }
 
-    LaunchedEffect(messageId, message, enabled, initialized) {
-        if (messageId == null || message.isNullOrBlank()) return@LaunchedEffect
-        if (!enabled) {
-            lastSpokenId = messageId
-            return@LaunchedEffect
-        }
-        if (!initialized || lastSpokenId == messageId) return@LaunchedEffect
+    LaunchedEffect(messageId, message, enabled, initialized, engine) {
+        if (!enabled || engine == null || !initialized) return@LaunchedEffect
+        if (messageId == null || message.isNullOrBlank() || lastSpokenId == messageId) return@LaunchedEffect
 
         // Speak the script actually returned by the assistant. Never send English text
         // through a Telugu/Hindi voice merely because that is the selected input language.
