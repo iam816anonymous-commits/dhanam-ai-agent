@@ -11,7 +11,6 @@ import com.aistudio.dhanam.expense.data.IncomeEntity
 import com.aistudio.dhanam.expense.data.FinanceDatabase
 import com.aistudio.dhanam.expense.domain.MoneyParser
 import com.aistudio.dhanam.expense.domain.IncomeInputValidator
-import com.aistudio.dhanam.expense.agent.learning.NightlyAgentLearningScheduler
 import com.aistudio.dhanam.expense.domain.KhataValidator
 import com.aistudio.dhanam.expense.model.LocalInferenceViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,7 +23,6 @@ import java.util.UUID
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.YearMonth
-import java.time.LocalTime
 
 data class AgentChatMessage(val id: String = UUID.randomUUID().toString(), val role: String, val text: String)
 data class AgentState(
