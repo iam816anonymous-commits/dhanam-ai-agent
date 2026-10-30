@@ -63,8 +63,8 @@ fun KhataScreen(viewModel: KhataViewModel = viewModel()) {
                 Text(if (editingLoanId == null) "New Khata record" else "Edit Khata record", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                 OutlinedTextField(person, { person = it }, label = { Text("Person's name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(direction == KhataValidator.LENT, { direction = KhataValidator.LENT }, label = { Text("I lent money") })
-                    FilterChip(direction == KhataValidator.BORROWED, { direction = KhataValidator.BORROWED }, label = { Text("I borrowed") })
+                    FilterChip(direction == KhataValidator.LENT, { direction = KhataValidator.LENT }, enabled = editingLoanId == null, label = { Text("I lent money") })
+                    FilterChip(direction == KhataValidator.BORROWED, { direction = KhataValidator.BORROWED }, enabled = editingLoanId == null, label = { Text("I borrowed") })
                 }
                 OutlinedTextField(amount, { amount = it }, label = { Text("Principal amount (₹)") }, placeholder = { Text("1000.00") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(opened, { opened = it }, label = { Text("Start date (YYYY-MM-DD)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
