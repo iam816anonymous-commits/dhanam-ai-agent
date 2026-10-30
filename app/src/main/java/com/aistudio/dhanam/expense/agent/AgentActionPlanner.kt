@@ -401,11 +401,9 @@ object AgentActionPlanner {
         val categoryWord = categories.keys.sortedByDescending { it.length }
             .firstOrNull { Regex("""\b${Regex.escape(it)}\b""").containsMatchIn(lower) }
         val amountMatch = amountPattern.findAll(input).lastOrNull()
-        val amountIntent = amountMatch != null && (
-            lower.contains("to ${amountMatch.groupValues[1].lowercase()}") ||
-                lower.contains("amount") || lower.contains("cost") || lower.contains("spent") ||
-                lower.contains("actually") || lower.contains("change") || lower.contains("correct")
-            )
+        val amountIntent = listOf("amount", "cost", "spent", "actually", "change", "correct")
+            .any { lower.contains(it) } ||
+            amountMatch?.let { lower.contains("to ${it.groupValues[1].lowercase()}") } == true
         return try {
             when (action) {
                 is PlannedFinanceAction.AnalyzeSpending -> null
