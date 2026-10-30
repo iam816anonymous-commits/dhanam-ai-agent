@@ -290,7 +290,7 @@ private fun AgentHeroCard(activity: String, status: String?) {
                 Text("DHANAM AI", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
                 Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
                 Text(
-                    status ?: "Expenses · Budgets · Khata repayments · Offline voice",
+                    status ?: "Expenses · Income · Budgets · Khata · Spending analysis",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 3
