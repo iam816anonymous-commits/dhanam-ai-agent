@@ -40,7 +40,6 @@ import com.aistudio.dhanam.expense.model.LocalInferenceRuntimeRegistry
 import com.aistudio.dhanam.expense.ui.components.AgentStatusPill
 import com.aistudio.dhanam.expense.ui.components.JarvisCoreState
 import com.aistudio.dhanam.expense.ui.components.LivingAgentOverlay
-import com.aistudio.dhanam.expense.ui.components.OfflineVoiceInput
 import com.aistudio.dhanam.expense.ui.screens.AgentScreen
 import com.aistudio.dhanam.expense.ui.screens.ExpensesScreen
 import com.aistudio.dhanam.expense.ui.screens.InsightsScreen
@@ -122,15 +121,6 @@ fun DhanamApp(
                         containerColor = MaterialTheme.colorScheme.surface
                     )
                 )
-                // Persistent voice control: available from Agent, Expenses, Khata, Insights and Settings.
-                OfflineVoiceInput(
-                    enabled = !agentState.busy,
-                    onRecognized = { spoken ->
-                        navigateTo(AppDestination.AGENT)
-                        agentViewModel.submit(spoken)
-                    },
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                )
             }
         },
         bottomBar = {
@@ -183,6 +173,10 @@ fun DhanamApp(
                 activity = agentState.activity,
                 status = agentState.status,
                 onNavigate = ::navigateTo,
+                onVoiceRecognized = { spoken ->
+                    navigateTo(AppDestination.AGENT)
+                    agentViewModel.submit(spoken)
+                },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
             )
         }
