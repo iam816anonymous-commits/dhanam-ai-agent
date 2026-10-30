@@ -8,8 +8,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [ExpenseEntity::class, BudgetEntity::class, KhataLoanEntity::class, RepaymentEntity::class, AgentLearningReportEntity::class],
-    version = 5,
+    entities = [ExpenseEntity::class, BudgetEntity::class, KhataLoanEntity::class, RepaymentEntity::class, AgentLearningReportEntity::class, AgentSkillEntity::class],
+    version = 6,
     exportSchema = true
 )
 abstract class FinanceDatabase : RoomDatabase() {
@@ -97,6 +97,28 @@ abstract class FinanceDatabase : RoomDatabase() {
             }
         }
 
+        /** Versioned, data-only agent skills. Existing finance tables are not modified. */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""CREATE TABLE IF NOT EXISTS agent_skills (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    skill_key TEXT NOT NULL,
+                    version INTEGER NOT NULL,
+                    title TEXT NOT NULL,
+                    match_text TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    example_count INTEGER NOT NULL,
+                    test_pass_count INTEGER NOT NULL,
+                    test_total_count INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    created_at_epoch_millis INTEGER NOT NULL,
+                    approved_at_epoch_millis INTEGER
+                )""")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_agent_skills_skill_key_version ON agent_skills(skill_key, version)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_agent_skills_status ON agent_skills(status)")
+            }
+        }
+
         @Volatile private var instance: FinanceDatabase? = null
 
         fun getInstance(context: Context): FinanceDatabase =
@@ -105,7 +127,7 @@ abstract class FinanceDatabase : RoomDatabase() {
                     context.applicationContext,
                     FinanceDatabase::class.java,
                     DATABASE_NAME
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build().also { instance = it }
             }
     }
 }
