@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aistudio.dhanam.expense.model.ModelCatalog
+import com.aistudio.dhanam.expense.model.ModelTier
 import com.aistudio.dhanam.expense.model.ModelManagerViewModel
 import com.aistudio.dhanam.expense.model.LocalInferenceViewModel
 import java.util.Locale
@@ -40,23 +41,57 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text("Choose a model", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        ModelCatalog.models.forEach { candidate ->
-            if (candidate.id == model.id) {
-                Button(
-                    onClick = { viewModel.selectModel(candidate.id) },
-                    enabled = canSwitchModel,
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Selected · ${candidate.displayName}") }
-            } else {
-                OutlinedButton(
-                    onClick = { viewModel.selectModel(candidate.id) },
-                    enabled = canSwitchModel,
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text(candidate.displayName) }
+        ModelTier.values().forEach { tier ->
+            Text(tier.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(tier.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            ModelCatalog.modelsFor(tier).forEach { candidate ->
+                val downloadCheck = state.eligibilityByModel[candidate.id]
+                val runtimeCheck = state.runtimeEligibilityByModel[candidate.id]
+                val installed = candidate.id in state.installedModelIds
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (candidate.id == model.id) MaterialTheme.colorScheme.secondaryContainer
+                        else MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text(candidate.displayName, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "${formatBytes(candidate.expectedBytes)} · ${candidate.license} · ${candidate.contextTokens}-token context",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            if (downloadCheck == null) "Download eligibility: checking…"
+                            else if (downloadCheck.allowed) "Download: supported on this device"
+                            else "Download: blocked · ${downloadCheck.reasons.joinToString(" ")}",
+                            color = if (downloadCheck?.allowed == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            if (runtimeCheck == null) "Run now: checking…"
+                            else if (runtimeCheck.allowed) "Run now: current RAM and storage checks pass"
+                            else "Run now: ${runtimeCheck.reasons.joinToString(" ")}",
+                            color = if (runtimeCheck?.allowed == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            if (installed) "Installed · file size present; SHA-256 is checked again before use"
+                            else "Not downloaded",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        OutlinedButton(
+                            onClick = { viewModel.selectModel(candidate.id) },
+                            enabled = canSwitchModel || candidate.id == model.id,
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text(if (candidate.id == model.id) "Selected" else "Select model") }
+                    }
+                }
             }
         }
         Text(
-            "A model switch is disabled while inference is loaded or running. Dynamic RAM is not counted as physical RAM.",
+            "Download eligibility checks physical RAM and storage. Run-now eligibility also checks current free RAM. Android memory expansion/swap is not treated as physical RAM. A model switch is disabled while inference is loaded or running.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -68,6 +103,13 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
                 Text(model.displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text("${formatBytes(model.expectedBytes)} · ${model.license} · ${model.contextTokens}-token context", style = MaterialTheme.typography.bodySmall)
                 Text("Pinned Hugging Face artifact revision; exact byte size and SHA-256 are verified after download.", style = MaterialTheme.typography.bodySmall)
+                eligibility?.let { detected ->
+                    Text(
+                        "Android reports: total RAM ${formatBytes(detected.totalRamBytes)} · currently available ${formatBytes(detected.availableRamBytes)} · free app storage ${formatBytes(detected.freeStorageBytes)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Text(
                     "Safety gate: ${formatBytes(model.minTotalRamBytes)} total RAM, ${formatBytes(model.minAvailableRamBytes)} currently available RAM, and ${formatBytes(model.minFreeStorageBytes)} free app storage. Peak process budget: ${formatBytes(model.maxProcessPeakBytes)}. ${model.runtimeRequirement}",
                     style = MaterialTheme.typography.bodySmall,
