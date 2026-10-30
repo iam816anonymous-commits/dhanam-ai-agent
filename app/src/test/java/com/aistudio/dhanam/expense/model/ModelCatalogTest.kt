@@ -45,8 +45,8 @@ class ModelCatalogTest {
 
     @Test fun qwen25ArtifactUsesPublishedExactSizeAndDigest() {
         val model = ModelCatalog.models.first { it.id == "qwen25-1.5b-instruct-q8-4096" }
-        assertTrue(model.downloadUrl.contains("/resolve/8c784d74ad0e9a6f1bdbdbc898682a50e7866727/"))
-        assertEquals(1_597_931_520L, model.expectedBytes)
+        assertTrue(model.downloadUrl.contains("/resolve/4526a9ff32b96063c7b07f0d681af7dc6c8ec342/"))
+        assertEquals(1_598_603_264L, model.expectedBytes)
         assertEquals("2ac49902133f729199bbd23ad6714df32b20585c786f2546d2293cc371f35278", model.sha256)
         assertEquals("Apache-2.0", model.license)
     }
@@ -65,7 +65,7 @@ class ModelCatalogTest {
         val model = ModelCatalog.models.first { it.id == "qwen3-1.7b-int4-4096" }
         assertTrue(model.downloadUrl.contains("/resolve/87603f0ff3fe74b9b77ed0477edb773b4b596f32/"))
         assertEquals(977_184_032L, model.expectedBytes)
-        assertEquals("2a72330b504a6596d53a2c00923c57173b10f1b83e6a541213ffec08d1fc5de8", model.sha256)
+        assertEquals("faa60663b333290c1496c499828b21d3e3254a788cacd8cce917ce0f761a2dc9", model.sha256)
         assertEquals(4096, model.contextTokens)
         assertEquals(8L * 1024L * 1024L * 1024L, model.minTotalRamBytes)
         assertEquals(4L * 1024L * 1024L * 1024L, model.minAvailableRamBytes)
