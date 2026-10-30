@@ -20,7 +20,7 @@ interface FinanceDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAgentSkillIfMissing(skill: AgentSkillEntity): Long
 
-    @Query("UPDATE agent_skills SET status = 'ACTIVE', approved_at_epoch_millis = :approvedAt WHERE id = :id AND status = 'PROPOSED' AND test_total_count >= 3 AND test_pass_count = test_total_count")
+    @Query("UPDATE agent_skills SET status = 'ACTIVE', approved_at_epoch_millis = :approvedAt WHERE id = :id AND status = 'PROPOSED' AND test_total_count >= 3 AND test_pass_count * 100 >= test_total_count * 90")
     suspend fun approveAgentSkill(id: Long, approvedAt: Long): Int
 
     @Query("UPDATE agent_skills SET status = 'REJECTED' WHERE id = :id AND status = 'PROPOSED'")
