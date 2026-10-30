@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -37,8 +35,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.aistudio.dhanam.expense.ui.AppDestination
-import com.aistudio.dhanam.expense.ui.components.JarvisCoreState
-import com.aistudio.dhanam.expense.ui.components.JarvisLivingCore
 
 /**
  * In-app floating assistant. It is composed above the NavHost, so it remains available
