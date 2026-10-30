@@ -43,7 +43,15 @@ fun OfflineVoiceInput(
 ) {
     val context = LocalContext.current
     val latestOnRecognized by rememberUpdatedState(onRecognized)
-    var language by remember { mutableStateOf("en-IN") }
+    val voicePreferences = remember(context) { context.getSharedPreferences("dhanam_voice", 0) }
+    var language by remember {
+        mutableStateOf(voicePreferences.getString("recognition_language", "en-IN") ?: "en-IN")
+    }
+    fun selectLanguage(code: String) {
+        language = code
+        voicePreferences.edit().putString("recognition_language", code).apply()
+        status = "Voice language set to ${when (code) { "te-IN" -> "Telugu"; "hi-IN" -> "Hindi"; else -> "English" }}."
+    }
     var status by remember {
         mutableStateOf(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -144,11 +152,14 @@ fun OfflineVoiceInput(
     androidx.compose.foundation.layout.Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("Voice language", style = MaterialTheme.typography.labelMedium)
-            TextButton(enabled = enabled, onClick = { language = "en-IN" }) {
+            TextButton(enabled = enabled, onClick = { selectLanguage("en-IN") }) {
                 Text(if (language == "en-IN") "✓ English" else "English")
             }
-            TextButton(enabled = enabled, onClick = { language = "te-IN" }) {
+            TextButton(enabled = enabled, onClick = { selectLanguage("te-IN") }) {
                 Text(if (language == "te-IN") "✓ తెలుగు" else "తెలుగు")
+            }
+            TextButton(enabled = enabled, onClick = { selectLanguage("hi-IN") }) {
+                Text(if (language == "hi-IN") "✓ हिन्दी" else "हिन्दी")
             }
             Button(enabled = enabled, onClick = {
                 val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
