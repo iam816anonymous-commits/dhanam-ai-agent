@@ -73,6 +73,7 @@ class AgentMemoryEntityTest {
         assertThrows(IllegalArgumentException::class.java) {
             AgentMessageEntity(
                 sessionId = "night-20261030",
+                messageKey = "self-handoff",
                 fromAgent = "FINANCIAL_INTELLIGENCE",
                 toAgent = "FINANCIAL_INTELLIGENCE",
                 messageType = "ANALYSIS",
@@ -83,6 +84,7 @@ class AgentMemoryEntityTest {
         assertThrows(IllegalArgumentException::class.java) {
             AgentMessageEntity(
                 sessionId = "night-20261030",
+                messageKey = "oversized-summary",
                 fromAgent = "FINANCE_OPERATIONS",
                 toAgent = "FINANCIAL_INTELLIGENCE",
                 messageType = "ANALYSIS",
