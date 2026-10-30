@@ -20,8 +20,47 @@ interface FinanceDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAgentSkillIfMissing(skill: AgentSkillEntity): Long
 
+    @Query("SELECT * FROM agent_skills WHERE id = :id LIMIT 1")
+    suspend fun findAgentSkill(id: Long): AgentSkillEntity?
+
+    @Query("UPDATE agent_skills SET status = 'SUPERSEDED' WHERE skill_key = :skillKey AND status = 'ACTIVE' AND id != :exceptId")
+    suspend fun supersedeActiveSkills(skillKey: String, exceptId: Long): Int
+
     @Query("UPDATE agent_skills SET status = 'ACTIVE', approved_at_epoch_millis = :approvedAt WHERE id = :id AND status = 'PROPOSED' AND test_total_count >= 3 AND test_pass_count * 100 >= test_total_count * 90")
-    suspend fun approveAgentSkill(id: Long, approvedAt: Long): Int
+    suspend fun activateProposedAgentSkill(id: Long, approvedAt: Long): Int
+
+    @Transaction
+    suspend fun approveAgentSkill(id: Long, approvedAt: Long): Int {
+        val candidate = findAgentSkill(id) ?: return 0
+        if (candidate.status != "PROPOSED" || candidate.testTotalCount < 3 ||
+            candidate.testPassCount * 100 < candidate.testTotalCount * 90) return 0
+        supersedeActiveSkills(candidate.skillKey, id)
+        check(activateProposedAgentSkill(id, approvedAt) == 1) {
+            "The skill proposal changed before it could be approved."
+        }
+        return 1
+    }
+
+    @Query("SELECT * FROM agent_skills WHERE skill_key = :skillKey AND status = 'ACTIVE' ORDER BY version DESC LIMIT 1")
+    suspend fun findActiveAgentSkill(skillKey: String): AgentSkillEntity?
+
+    @Query("SELECT * FROM agent_skills WHERE skill_key = :skillKey AND version < :version AND status = 'SUPERSEDED' ORDER BY version DESC LIMIT 1")
+    suspend fun findPreviousAgentSkill(skillKey: String, version: Int): AgentSkillEntity?
+
+    @Query("UPDATE agent_skills SET status = 'SUPERSEDED' WHERE id = :id AND status = 'ACTIVE'")
+    suspend fun supersedeAgentSkill(id: Long): Int
+
+    @Query("UPDATE agent_skills SET status = 'ACTIVE', approved_at_epoch_millis = :approvedAt WHERE id = :id AND status = 'SUPERSEDED'")
+    suspend fun restoreAgentSkill(id: Long, approvedAt: Long): Int
+
+    @Transaction
+    suspend fun rollbackAgentSkill(skillKey: String, approvedAt: Long): Boolean {
+        val active = findActiveAgentSkill(skillKey) ?: return false
+        val previous = findPreviousAgentSkill(skillKey, active.version) ?: return false
+        check(supersedeAgentSkill(active.id) == 1) { "The active skill changed before rollback." }
+        check(restoreAgentSkill(previous.id, approvedAt) == 1) { "The previous skill could not be restored." }
+        return true
+    }
 
     @Query("UPDATE agent_skills SET status = 'REJECTED' WHERE id = :id AND status = 'PROPOSED'")
     suspend fun rejectAgentSkill(id: Long): Int
