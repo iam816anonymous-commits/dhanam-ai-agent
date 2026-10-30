@@ -120,6 +120,7 @@ fun KhataScreen(viewModel: KhataViewModel = viewModel()) {
                         repaymentAmount = ""
                         repaymentDate = LocalDate.now().toString()
                         repaymentNote = ""
+                        repaymentRequestId = UUID.randomUUID().toString()
                     },
                     onDelete = { deleteFor = loan }
                 )
