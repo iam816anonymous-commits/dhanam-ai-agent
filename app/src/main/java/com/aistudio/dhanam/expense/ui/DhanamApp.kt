@@ -26,7 +26,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.aistudio.dhanam.expense.agent.AgentViewModel
-import com.aistudio.dhanam.expense.model.LocalInferenceViewModel
 import com.aistudio.dhanam.expense.model.LocalInferenceRuntimeRegistry
 import com.aistudio.dhanam.expense.ui.screens.AgentScreen
 import com.aistudio.dhanam.expense.ui.screens.ExpensesScreen
