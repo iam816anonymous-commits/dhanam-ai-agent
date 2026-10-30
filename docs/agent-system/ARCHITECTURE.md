@@ -66,9 +66,13 @@ The runtime contract:
 
 ## Persistent specialist memory and handoff history
 
-Room schema version 7 adds two local-only tables:
-- `agent_memories`: one bounded latest summary per role/key, with source report date and confidence. Each role reads only its own prior memory before its next nightly task.
-- `agent_messages`: structured, bounded handoff summaries between different specialist roles. Records are retained for 90 days and displayed in Settings.
+Room schema version 11 includes these local-only agent/finance tables:
+- `agent_memories` (v7): one bounded latest summary per role/key, with source report date and confidence. Each role reads only its own prior memory before its next nightly task.
+- `agent_messages` (v7, idempotent in v11): structured, bounded handoff summaries between different specialist roles. Records are retained for 90 days and displayed in Settings; a unique session/agent/type key prevents duplicate rows on retries.
+- `income_records` (v8–v9): a separate integer-paise income ledger with stable CSV import source keys.
+- `recommendation_feedback` (v10): one helpful/not-useful decision per recommendation and month. The worker retains the latest 12 months and supplies aggregate feedback to Financial Intelligence.
+
+Skill versions are data-only. Approving a new version supersedes the previous active version; the user can roll back to the previous validated version from Settings.
 
 Memory is historical context, not a source of current balances or transaction facts. Each task must re-read current aggregates from the financial ledger. Model-generated summaries are explicitly marked untrusted when supplied to a later agent. Raw prompts and raw transaction descriptions are not persisted in these tables.
 
@@ -80,7 +84,7 @@ Suggested nightly order:
 1. Finance Operations Agent creates a deterministic ledger snapshot and checks data integrity.
 2. Financial Intelligence Agent analyses the snapshot and drafts recommendations.
 3. Skill and Improvement Agent reviews safe, local task metrics and proposes tested workflow improvements.
-4. Report generator stores one daily report and schedules a user-visible notification.
+4. Report generator stores one daily report, agent memories and handoffs; the report is visible in Settings. A separate notification is not a release requirement.
 
 The broker checks the time window before every task, not just when the worker starts. At 06:00 it stops accepting new background tasks, cancels or safely checkpoints the active task, releases the model, and records the run as partial if incomplete.
 
