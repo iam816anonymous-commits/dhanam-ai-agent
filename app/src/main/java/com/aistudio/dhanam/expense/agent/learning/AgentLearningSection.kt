@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aistudio.dhanam.expense.data.FinanceDatabase
+import androidx.room.withTransaction
 import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -264,5 +267,32 @@ fun AgentLearningSection() {
                 }
             }
         }
+
+        OutlinedButton(
+            onClick = { confirmClearMemory = true },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Clear agent memory and handoff history") }
+    }
+
+    if (confirmClearMemory) {
+        AlertDialog(
+            onDismissRequest = { confirmClearMemory = false },
+            title = { Text("Clear agent memory?") },
+            text = { Text("This deletes the specialists' saved summaries and handoff history. Expenses, income, budgets, Khata records, approved skills, recommendation feedback and daily reports are not deleted.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        db.withTransaction {
+                            db.financeDao().clearAgentMemories()
+                            db.financeDao().clearAgentMessages()
+                        }
+                        confirmClearMemory = false
+                    }
+                }) { Text("Clear memory") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClearMemory = false }) { Text("Cancel") }
+            }
+        )
     }
 }
