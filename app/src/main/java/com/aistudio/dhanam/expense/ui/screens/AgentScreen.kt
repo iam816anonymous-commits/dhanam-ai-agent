@@ -22,6 +22,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -42,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -50,6 +53,7 @@ import com.aistudio.dhanam.expense.agent.AgentViewModel
 import com.aistudio.dhanam.expense.agent.PlannedFinanceAction
 import com.aistudio.dhanam.expense.ui.components.JarvisCoreState
 import com.aistudio.dhanam.expense.ui.components.JarvisLivingCore
+import com.aistudio.dhanam.expense.ui.components.AgentSpeechFeedback
 
 private data class QuickCommand(val label: String, val prompt: String)
 
@@ -59,7 +63,22 @@ fun AgentScreen(
     isLocalModelReady: Boolean = false,
     onOpenSettings: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val voicePreferences = remember(context) { context.getSharedPreferences("dhanam_voice", 0) }
     val state by viewModel.state.collectAsState()
+    var voiceFeedbackEnabled by remember(context) {
+        mutableStateOf(voicePreferences.getBoolean("voice_feedback_enabled", false))
+    }
+    val voiceLanguage = remember(context) {
+        voicePreferences.getString("recognition_language", "en-IN") ?: "en-IN"
+    }
+    val latestAssistantMessage = state.messages.lastOrNull()?.takeIf { it.role == "assistant" }
+    AgentSpeechFeedback(
+        messageId = latestAssistantMessage?.id,
+        message = latestAssistantMessage?.text,
+        enabled = voiceFeedbackEnabled,
+        languageTag = voiceLanguage
+    )
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     LaunchedEffect(state.messages.size) {
@@ -117,6 +136,18 @@ fun AgentScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            }
+            IconButton(
+                onClick = {
+                    voiceFeedbackEnabled = !voiceFeedbackEnabled
+                    voicePreferences.edit().putBoolean("voice_feedback_enabled", voiceFeedbackEnabled).apply()
+                }
+            ) {
+                Icon(
+                    if (voiceFeedbackEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                    contentDescription = if (voiceFeedbackEnabled) "Disable voice replies" else "Enable voice replies",
+                    tint = if (voiceFeedbackEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             IconButton(onClick = viewModel::clearChat, enabled = !state.busy) {
                 Icon(Icons.Default.DeleteSweep, contentDescription = "Clear conversation", tint = MaterialTheme.colorScheme.onSurfaceVariant)
