@@ -1,11 +1,5 @@
 package com.aistudio.dhanam.expense.ui.screens
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,7 +21,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -49,15 +42,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aistudio.dhanam.expense.agent.AgentViewModel
 import com.aistudio.dhanam.expense.agent.PlannedFinanceAction
+import com.aistudio.dhanam.expense.ui.components.JarvisCoreState
+import com.aistudio.dhanam.expense.ui.components.JarvisLivingCore
 
 private data class QuickCommand(val label: String, val prompt: String)
 
@@ -270,16 +262,13 @@ fun AgentScreen(
 
 @Composable
 private fun AgentHeroCard(activity: String, status: String?) {
-    val transition = rememberInfiniteTransition(label = "dhanam-hero")
-    val pulse by transition.animateFloat(
-        initialValue = 0.96f,
-        targetValue = if (activity == "thinking" || activity == "acting" || activity == "analyzing") 1.08f else 1.02f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(if (activity == "acting") 500 else if (activity == "analyzing") 700 else 1000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse"
-    )
+    val coreState = when (activity) {
+        "thinking", "analyzing" -> JarvisCoreState.THINKING
+        "acting" -> JarvisCoreState.PROCESSING
+        "awaiting_confirmation" -> JarvisCoreState.NOTING
+        "complete" -> JarvisCoreState.SPEAKING
+        else -> JarvisCoreState.IDLE
+    }
     val label = when (activity) {
         "thinking" -> "THINKING & UNDERSTANDING"
         "acting" -> "CHECKING LOCAL RECORDS"
@@ -287,33 +276,34 @@ private fun AgentHeroCard(activity: String, status: String?) {
         "awaiting_confirmation" -> "READY FOR YOUR APPROVAL"
         "complete" -> "ACTION VERIFIED"
         "error" -> "ACTION NEEDS ATTENTION"
-        else -> "YOUR PRIVATE FINANCE COMPANION"
+        else -> "JARVIS CORE ACTIVE · TAP THE MIC TO SPEAK"
     }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(13.dp),
+            Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(13.dp)
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Box(
-                modifier = Modifier.size(62.dp).scale(pulse).graphicsLayer { alpha = if (activity == "error") 0.88f else 1f }
-                    .background(
-                        Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)),
-                        CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(29.dp))
-            }
+            JarvisLivingCore(state = coreState, coreSize = 68.dp)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("DHANAM AI", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
-                Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                Text(
+                    "DHANAM AI",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.secondary
+                )
                 Text(
                     status ?: "Expenses · Income · Budgets · Khata · Spending analysis",
                     style = MaterialTheme.typography.bodySmall,
