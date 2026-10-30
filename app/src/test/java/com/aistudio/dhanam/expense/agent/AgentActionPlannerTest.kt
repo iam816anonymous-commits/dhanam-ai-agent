@@ -74,4 +74,28 @@ class AgentActionPlannerTest {
         assertEquals("Food", budget.category)
     }
 
+    @Test fun commonSpokenAndShortExpenseFormatsCreatePreviews() {
+        val short = AgentActionPlanner.parse("Lunch 250").action as PlannedFinanceAction.AddExpense
+        assertEquals("Lunch", short.title)
+        assertEquals(25000L, short.amountPaise)
+        assertEquals("Food", short.category)
+
+        val reversed = AgentActionPlanner.parse("250 groceries").action as PlannedFinanceAction.AddExpense
+        assertEquals("groceries", reversed.title)
+        assertEquals("Food", reversed.category)
+
+        val paid = AgentActionPlanner.parse("I paid 120 for bus").action as PlannedFinanceAction.AddExpense
+        assertEquals("bus", paid.title)
+        assertEquals("Transport", paid.category)
+        assertEquals(12000L, paid.amountPaise)
+
+        val bought = AgentActionPlanner.parse("bought vegetables 85").action as PlannedFinanceAction.AddExpense
+        assertEquals(8500L, bought.amountPaise)
+    }
+
+    @Test fun spendingQueriesAreNotMistakenForNewExpenses() {
+        assertEquals(null, AgentActionPlanner.parse("how much did I spend on lunch 250").action)
+        assertEquals(null, AgentActionPlanner.parse("show food history 250").action)
+    }
+
 }

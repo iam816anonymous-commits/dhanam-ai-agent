@@ -31,41 +31,59 @@ object AgentActionPlanner {
     )
 
     fun parse(text: String): PlannerResult {
-        // Kotlin regular-expression patterns containing backslashes must use a raw string
-        // or escape the backslash; raw strings keep this whitespace normalization readable.
-        val input = text.trim().replace(Regex("""\s+"""), " ")
+        val input = text.trim().replace(Regex("""\s+"""), " ").take(1000)
         if (input.isEmpty()) return PlannerResult(message = "Tell me what you want to do.")
         val lower = input.lowercase()
         parseTelugu(input)?.let { return it }
         if (lower in setOf("help", "what can you do", "commands")) {
-            return PlannerResult(message = "Try: “I spent 250 on lunch”, “set food budget to 3000”, or “record repayment 500 from Ravi”. I'll show a preview and ask before saving.")
+            return PlannerResult(message = "Try “Lunch 250”, “I spent 250 on lunch”, “paid 120 for bus”, “set food budget to 3000”, or “record repayment 500 from Ravi”. I'll preview every change before saving.")
         }
         if (lower.contains("budget")) {
             val amount = amountPattern.findAll(input).lastOrNull()?.groupValues?.get(1)
                 ?: return PlannerResult(message = "What amount should the budget be?", needsClarification = true)
-            val categoryWord = categories.keys.sortedByDescending { it.length }.firstOrNull { Regex("""\b${Regex.escape(it)}\b""").containsMatchIn(lower) }
+            val categoryWord = categories.keys.sortedByDescending { it.length }
+                .firstOrNull { Regex("\\b" + Regex.escape(it) + "\\b").containsMatchIn(lower) }
                 ?: return PlannerResult(message = "Which category is this budget for? Choose Food, Transport, Shopping, Bills, Health, Education or Other.", needsClarification = true)
-            val category = categories[categoryWord] ?: categoryWord.replaceFirstChar { it.uppercase() }
             return try {
                 val paise = MoneyParser.parseRupeesToPaise(amount)
-                PlannerResult(PlannedFinanceAction.SetBudget(category, paise, YearMonth.now()), "Review this budget change before saving.")
-            } catch (e: Exception) { PlannerResult(message = e.message ?: "Check the budget amount.", needsClarification = true) }
+                PlannerResult(PlannedFinanceAction.SetBudget(categories.getValue(categoryWord), paise, YearMonth.now()), "Review this budget change before saving.")
+            } catch (e: Exception) {
+                PlannerResult(message = e.message ?: "Check the budget amount.", needsClarification = true)
+            }
         }
-        if (lower.contains("repayment") || lower.contains("paid") || lower.contains("pay back") || lower.contains("paid back")) {
+        if (listOf("how much", "what did i spend", "show ", "list ", "history", "total spent", "remaining budget").any { lower.startsWith(it) }) {
+            return PlannerResult(message = "That sounds like a question about your existing records. Open Insights for saved totals, or ask me a more specific question.", needsClarification = true)
+        }
+        if (lower.contains("repayment") || lower.contains("pay back") || lower.contains("paid back") ||
+            lower.contains("returned") || lower.contains("చెల్లించాడు") || lower.contains("తిరిగి ఇచ్చాడు")) {
             return PlannerResult(message = "I need to match the repayment to exactly one open Khata record before I can prepare it. Use “record repayment 500 from Ravi” and confirm the matching person in the preview.", needsClarification = true)
         }
-        val amountMatch = amountPattern.find(input)
-            ?: return PlannerResult(message = "I couldn't find an amount. Try “I spent 250 on lunch”.", needsClarification = true)
-        if (!(lower.contains("spent") || lower.contains("expense") || lower.contains("bought") || lower.contains("paid for"))) {
-            return PlannerResult(message = "I can prepare an expense or budget change. Try “I spent 250 on lunch”.", needsClarification = true)
+
+        val amountMatch = amountPattern.findAll(input).firstOrNull()
+            ?: return PlannerResult(message = "I couldn't find an amount. Try “I spent 250 on lunch” or “Lunch 250”.", needsClarification = true)
+        val categoryWord = categories.keys.sortedByDescending { it.length }
+            .firstOrNull { Regex("\\b" + Regex.escape(it) + "\\b").containsMatchIn(lower) }
+        val hasExpenseVerb = listOf(
+            "spent", "spend", "expense", "bought", "buy", "paid", "purchase", "purchased",
+            "add", "record", "log", "note", "cost", "ఖర్చు", "కొన్న", "చెల్లించ"
+        ).any { lower.contains(it) }
+        val looksLikeBareEntry = categoryWord != null &&
+            !listOf("how much", "what is", "show", "list", "history", "budget", "remaining", "total").any { lower.contains(it) }
+        if (!hasExpenseVerb && !looksLikeBareEntry) {
+            return PlannerResult(message = "I can prepare an expense or budget change. Try “I spent 250 on lunch” or “Lunch 250”.", needsClarification = true)
         }
-        val categoryWord = categories.keys.sortedByDescending { it.length }.firstOrNull { Regex("""\b${Regex.escape(it)}\b""").containsMatchIn(lower) }
-        val category = categoryWord?.let { categories[it] } ?: "Other"
+        val category = categoryWord?.let { categories.getValue(it) } ?: "Other"
         val title = when {
-            Regex("""\bon\s+(.+)$""", RegexOption.IGNORE_CASE).containsMatchIn(input) ->
-                Regex("""\bon\s+(.+)$""", RegexOption.IGNORE_CASE).find(input)!!.groupValues[1]
+            Regex("""(?i)\b(?:on|for)\s+(.+)$""").containsMatchIn(input) -> {
+                Regex("""(?i)\b(?:on|for)\s+(.+)$""").find(input)!!.groupValues[1]
                     .replace(Regex("""[.!?]$"""), "").take(120)
-            else -> input.replace(amountMatch.value, "").replace(Regex("""(?i)\b(i spent|spent|expense|add|record|bought|paid for)\b"""), "").trim().take(120).ifBlank { category }
+            }
+            else -> input
+                .replace(amountMatch.value, " ")
+                .replace(Regex("""(?i)\b(?:i|my|spent|spend|expense|add|record|log|note|bought|buy|paid|purchase|purchased|for|on|rupees|rs)\b"""), " ")
+                .replace(Regex("""[₹,]"""), " ")
+                .replace(Regex("""\s+"""), " ")
+                .trim().take(120).ifBlank { category }
         }
         return try {
             val validated = ExpenseInputValidator.validate(title, amountMatch.groupValues[1], category, LocalDate.now().toString(), "")
@@ -74,7 +92,6 @@ object AgentActionPlanner {
             PlannerResult(message = e.message ?: "I couldn't validate that expense.", needsClarification = true)
         }
     }
-
 
     private val teluguCategoryTerms = listOf(
         Triple("ఆహారం", "Food", "భోజనం"),

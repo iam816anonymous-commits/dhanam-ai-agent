@@ -211,7 +211,12 @@ fun AgentScreen(viewModel: AgentViewModel = viewModel()) {
         OfflineVoiceInput(
             enabled = !state.busy,
             onRecognized = { spoken ->
-                input = listOf(input.trim(), spoken).filter { it.isNotBlank() }.joinToString(" ").take(1000)
+                // Match the reference app: a completed voice transcript is sent to the
+                // finance agent automatically. The agent still stages a preview and asks
+                // for confirmation before any database write.
+                input = spoken.take(1000)
+                viewModel.submit(spoken)
+                input = ""
             }
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
