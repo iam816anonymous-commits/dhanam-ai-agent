@@ -10,7 +10,8 @@ import androidx.room.PrimaryKey
     tableName = "agent_messages",
     indices = [
         Index(value = ["session_id", "created_at_epoch_millis"]),
-        Index(value = ["created_at_epoch_millis"])
+        Index(value = ["created_at_epoch_millis"]),
+        Index(value = ["session_id", "from_agent", "to_agent", "message_type"], unique = true)
     ]
 )
 data class AgentMessageEntity(
