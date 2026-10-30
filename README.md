@@ -15,7 +15,7 @@ Implemented in the current codebase:
 - Finance Operations, Financial Intelligence and Skill Improvement specialist roles.
 - Nightly WorkManager scheduling between 01:00 and 06:00 local time, subject to Android battery/idle policies.
 - Versioned exact-description category skill proposals, leave-one-out validation and explicit user approval.
-- Local daily agent reports and skill review in Settings.
+- Local daily agent reports, role-isolated bounded memories, auditable inter-agent handoffs and skill review in Settings.
 
 This is an implementation milestone, not a claim of release completion. Physical-device qualification, remaining finance-parity items and extended migration/security tests are still required.
 
@@ -74,4 +74,4 @@ The debug APK is generated at `app/build/outputs/apk/debug/app-debug.apk`. GitHu
 - Measure model load peak RAM, thermal behaviour, battery impact and actual inference duration on the target handset.
 - Verify WorkManager execution across reboot, Doze, force-stop and battery restrictions.
 - Complete remaining feature-parity, security, backup/restore and release-signing work.
-- Add persistent per-agent memory and richer inter-agent task/event history; current cross-agent coordination is through the shared ledger, skill registry and sequential nightly reports.
+- Expand persistent per-agent memory from latest verified summaries into evaluated trend memory, and add broader recommendation feedback and rollback workflows.
