@@ -94,7 +94,7 @@ object AgentActionPlanner {
     }
 
     private fun parseLoanCommand(input: String): PlannerResult? {
-        val pattern = Regex("""(?i)^(?:i\\s+)?(lent|loaned|gave|borrowed|took)\\s+(?:₹\\s*)?([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\s+(to|from)\\s+(.+)$""")
+        val pattern = Regex("""(?i)^(?:i\s+)?(lent|loaned|gave|borrowed|took)\s+(?:₹\s*)?([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s+(to|from)\s+(.+)$""")
         val match = pattern.matchEntire(input) ?: return null
         val verb = match.groupValues[1].lowercase()
         val amount = match.groupValues[2]
