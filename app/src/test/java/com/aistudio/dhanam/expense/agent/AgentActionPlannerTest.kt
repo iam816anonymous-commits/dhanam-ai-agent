@@ -190,4 +190,22 @@ class AgentActionPlannerTest {
         assertEquals("Ravi", action.personName)
     }
 
+    @Test fun disabledLearnedSkillDoesNotChangeExpenseCategory() {
+        val skill = AgentSkillEntity(
+            skillKey = "e".repeat(64),
+            version = 1,
+            title = "Category rule: metro card",
+            matchText = "metro card",
+            category = "Transport",
+            exampleCount = 4,
+            testPassCount = 4,
+            testTotalCount = 4,
+            status = "DISABLED",
+            createdAtEpochMillis = 1L
+        )
+        val result = AgentActionPlanner.parseWithLearnedSkills("I spent 80 on Metro Card", listOf(skill))
+        val action = result.action as PlannedFinanceAction.AddExpense
+        assertEquals("Other", action.category)
+    }
+
 }
