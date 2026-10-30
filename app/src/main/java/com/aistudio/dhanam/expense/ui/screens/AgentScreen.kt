@@ -1,14 +1,7 @@
 package com.aistudio.dhanam.expense.ui.screens
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -25,8 +20,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -47,21 +43,37 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aistudio.dhanam.expense.agent.AgentViewModel
 import com.aistudio.dhanam.expense.agent.PlannedFinanceAction
-import com.aistudio.dhanam.expense.ui.components.OfflineVoiceInput
+import com.aistudio.dhanam.expense.ui.components.JarvisCoreState
+import com.aistudio.dhanam.expense.ui.components.JarvisLivingCore
+import com.aistudio.dhanam.expense.ui.components.AgentSpeechFeedback
 
 private data class QuickCommand(val label: String, val prompt: String)
 
 @Composable
-fun AgentScreen(viewModel: AgentViewModel = viewModel()) {
+fun AgentScreen(
+    viewModel: AgentViewModel = viewModel(),
+    isLocalModelReady: Boolean = false,
+    onOpenSettings: () -> Unit = {}
+) {
+    val context = LocalContext.current
+    val voicePreferences = remember(context) { context.getSharedPreferences("dhanam_voice", 0) }
     val state by viewModel.state.collectAsState()
+    var voiceFeedbackEnabled by remember(context) {
+        mutableStateOf(voicePreferences.getBoolean("voice_feedback_enabled", false))
+    }
+    val latestAssistantMessage = state.messages.lastOrNull()?.takeIf { it.role == "assistant" }
+    AgentSpeechFeedback(
+        messageId = latestAssistantMessage?.id,
+        message = latestAssistantMessage?.text,
+        enabled = voiceFeedbackEnabled
+    )
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     LaunchedEffect(state.messages.size) {
@@ -120,12 +132,45 @@ fun AgentScreen(viewModel: AgentViewModel = viewModel()) {
                     )
                 }
             }
+            IconButton(
+                onClick = {
+                    voiceFeedbackEnabled = !voiceFeedbackEnabled
+                    voicePreferences.edit().putBoolean("voice_feedback_enabled", voiceFeedbackEnabled).apply()
+                }
+            ) {
+                Icon(
+                    if (voiceFeedbackEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                    contentDescription = if (voiceFeedbackEnabled) "Disable voice replies" else "Enable voice replies",
+                    tint = if (voiceFeedbackEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             IconButton(onClick = viewModel::clearChat, enabled = !state.busy) {
                 Icon(Icons.Default.DeleteSweep, contentDescription = "Clear conversation", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
         AgentHeroCard(activity = state.activity, status = state.status)
+
+        if (!isLocalModelReady) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("On-device AI is not loaded", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
+                        Text("Built-in finance commands still work. Load a verified model for flexible phrasing.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    OutlinedButton(onClick = onOpenSettings, enabled = !state.busy) { Text("Models") }
+                }
+            }
+        } else {
+            Text("LOCAL AI READY · requests run on this device", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        }
 
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("QUICK ACTIONS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
@@ -209,15 +254,16 @@ fun AgentScreen(viewModel: AgentViewModel = viewModel()) {
             minLines = 1,
             maxLines = 3,
             enabled = !state.busy,
-            shape = RoundedCornerShape(18.dp)
-        )
-        OfflineVoiceInput(
-            enabled = !state.busy,
-            onRecognized = { spoken ->
-                // Keep speech reviewable: the transcript fills the composer but is not sent
-                // until the user taps Send. Financial writes still require a separate confirm.
-                input = spoken.take(1000)
-            }
+            shape = RoundedCornerShape(18.dp),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+            keyboardActions = KeyboardActions(
+                onSend = {
+                    if (input.isNotBlank() && !state.busy) {
+                        viewModel.submit(input)
+                        input = ""
+                    }
+                }
+            )
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedButton(
@@ -242,16 +288,13 @@ fun AgentScreen(viewModel: AgentViewModel = viewModel()) {
 
 @Composable
 private fun AgentHeroCard(activity: String, status: String?) {
-    val transition = rememberInfiniteTransition(label = "dhanam-hero")
-    val pulse by transition.animateFloat(
-        initialValue = 0.96f,
-        targetValue = if (activity == "thinking" || activity == "acting" || activity == "analyzing") 1.08f else 1.02f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(if (activity == "acting") 500 else if (activity == "analyzing") 700 else 1000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse"
-    )
+    val coreState = when (activity) {
+        "thinking", "analyzing" -> JarvisCoreState.THINKING
+        "acting" -> JarvisCoreState.PROCESSING
+        "awaiting_confirmation" -> JarvisCoreState.NOTING
+        "complete" -> JarvisCoreState.SPEAKING
+        else -> JarvisCoreState.IDLE
+    }
     val label = when (activity) {
         "thinking" -> "THINKING & UNDERSTANDING"
         "acting" -> "CHECKING LOCAL RECORDS"
@@ -259,33 +302,34 @@ private fun AgentHeroCard(activity: String, status: String?) {
         "awaiting_confirmation" -> "READY FOR YOUR APPROVAL"
         "complete" -> "ACTION VERIFIED"
         "error" -> "ACTION NEEDS ATTENTION"
-        else -> "YOUR PRIVATE FINANCE COMPANION"
+        else -> "JARVIS CORE ACTIVE · TAP THE MIC TO SPEAK"
     }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(13.dp),
+            Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(13.dp)
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Box(
-                modifier = Modifier.size(62.dp).scale(pulse).graphicsLayer { alpha = if (activity == "error") 0.88f else 1f }
-                    .background(
-                        Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)),
-                        CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(29.dp))
-            }
+            JarvisLivingCore(state = coreState, coreSize = 68.dp)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("DHANAM AI", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
-                Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+                Text(
+                    "DHANAM AI",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.secondary
+                )
                 Text(
                     status ?: "Expenses · Income · Budgets · Khata · Spending analysis",
                     style = MaterialTheme.typography.bodySmall,
