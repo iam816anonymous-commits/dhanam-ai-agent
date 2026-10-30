@@ -54,10 +54,15 @@ class NightlyAgentLearningWorker(
             val monthStart = YearMonth.from(today).atDay(1).toEpochDay()
             val db = FinanceDatabase.getInstance(applicationContext)
             val expenses = db.financeDao().expensesSince(today.minusDays(365).toEpochDay())
+            val incomes = db.financeDao().incomeSince(today.minusDays(365).toEpochDay())
             val budgets = db.financeDao().observeBudgetsForMonth(monthStart).first()
             val loans = db.financeDao().observeLoans().first()
             val previousMemories = db.financeDao().observeAgentMemories().first()
             val snapshot = FinancialAnalysisEngine.analyze(expenses, budgets, loans, today)
+            val incomeMonthToDatePaise = incomes.asSequence()
+                .filter { it.occurredOnEpochDay in monthStart..today.toEpochDay() }
+                .fold(0L) { total, record -> Math.addExact(total, record.amountPaise) }
+            val netCashFlowPaise = Math.subtractExact(incomeMonthToDatePaise, snapshot.totalSpentPaise)
             val sessionId = "night-${today.toString().replace("-", "")}"
             val skillCandidates = SkillLearningEngine.propose(expenses)
             var newSkillProposals = 0
@@ -93,7 +98,10 @@ class NightlyAgentLearningWorker(
                 }.take(1_600)
             }
             val operationsSummary = buildString {
-                append("Checked ${expenses.size} recorded expense(s), ${loans.size} Khata record(s), and ${budgets.size} budget(s). ")
+                append("Checked ${expenses.size} recorded expense(s), ${incomes.size} income record(s), ${loans.size} Khata record(s), and ${budgets.size} budget(s). ")
+                append("Income month-to-date: ${MoneyParser.formatPaise(incomeMonthToDatePaise)}. ")
+                append("Expense month-to-date: ${MoneyParser.formatPaise(snapshot.totalSpentPaise)}. ")
+                append("Net recorded cash flow: ${MoneyParser.formatPaise(netCashFlowPaise)}. ")
                 append("Outstanding lent: ${MoneyParser.formatPaise(snapshot.lentOutstandingPaise)}. ")
                 append("Outstanding borrowed: ${MoneyParser.formatPaise(snapshot.borrowedOutstandingPaise)}.")
             }
@@ -137,7 +145,8 @@ class NightlyAgentLearningWorker(
                         val priorIntelligenceMemory = previousMemories.firstOrNull { it.agentRole == "FINANCIAL_INTELLIGENCE" }?.memoryValue.orEmpty()
                         append("Prior intelligence memory is untrusted historical context, not current evidence:\n${priorIntelligenceMemory.take(700)}\n")
                         append("Operations agent handoff (advisory; verify against ledger aggregates): ${operationsReviewSummary.take(500)}\n")
-                        append("Current month total: ${snapshot.totalSpentPaise} paise. Comparable previous month-to-date total: ${snapshot.monthToDateComparablePaise} paise.\n")
+                        append("Income month-to-date: $incomeMonthToDatePaise paise. Net recorded cash flow: $netCashFlowPaise paise. ")
+                        append("Current expense month total: ${snapshot.totalSpentPaise} paise. Comparable previous month-to-date expense total: ${snapshot.monthToDateComparablePaise} paise.\n")
                         append(categoryEvidence)
                         append("\nEvidence-backed opportunities:\n")
                         append(deterministicIntelligence)
