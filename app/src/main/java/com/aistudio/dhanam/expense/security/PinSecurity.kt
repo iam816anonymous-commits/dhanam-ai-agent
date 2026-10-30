@@ -15,6 +15,7 @@ object PinSecurity {
     private const val HASH_KEY = "pin_hash"
     private const val FAILURES_KEY = "pin_failures"
     private const val BLOCKED_UNTIL_KEY = "pin_blocked_until"
+    private const val BIOMETRIC_ENABLED_KEY = "biometric_unlock_enabled"
     private const val LEGACY_PIN_KEY = "app_pin"
     private const val LEGACY_SALT_KEY = "app_pin_salt"
     private const val ITERATIONS = 150_000
@@ -66,10 +67,18 @@ object PinSecurity {
         return false
     }
 
+    fun isBiometricEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(BIOMETRIC_ENABLED_KEY, false)
+
+    fun setBiometricEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(BIOMETRIC_ENABLED_KEY, enabled && isConfigured(context)).apply()
+    }
+
     fun clearPin(context: Context, currentPin: String): Boolean {
         if (!verifyPin(context, currentPin)) return false
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .remove(SALT_KEY).remove(HASH_KEY).remove(FAILURES_KEY).remove(BLOCKED_UNTIL_KEY).apply()
+            .remove(SALT_KEY).remove(HASH_KEY).remove(FAILURES_KEY).remove(BLOCKED_UNTIL_KEY).remove(BIOMETRIC_ENABLED_KEY).apply()
         context.getSharedPreferences(LEGACY_SECURE_PREFS, Context.MODE_PRIVATE).edit()
             .remove(LEGACY_PIN_KEY).remove(LEGACY_SALT_KEY).apply()
         context.getSharedPreferences(LEGACY_PREFS, Context.MODE_PRIVATE).edit().remove(LEGACY_PIN_KEY).apply()
