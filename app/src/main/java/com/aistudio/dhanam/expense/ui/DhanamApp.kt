@@ -1,5 +1,9 @@
 package com.aistudio.dhanam.expense.ui
 
+import android.app.Application
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DarkMode
@@ -19,13 +23,12 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.ui.platform.LocalContext
-import android.app.Application
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -33,6 +36,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.aistudio.dhanam.expense.agent.AgentViewModel
 import com.aistudio.dhanam.expense.model.LocalInferenceRuntimeRegistry
+import com.aistudio.dhanam.expense.ui.components.LivingAgentOverlay
+import com.aistudio.dhanam.expense.ui.components.OfflineVoiceInput
 import com.aistudio.dhanam.expense.ui.screens.AgentScreen
 import com.aistudio.dhanam.expense.ui.screens.ExpensesScreen
 import com.aistudio.dhanam.expense.ui.screens.InsightsScreen
@@ -52,6 +57,8 @@ fun DhanamApp(
     val inferenceViewModel = remember(context) {
         LocalInferenceRuntimeRegistry.getOrCreate(context.applicationContext as Application)
     }
+    val inferenceState by inferenceViewModel.state.collectAsState()
+    val agentState by agentViewModel.state.collectAsState()
     agentViewModel.attachLocalInference(inferenceViewModel)
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -60,41 +67,55 @@ fun DhanamApp(
         currentDestination?.hierarchy?.any { it.route == item.route } == true
     } ?: AppDestination.AGENT
 
+    fun navigateTo(destination: AppDestination) {
+        navController.navigate(destination.route) {
+            popUpTo(navController.graph.startDestinationId) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        currentTab.label.uppercase(),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                },
-                actions = {
-                    IconButton(onClick = { onThemeChange(!isDarkTheme) }) {
-                        Icon(
-                            imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                            contentDescription = "Toggle theme",
-                            tint = MaterialTheme.colorScheme.onSurface
+            Column {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(
+                            currentTab.label,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
-                    }
-                    if (canLock) {
-                        IconButton(onClick = onLockClick) {
+                    },
+                    actions = {
+                        IconButton(onClick = { onThemeChange(!isDarkTheme) }) {
                             Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = "Lock app",
+                                imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                contentDescription = "Toggle theme",
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                        if (canLock) {
+                            IconButton(onClick = onLockClick) {
+                                Icon(Icons.Default.Lock, contentDescription = "Lock app", tint = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
                 )
-            )
+                // Persistent voice control: available from Agent, Expenses, Khata, Insights and Settings.
+                OfflineVoiceInput(
+                    enabled = !agentState.busy,
+                    onRecognized = { spoken ->
+                        navigateTo(AppDestination.AGENT)
+                        agentViewModel.submit(spoken)
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+            }
         },
         bottomBar = {
             NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 8.dp) {
@@ -102,13 +123,7 @@ fun DhanamApp(
                     val selected = currentTab == destination
                     NavigationBarItem(
                         selected = selected,
-                        onClick = {
-                            navController.navigate(destination.route) {
-                                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
+                        onClick = { navigateTo(destination) },
                         icon = { Icon(destination.icon, contentDescription = destination.label) },
                         label = {
                             Text(
@@ -126,16 +141,34 @@ fun DhanamApp(
             }
         }
     ) { innerPadding ->
-        NavHost(
-            navController,
-            startDestination = AppDestination.AGENT.route,
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            composable(AppDestination.AGENT.route) { AgentScreen(agentViewModel) }
-            composable(AppDestination.EXPENSES.route) { ExpensesScreen() }
-            composable(AppDestination.KHATA.route) { KhataScreen() }
-            composable(AppDestination.INSIGHTS.route) { InsightsScreen() }
-            composable(AppDestination.SETTINGS.route) { SettingsScreen(inferenceViewModel, isDarkTheme, onThemeChange) }
+        Box(Modifier.fillMaxSize().padding(innerPadding)) {
+            NavHost(
+                navController = navController,
+                startDestination = AppDestination.AGENT.route,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                composable(AppDestination.AGENT.route) {
+                    AgentScreen(
+                        viewModel = agentViewModel,
+                        isLocalModelReady = inferenceState.isReady,
+                        onOpenSettings = { navigateTo(AppDestination.SETTINGS) }
+                    )
+                }
+                composable(AppDestination.EXPENSES.route) { ExpensesScreen() }
+                composable(AppDestination.KHATA.route) { KhataScreen() }
+                composable(AppDestination.INSIGHTS.route) { InsightsScreen() }
+                composable(AppDestination.SETTINGS.route) {
+                    SettingsScreen(inferenceViewModel, isDarkTheme, onThemeChange)
+                }
+            }
+
+            // The living assistant remains available above every destination, not only the Agent tab.
+            LivingAgentOverlay(
+                activity = agentState.activity,
+                status = agentState.status,
+                onNavigate = ::navigateTo,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+            )
         }
     }
 }
