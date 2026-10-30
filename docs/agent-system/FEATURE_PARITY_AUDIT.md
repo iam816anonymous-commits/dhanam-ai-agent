@@ -20,7 +20,7 @@ Repository: `iam816anonymous-commits/dhanam-ai`
 | Biometric unlock | Optional AndroidX strong-biometric prompt is now available alongside the PBKDF2 PIN fallback | Implemented in code; physical-device testing is still required for enrolled fingerprint/face sensors and Android 8.1 compatibility |
 | Repayment/budget notifications | New finance reminder section and WorkManager scheduling exist | Partial parity; verify exact schedules, notification channels and OEM behaviour |
 | Theme switching | Current app retains the emerald/gold visual system | Legacy app has a theme-mode preference; new app is currently dark-only |
-| Security and privacy settings | PBKDF2-backed PIN, local-only ledger, explicit file destinations and backup restrictions | Newer security foundation in some areas; biometric and screenshot privacy controls still need parity review |
+| Security and privacy settings | PBKDF2-backed PIN, local-only ledger, explicit file destinations and backup restrictions | Newer security foundation in some areas; biometric and screenshot privacy controls are restored in code; physical-device verification remains |
 
 ## 2. Earlier general Android agent
 
