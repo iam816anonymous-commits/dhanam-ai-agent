@@ -16,6 +16,7 @@ object PinSecurity {
     private const val FAILURES_KEY = "pin_failures"
     private const val BLOCKED_UNTIL_KEY = "pin_blocked_until"
     private const val BIOMETRIC_ENABLED_KEY = "biometric_unlock_enabled"
+    private const val SCREENSHOT_PRIVACY_KEY = "screenshot_privacy_enabled"
     private const val LEGACY_PIN_KEY = "app_pin"
     private const val LEGACY_SALT_KEY = "app_pin_salt"
     private const val ITERATIONS = 150_000
