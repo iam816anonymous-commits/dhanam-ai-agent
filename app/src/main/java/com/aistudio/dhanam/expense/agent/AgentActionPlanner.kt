@@ -390,7 +390,7 @@ object AgentActionPlanner {
                 }
                 is PlannedFinanceAction.AddIncome -> {
                     val incomeCategory = IncomeInputValidator.categories.firstOrNull {
-                        Regex("""\\b${Regex.escape(it.lowercase())}\\b""").containsMatchIn(lower)
+                        Regex("""\b${Regex.escape(it.lowercase())}\b""").containsMatchIn(lower)
                     } ?: action.category
                     when {
                         titleMatch != null -> {
