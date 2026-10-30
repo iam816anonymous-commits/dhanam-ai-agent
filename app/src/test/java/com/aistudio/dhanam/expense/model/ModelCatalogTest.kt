@@ -63,9 +63,9 @@ class ModelCatalogTest {
 
     @Test fun qwen17bHasItsOwnMemoryTierAndArtifact() {
         val model = ModelCatalog.models.first { it.id == "qwen3-1.7b-int4-4096" }
-        assertTrue(model.downloadUrl.contains("/resolve/d9b8a91/"))
+        assertTrue(model.downloadUrl.contains("/resolve/87603f0ff3fe74b9b77ed0477edb773b4b596f32/"))
         assertEquals(977_184_032L, model.expectedBytes)
-        assertEquals("2eeffef7b51bc3e1225ea69fe7aa5f417397934b56a5b6c20cc068d6fd2c918b", model.sha256)
+        assertEquals("2a72330b504a6596d53a2c00923c57173b10f1b83e6a541213ffec08d1fc5de8", model.sha256)
         assertEquals(4096, model.contextTokens)
         assertEquals(8L * 1024L * 1024L * 1024L, model.minTotalRamBytes)
         assertEquals(4L * 1024L * 1024L * 1024L, model.minAvailableRamBytes)
