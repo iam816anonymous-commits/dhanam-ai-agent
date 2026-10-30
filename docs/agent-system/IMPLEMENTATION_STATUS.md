@@ -12,7 +12,7 @@ The existing Compose UI and emerald/gold theme remain the application UI. Agent 
 
 | Agent | Implemented responsibility | Guardrail |
 |---|---|---|
-| Finance Operations | Existing deterministic expense/budget/Khata command planner, validated previews, confirmed writes; nightly ledger integrity review | Never commits a model proposal without app validation and user confirmation |
+| Finance Operations | Deterministic expense/income/budget/Khata command planner, validated previews and confirmed writes; read-only chat analysis for current/previous-month spending, category-specific reduction and outstanding lending/borrowing; nightly ledger integrity review | Never commits a model proposal without app validation and user confirmation |
 | Financial Intelligence | Deterministic local-ledger analysis for month-to-date category movement, budget overruns, income/expense cash flow when income is recorded, lending/borrowing outstanding, recurring expense candidates and month-scoped user recommendation feedback; local model may explain the evidence | Calculations and evidence come from Kotlin/Room, not LLM arithmetic |
 | Skill Improvement | Learns exact-description-to-category rules from repeated local expense history using leave-one-out validation; local model can suggest safer tests | A proposal is not active until the user approves it; no generated code or executable tools |
 
@@ -22,7 +22,7 @@ The existing Compose UI and emerald/gold theme remain the application UI. Agent 
 - The Compose UI and WorkManager worker obtain the same model owner.
 - That owner creates one LiteRT-LM Engine and one `SharedAgentCoordinator`.
 - The coordinator serializes specialist inference, bounds queued requests, caps background inference duration and rejects background tasks outside the device-local 01:00–06:00 window.
-- The nightly worker runs Finance Operations, Financial Intelligence and Skill Improvement sequentially through that same coordinator.
+- The nightly worker runs Finance Operations, Financial Intelligence and Skill Improvement sequentially through that same coordinator. The interactive Finance Operations agent can use the same runtime during the day; read-only calculations and validated deterministic writes do not require model inference.
 - The worker may load only the user's already-downloaded preferred model. The existing model resource-eligibility and file SHA-256 checks still run before Engine initialization. A worker-loaded model is unloaded afterward if it is idle; a model already loaded by the app is not unloaded by the worker.
 
 A user-facing request is not gated by the nightly window. Background agent tasks are.
@@ -33,9 +33,9 @@ A user-facing request is not gated by the nightly window. Background agent tasks
 - WorkManager schedules a one-time run for 01:00 local time, with battery-not-low and device-idle constraints.
 - The worker rechecks the exact time window before each model task. Each background model call is bounded by the remaining time and a 120-second per-task cap. A completed nightly report is saved after the three specialist stages.
 - WorkManager is best-effort Android background execution, not a guarantee that the phone will execute for five continuous hours. Doze, battery state, OEM restrictions and force-stop can delay or prevent execution. A cancelled or failed run is retried and the next date is rescheduled after the retry limit.
-- The worker first performs deterministic analysis and skill validation. If the preferred model is unavailable, incompatible, not selected or there is insufficient time, the deterministic work still runs and the report says model inference was skipped.
+- The worker first performs deterministic analysis and skill validation. If the preferred model is unavailable, incompatible, not selected or there is insufficient time, the deterministic work still runs and the report says model inference was skipped. WorkManager retries the whole nightly session after process death; persistence is idempotent for daily reports, role memories, handoffs and versioned skills, but model inference may be repeated because there is no per-agent task checkpoint table.
 - Reports are stored locally in Room. The report shows operations checks, financial findings, skill proposals, model status and next improvements.
-- Room v7 stores one bounded latest memory per role and a 90-day structured inter-agent handoff history. The Settings screen exposes both and provides a confirmed action to clear only specialist memories and handoffs while preserving financial records, skills, feedback and reports. Previous memories are passed back as untrusted historical context, never as current financial evidence.
+- Room v7 stores one bounded latest memory per role and a 90-day structured inter-agent handoff history. Room v11 makes handoff rows idempotent across retries. The Settings screen exposes both and provides a confirmed action to clear only specialist memories and handoffs while preserving financial records, skills, feedback and reports. Previous memories are passed back as untrusted historical context, never as current financial evidence.
 - Report rows store summaries, not raw model prompts. Skill rules are data-only exact-match mappings.
 
 ## Skill governance
@@ -49,18 +49,18 @@ The candidate is stored as a versioned data-only rule. It cannot contain code, r
 - Room schema version 5 adds `agent_learning_reports`.
 - Room schema version 6 adds versioned `agent_skills`.
 - Room schema version 7 adds bounded role-specific `agent_memories` and structured `agent_messages` handoff history.
-- Migrations 4→5 through 10→11 are additive. Existing expense, budget, Khata and repayment records are preserved.
+- Migrations 1→2 through 10→11 are additive. Existing expense, budget, Khata and repayment records are preserved.
 - Room schema version 8 adds a separate `income_records` ledger; version 9 adds unique import source keys for repeatable CSV imports. Income is included in the monthly cash-flow dashboard, nightly aggregate context and full-ledger CSV export; a dedicated income CSV import/export path validates and previews rows before transactional idempotent import.
-- Room schema version 10 adds month-scoped recommendation feedback; version 11 makes nightly inter-agent handoff rows idempotent across WorkManager retries. The Financial Intelligence agent receives aggregate helpful/not-useful feedback during its next nightly run. The chat agent also answers read-only current/previous-month spending, category-specific reduction and Khata outstanding queries from deterministic local analysis. Skill approvals supersede the previous active version and Settings now exposes transactional rollback to the prior validated version.
+- Room schema version 10 adds month-scoped recommendation feedback; the worker retains the latest 12 months and supplies aggregate helpful/not-useful feedback to Financial Intelligence. Version 11 normalizes old active skill versions and makes nightly inter-agent handoff rows idempotent across WorkManager retries. Skill approvals supersede the previous active version and Settings exposes transactional rollback to the prior validated version. The chat agent answers read-only current/previous-month spending, category-specific reduction and Khata outstanding queries from deterministic local analysis.
 - Financial amounts remain integer paise. LLM outputs are never used for financial arithmetic or direct writes.
 
 ## Current limitations / next phases
 
 1. **Physical-device qualification remains mandatory.** CI cannot prove model loading, peak memory, thermal behaviour, battery impact, WorkManager timing or Android 8.1 OEM background behaviour on the user's handset.
-2. **WorkManager is not a five-hour guaranteed reservation.** It runs eligible work when Android permits; the worker is checkpoint-safe at task boundaries but cannot guarantee the full window.
+2. **WorkManager is not a five-hour guaranteed reservation.** It runs eligible work when Android permits. A process-death retry restarts the nightly sequence; persistent writes are idempotent, but inference can repeat because per-agent task checkpoints are not implemented.
 3. **No neural-weight training occurs.** "Self-improvement" currently means validated, versioned local rules and model-generated review suggestions. It does not fine-tune Qwen or rewrite source code.
 4. **The specialist queue is serialized, not preemptive.** A currently running inference is allowed to finish or time out; a user request cannot interrupt a token already being generated.
-5. **Persistent memory is currently bounded to the latest verified summary per role plus 90 days of handoff history.** Recommendation feedback, longitudinal evaluation and rollback workflows remain to be implemented.
+5. **Learning is bounded and auditable.** Memory keeps the latest summary per role, handoffs are retained for 90 days, recommendation feedback for 12 months, and approved skill versions can be rolled back. Longitudinal outcome evaluation and automatic measurement of whether recommendations actually reduced spending remain to be implemented.
 6. **Broader financial planning** (income forecasting, cash-flow runway, debt payoff scenarios, user-defined savings targets and multi-month trend confidence) remains to be implemented and tested.
 7. **Release qualification** still requires the final CI result, APK artifact verification, migration testing on a copy of existing user data, and real-device smoke tests.
 
