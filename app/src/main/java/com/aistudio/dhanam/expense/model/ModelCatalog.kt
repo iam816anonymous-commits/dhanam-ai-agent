@@ -102,7 +102,7 @@ object ModelCatalog {
             fileName = "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
             downloadUrl = "https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct/resolve/8c784d74ad0e9a6f1bdbdbc898682a50e7866727/Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
             expectedBytes = 1_597_931_520L,
-            sha256 = "faa60663b333290c1496c499828b21d3e3254a788cacd8cce917ce0f761a2dc9",
+            sha256 = "2ac49902133f729199bbd23ad6714df32b20585c786f2546d2293cc371f35278",
             license = "Apache-2.0",
             contextTokens = 4096,
             minTotalRamBytes = 8L * GIB,
