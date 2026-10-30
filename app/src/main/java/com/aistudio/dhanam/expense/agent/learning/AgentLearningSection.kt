@@ -112,6 +112,56 @@ fun AgentLearningSection() {
         Text("Active approved skills: $activeCount", style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
 
+
+        val activeSkills = skills.filter { it.status == "ACTIVE" }
+        if (activeSkills.isNotEmpty()) {
+            Text("Active learned rules", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            activeSkills.forEach { skill ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(skill.title, fontWeight = FontWeight.Medium)
+                            Text("“${skill.matchText}” → ${skill.category}", style = MaterialTheme.typography.bodySmall)
+                        }
+                        OutlinedButton(onClick = {
+                            scope.launch { db.financeDao().deactivateAgentSkill(skill.id) }
+                        }) { Text("Disable") }
+                    }
+                }
+            }
+        }
+        val disabledSkills = skills.filter { it.status == "DISABLED" }
+        if (disabledSkills.isNotEmpty()) {
+            Text("Disabled rules", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            disabledSkills.forEach { skill ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(skill.title, fontWeight = FontWeight.Medium)
+                            Text("“${skill.matchText}” → ${skill.category}", style = MaterialTheme.typography.bodySmall)
+                            Text("Validated ${skill.testPassCount}/${skill.testTotalCount}", style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        OutlinedButton(onClick = {
+                            scope.launch { db.financeDao().reactivateAgentSkill(skill.id, System.currentTimeMillis()) }
+                        }) { Text("Restore") }
+                    }
+                }
+            }
+        }
+
         Text("Shared agent memory", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Text(
             "Each specialist keeps a bounded local summary of its latest verified work. Memories are historical context, not a source of current financial balances.",
