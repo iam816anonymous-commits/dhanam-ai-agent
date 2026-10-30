@@ -129,6 +129,29 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         val result = AgentActionPlanner.parseWithLearnedSkills(input, activeSkills)
+        val analysisAction = result.action as? PlannedFinanceAction.AnalyzeSpending
+        if (analysisAction != null) {
+            _state.value = _state.value.copy(
+                messages = _state.value.messages + AgentChatMessage(role = "assistant", text = result.message),
+                pendingAction = null,
+                busy = true,
+                activity = "analyzing"
+            )
+            viewModelScope.launch {
+                try {
+                    appendAssistant(buildSpendingAnalysis(analysisAction.month))
+                    _state.value = _state.value.copy(activity = "complete", status = "Analysis calculated from local financial records.")
+                } catch (error: kotlinx.coroutines.CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    appendAssistant(error.message ?: "I couldn't complete the spending analysis.")
+                    _state.value = _state.value.copy(activity = "error", status = "Analysis could not be completed.")
+                } finally {
+                    _state.value = _state.value.copy(busy = false)
+                }
+            }
+            return
+        }
         if (result.action != null || !result.needsClarification) {
             _state.value = _state.value.copy(
                 messages = _state.value.messages + AgentChatMessage(role = "assistant", text = result.message),
@@ -187,6 +210,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 when (action) {
+                    is PlannedFinanceAction.AnalyzeSpending -> error("Read-only analysis cannot be saved as a financial transaction.")
                     is PlannedFinanceAction.AddExpense -> {
                         val now = System.currentTimeMillis()
                         val id = dao.insertExpense(ExpenseEntity(
@@ -299,6 +323,53 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 _state.value = _state.value.copy(busy = false)
             }
         }
+    }
+
+    private suspend fun buildSpendingAnalysis(month: YearMonth): String {
+        val today = if (month == YearMonth.now()) LocalDate.now() else month.atEndOfMonth()
+        val expenses = dao.expensesSince(today.minusDays(365).toEpochDay())
+        val budgets = dao.observeBudgetsForMonth(month.atDay(1).toEpochDay()).first()
+        val loans = dao.observeLoans().first()
+        val incomes = dao.incomeSince(month.atDay(1).toEpochDay())
+            .filter { it.occurredOnEpochDay <= month.atEndOfMonth().toEpochDay() }
+        val snapshot = FinancialAnalysisEngine.analyze(expenses, budgets, loans, today)
+        val monthStart = month.atDay(1).toEpochDay()
+        val monthEnd = today.toEpochDay()
+        val monthExpenses = expenses.filter { it.occurredOnEpochDay in monthStart..monthEnd && it.amountPaise > 0 }
+        val incomeTotalPaise = incomes.fold(0L) { total, record -> Math.addExact(total, record.amountPaise) }
+        val lines = mutableListOf<String>()
+        lines += "Spending review for $month"
+        lines += "Recorded expenses: ${MoneyParser.formatPaise(snapshot.totalSpentPaise)} across ${monthExpenses.size} transaction(s)."
+        if (incomes.isEmpty()) {
+            lines += "Income: no records entered for this month. Net cash flow is unknown, not zero."
+        } else {
+            lines += "Recorded income: ${MoneyParser.formatPaise(incomeTotalPaise)} across ${incomes.size} record(s)."
+            lines += "Net recorded cash flow: ${MoneyParser.formatPaise(Math.subtractExact(incomeTotalPaise, snapshot.totalSpentPaise))}. This is not a bank balance."
+        }
+        if (snapshot.categoryMovements.isNotEmpty()) {
+            lines += "Category movement versus the previous month:"
+            snapshot.categoryMovements.take(4).forEach { movement ->
+                val change = if (movement.changePaise >= 0) "increased by " else "decreased by "
+                lines += "• ${movement.category}: ${MoneyParser.formatPaise(movement.currentMonthPaise)} this month, ${MoneyParser.formatPaise(movement.previousMonthPaise)} previously; $change${MoneyParser.formatPaise(kotlin.math.abs(movement.changePaise))}."
+            }
+        }
+        if (snapshot.budgetOverruns.isNotEmpty()) {
+            lines += "Budget overruns:"
+            snapshot.budgetOverruns.toList().sortedByDescending { it.second }.take(4).forEach { (category, overrun) ->
+                lines += "• $category is over its recorded budget by ${MoneyParser.formatPaise(overrun)}."
+            }
+        }
+        if (snapshot.opportunities.isNotEmpty()) {
+            lines += "Potential actions to review:"
+            snapshot.opportunities.take(5).forEach { opportunity ->
+                lines += "• ${opportunity.title}: ${opportunity.action} Confidence: ${opportunity.confidence.name.lowercase()}. No guaranteed saving amount is assumed."
+            }
+        } else {
+            lines += "No specific spending anomaly was identified in the available records. This does not prove that all spending is necessary."
+        }
+        lines += "Khata outstanding: lent ${MoneyParser.formatPaise(snapshot.lentOutstandingPaise)}; borrowed ${MoneyParser.formatPaise(snapshot.borrowedOutstandingPaise)}."
+        lines += "Recorded expense history coverage: ${snapshot.dataCoverageDays} day(s). Recommendations are less reliable when history is sparse."
+        return lines.joinToString("\n")
     }
 
     fun clearChat() {
