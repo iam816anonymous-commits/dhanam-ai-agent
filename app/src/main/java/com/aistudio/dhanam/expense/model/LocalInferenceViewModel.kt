@@ -233,7 +233,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                 if (peakBytes == null || peakBytes >= model.maxProcessPeakBytes) {
                     shouldUnload = true
                     try { agentConversation.cancelProcess() } catch (_: Exception) { }
-                    throw IllegalStateException("The 2 GiB process peak-memory limit was reached or could not be measured.")
+                    throw IllegalStateException("The selected model's ${model.maxProcessPeakBytes / (1024L * 1024L)} MiB process peak-memory budget was reached or could not be measured.")
                 }
                 val text = chunk.toString()
                 if (!outputTooLong && builder.length + text.length > MAX_AGENT_OUTPUT_CHARS) {
