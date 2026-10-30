@@ -1,0 +1,108 @@
+package com.aistudio.dhanam.expense.agent.learning
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.aistudio.dhanam.expense.data.FinanceDatabase
+import java.time.LocalDate
+import kotlinx.coroutines.flow.flowOf
+
+@Composable
+fun AgentLearningSection() {
+    val context = LocalContext.current
+    val preferences = remember(context) { context.getSharedPreferences("agent_learning", 0) }
+    var enabled by remember(context) {
+        mutableStateOf(preferences.getBoolean(NightlyAgentLearningScheduler.ENABLED_PREFERENCE, false))
+    }
+    val db = remember(context) { FinanceDatabase.getInstance(context) }
+    val reports by db.financeDao().observeAgentLearningReports().collectAsState(initial = emptyList())
+
+    LaunchedEffect(enabled) {
+        if (enabled) NightlyAgentLearningScheduler.scheduleNext(context)
+        else NightlyAgentLearningScheduler.disable(context)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Nightly agent preparation", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Schedule local finance checks between 1 AM and 6 AM when Android permits background work.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = enabled,
+                        onCheckedChange = { value ->
+                            preferences.edit().putBoolean(NightlyAgentLearningScheduler.ENABLED_PREFERENCE, value).apply()
+                            enabled = value
+                        }
+                    )
+                }
+                Text(
+                    "Android may delay or skip background work because of Doze, battery restrictions or force-stop. This first slice prepares a deterministic ledger report; it does not yet run model-based agent learning.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Text("Agent learning history", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        if (reports.isEmpty()) {
+            Text("No nightly report yet. Enable the schedule and allow an eligible night window.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            reports.take(7).forEach { report ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            LocalDate.ofEpochDay(report.reportDateEpochDay).toString(),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text("Status: ${report.runStatus}", color = MaterialTheme.colorScheme.secondary)
+                        Text("Finance operations", fontWeight = FontWeight.Medium)
+                        Text(report.operationsSummary, style = MaterialTheme.typography.bodySmall)
+                        Text("Financial intelligence", fontWeight = FontWeight.Medium)
+                        Text(report.intelligenceSummary, style = MaterialTheme.typography.bodySmall)
+                        Text("Skill improvement", fontWeight = FontWeight.Medium)
+                        Text(report.skillSummary, style = MaterialTheme.typography.bodySmall)
+                        Text("Next improvements", fontWeight = FontWeight.Medium)
+                        Text(report.nextImprovements, style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            "Preparation duration: ${report.durationMillis} ms",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
