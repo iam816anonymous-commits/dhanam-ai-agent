@@ -103,6 +103,13 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
                 Text(model.displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text("${formatBytes(model.expectedBytes)} · ${model.license} · ${model.contextTokens}-token context", style = MaterialTheme.typography.bodySmall)
                 Text("Pinned Hugging Face artifact revision; exact byte size and SHA-256 are verified after download.", style = MaterialTheme.typography.bodySmall)
+                if (model.id == "phi4-mini-reasoning-int4-4096") {
+                    Text(
+                        "Compatibility note: the publisher documents a multi-turn cache issue on LiteRT-LM 0.18.x. Dhanam resets this model's conversation after every answer; it will not remember earlier chat turns.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 eligibility?.let { detected ->
                     Text(
                         "Android reports: total RAM ${formatBytes(detected.totalRamBytes)} · currently available ${formatBytes(detected.availableRamBytes)} · free app storage ${formatBytes(detected.freeStorageBytes)}",
