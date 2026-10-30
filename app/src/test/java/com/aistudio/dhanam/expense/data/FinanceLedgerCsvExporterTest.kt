@@ -5,6 +5,25 @@ import org.junit.Test
 import java.time.LocalDate
 
 class FinanceLedgerCsvExporterTest {
+    @Test fun exportsIncomeAsSeparateTypedRowsWithExactPaiseAndAlignedColumns() {
+        val income = IncomeEntity(
+            id = 7,
+            title = "Monthly salary",
+            amountPaise = 4_250_075L,
+            category = "Salary",
+            occurredOnEpochDay = LocalDate.parse("2026-10-30").toEpochDay(),
+            note = "October payroll",
+            createdAtEpochMillis = 1L,
+            updatedAtEpochMillis = 1L
+        )
+        val csv = FinanceLedgerCsvExporter.export(emptyList(), emptyList(), emptyList(), listOf(income))
+        val rows = csv.trim().lines()
+        assertTrue(rows.first().startsWith("record_type,id"))
+        assertTrue(rows.last().startsWith("INCOME,7"))
+        assertTrue(rows.last().contains("Monthly salary,Salary,42500.75,2026-10-30,October payroll"))
+        assertTrue(rows.all { it.split(",").size == 23 })
+    }
+
     @Test fun exportsLoansRepaymentsAndBudgetsWithTypedRowsAndExactMoney() {
         val loan = KhataLoanEntity(
             id = 1, personName = "Ravi, Kumar", direction = "LENT", principalPaise = 10050, paidPaise = 500,
