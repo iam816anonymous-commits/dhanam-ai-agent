@@ -8,8 +8,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [ExpenseEntity::class, BudgetEntity::class, KhataLoanEntity::class, RepaymentEntity::class, AgentLearningReportEntity::class, AgentSkillEntity::class, AgentMemoryEntity::class, AgentMessageEntity::class, IncomeEntity::class],
-    version = 9,
+    entities = [ExpenseEntity::class, BudgetEntity::class, KhataLoanEntity::class, RepaymentEntity::class, AgentLearningReportEntity::class, AgentSkillEntity::class, AgentMemoryEntity::class, AgentMessageEntity::class, IncomeEntity::class, RecommendationFeedbackEntity::class],
+    version = 10,
     exportSchema = true
 )
 abstract class FinanceDatabase : RoomDatabase() {
@@ -173,6 +173,20 @@ abstract class FinanceDatabase : RoomDatabase() {
             }
         }
 
+        /** Store one user decision per recommendation and month for measurable feedback. */
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""CREATE TABLE IF NOT EXISTS recommendation_feedback (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    recommendation_id TEXT NOT NULL,
+                    period_month TEXT NOT NULL,
+                    decision TEXT NOT NULL,
+                    created_at_epoch_millis INTEGER NOT NULL
+                )""")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_recommendation_feedback_recommendation_id_period_month ON recommendation_feedback(recommendation_id, period_month)")
+            }
+        }
+
         @Volatile private var instance: FinanceDatabase? = null
 
         fun getInstance(context: Context): FinanceDatabase =
@@ -181,7 +195,7 @@ abstract class FinanceDatabase : RoomDatabase() {
                     context.applicationContext,
                     FinanceDatabase::class.java,
                     DATABASE_NAME
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10).build().also { instance = it }
             }
     }
 }
