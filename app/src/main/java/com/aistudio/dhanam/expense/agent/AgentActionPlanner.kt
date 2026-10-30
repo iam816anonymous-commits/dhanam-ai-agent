@@ -45,7 +45,7 @@ object AgentActionPlanner {
             .sortedByDescending { it.matchText.length }
             .firstOrNull { skill ->
                 Regex(
-                    "(?<![\\\\p{L}\\\\p{N}])" + Regex.escape(skill.matchText) + "(?![\\\\p{L}\\\\p{N}])",
+                    """(?<![\p{L}\p{N}])\${Regex.escape(skill.matchText)}(?![\p{L}\p{N}])""",
                     RegexOption.IGNORE_CASE
                 ).containsMatchIn(input)
             }
