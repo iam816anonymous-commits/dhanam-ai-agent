@@ -11,6 +11,7 @@ import com.aistudio.dhanam.expense.agent.AgentTaskPriority
 import com.aistudio.dhanam.expense.agent.AgentTaskRequest
 import com.aistudio.dhanam.expense.agent.DhanamAgentRole
 import com.aistudio.dhanam.expense.model.LocalInferenceRuntimeRegistry
+import com.aistudio.dhanam.expense.model.LocalInferenceViewModel
 import kotlinx.coroutines.CancellationException
 import com.aistudio.dhanam.expense.data.AgentLearningReportEntity
 import com.aistudio.dhanam.expense.data.FinanceDatabase
@@ -41,6 +42,8 @@ class NightlyAgentLearningWorker(
         }
 
         val startedAt = SystemClock.elapsedRealtime()
+        var workerModelOwner: LocalInferenceViewModel? = null
+        var workerLoadedModel = false
         return try {
             val today = LocalDate.now()
             val monthStart = YearMonth.from(today).atDay(1).toEpochDay()
@@ -88,9 +91,11 @@ class NightlyAgentLearningWorker(
                 append("Outstanding borrowed: ${MoneyParser.formatPaise(snapshot.borrowedOutstandingPaise)}.")
             }
             val modelOwner = LocalInferenceRuntimeRegistry.getOrCreate(applicationContext.applicationContext as Application)
+            workerModelOwner = modelOwner
             val modelWasReady = modelOwner.state.value.isReady
             val minutesLeft = Duration.between(java.time.LocalTime.now(), java.time.LocalTime.of(6, 0)).toMinutes()
             val modelReady = modelWasReady || (minutesLeft >= 10 && modelOwner.loadModelAndAwait())
+            workerLoadedModel = !modelWasReady && modelReady
             var modelInsightSummary = "The verified preferred model was not available or there was insufficient time remaining in the 01:00–06:00 window. Deterministic finance analysis and skill tests still ran."
             var modelSkillSummary = "No model-based skill review was run; no untested skill was activated."
             var modelInsightCompleted = false
@@ -181,12 +186,17 @@ class NightlyAgentLearningWorker(
                     createdAtEpochMillis = System.currentTimeMillis()
                 )
             )
-            if (!modelWasReady && modelReady) modelOwner.unloadModelIfIdle()
+            if (workerLoadedModel) {
+                modelOwner.unloadModelIfIdle()
+                workerLoadedModel = false
+            }
             NightlyAgentLearningScheduler.scheduleNext(applicationContext, forceTomorrow = true)
             Result.success()
         } catch (cancelled: CancellationException) {
+            if (workerLoadedModel) workerModelOwner?.unloadModelIfIdle()
             throw cancelled
         } catch (error: Exception) {
+            if (workerLoadedModel) workerModelOwner?.unloadModelIfIdle()
             if (runAttemptCount < 2) {
                 Result.retry()
             } else {
