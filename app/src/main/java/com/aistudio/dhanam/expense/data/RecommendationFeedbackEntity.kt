@@ -4,6 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import java.time.YearMonth
 
 /** User feedback on a deterministic insight; contains no transaction details or free-form sensitive notes. */
 @Entity(
@@ -19,7 +20,7 @@ data class RecommendationFeedbackEntity(
 ) {
     init {
         require(recommendationId.isNotBlank() && recommendationId.length <= 120)
-        require(periodMonth.matches(Regex("\\d{4}-\\d{2}")))
+        require(runCatching { YearMonth.parse(periodMonth) }.isSuccess) { "Invalid recommendation month." }
         require(decision in setOf("HELPFUL", "NOT_USEFUL", "DISMISSED"))
     }
 }
