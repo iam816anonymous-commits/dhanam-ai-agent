@@ -50,14 +50,24 @@ The candidate is stored as a versioned data-only rule. It cannot contain code, r
 - Migrations 4→5 and 5→6 are additive. Existing expense, budget, Khata and repayment records are preserved.
 - Financial amounts remain integer paise. LLM outputs are never used for financial arithmetic or direct writes.
 
+## Persistent memory and specialist coordination
+
+- Room schema version 7 adds bounded `agent_memories` and idempotent `agent_messages` tables.
+- Each specialist maintains its own deterministic summary memory; previous verified summaries are passed back as historical context, never as instructions.
+- Finance Operations handoffs feed Financial Intelligence, and Financial Intelligence findings feed Skill Improvement.
+- Handoff messages are keyed per day to make WorkManager retries idempotent and are pruned after 90 days.
+- Settings displays each agent's memory and recent handoffs and provides a confirmed action to clear both without deleting financial records, skills or daily reports.
+- Approved skills can be disabled and later restored only if they still pass the 90% validation gate.
+
 ## Current limitations / next phases
 
 1. **Physical-device qualification remains mandatory.** CI cannot prove model loading, peak memory, thermal behaviour, battery impact, WorkManager timing or Android 8.1 OEM background behaviour on the user's handset.
 2. **WorkManager is not a five-hour guaranteed reservation.** It runs eligible work when Android permits; the worker is checkpoint-safe at task boundaries but cannot guarantee the full window.
 3. **No neural-weight training occurs.** "Self-improvement" currently means validated, versioned local rules and model-generated review suggestions. It does not fine-tune Qwen or rewrite source code.
 4. **The specialist queue is serialized, not preemptive.** A currently running inference is allowed to finish or time out; a user request cannot interrupt a token already being generated.
-5. **Broader financial planning** (income forecasting, cash-flow runway, debt payoff scenarios, user-defined savings targets and multi-month trend confidence) remains to be implemented and tested.
-6. **Release qualification** still requires the final CI result, APK artifact verification, migration testing on a copy of existing user data, and real-device smoke tests.
+5. **Recommendation feedback and learning evaluation** are not yet implemented. The app does not yet collect whether a savings recommendation was accepted, dismissed or achieved.
+6. **Broader financial planning** (income forecasting, cash-flow runway, debt payoff scenarios, user-defined savings targets and multi-month trend confidence) remains to be implemented and tested.
+7. **Release qualification** still requires the final CI result, APK artifact verification, migration testing on a copy of existing user data, and real-device smoke tests.
 
 ## Verification policy
 
