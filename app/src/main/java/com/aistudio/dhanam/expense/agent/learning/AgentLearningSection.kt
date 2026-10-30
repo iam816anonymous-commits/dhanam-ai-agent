@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -16,6 +18,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -23,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aistudio.dhanam.expense.data.FinanceDatabase
 import java.time.LocalDate
+import kotlinx.coroutines.launch
 
 @Composable
 fun AgentLearningSection() {
@@ -33,6 +37,8 @@ fun AgentLearningSection() {
     }
     val db = remember(context) { FinanceDatabase.getInstance(context) }
     val reports by db.financeDao().observeAgentLearningReports().collectAsState(initial = emptyList())
+    val skills by db.financeDao().observeAgentSkills().collectAsState(initial = emptyList())
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(enabled) {
         if (enabled) NightlyAgentLearningScheduler.scheduleNext(context)
@@ -63,12 +69,46 @@ fun AgentLearningSection() {
                     )
                 }
                 Text(
-                    "Android may delay or skip background work because of Doze, battery restrictions or force-stop. This first slice prepares a deterministic ledger report; it does not yet run model-based agent learning.",
+                    "Android may delay or skip background work because of Doze, battery restrictions or force-stop. Nightly work analyses local finance records and proposes tested exact-description skills. It does not retrain model weights or activate skills without your approval.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
+
+        Text("Learned skill proposals", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        val proposedSkills = skills.filter { it.status == "PROPOSED" }
+        if (proposedSkills.isEmpty()) {
+            Text("No pending skill approvals.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            proposedSkills.forEach { skill ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(skill.title, fontWeight = FontWeight.SemiBold)
+                        Text("Match: “${skill.matchText}” → ${skill.category}")
+                        Text(
+                            "Validated on ${skill.testPassCount}/${skill.testTotalCount} held-out examples from ${skill.exampleCount} local records.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = {
+                                scope.launch { db.financeDao().approveAgentSkill(skill.id, System.currentTimeMillis()) }
+                            }, modifier = Modifier.weight(1f)) { Text("Approve skill") }
+                            OutlinedButton(onClick = {
+                                scope.launch { db.financeDao().rejectAgentSkill(skill.id) }
+                            }, modifier = Modifier.weight(1f)) { Text("Reject") }
+                        }
+                    }
+                }
+            }
+        }
+        val activeCount = skills.count { it.status == "ACTIVE" }
+        Text("Active approved skills: $activeCount", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
 
         Text("Agent learning history", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         if (reports.isEmpty()) {
