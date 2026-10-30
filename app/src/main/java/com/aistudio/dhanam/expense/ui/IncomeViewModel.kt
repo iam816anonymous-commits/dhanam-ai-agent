@@ -39,7 +39,8 @@ class IncomeViewModel(application: Application) : AndroidViewModel(application) 
                     occurredOnEpochDay = input.occurredOn.toEpochDay(),
                     note = input.note,
                     createdAtEpochMillis = existing?.createdAtEpochMillis ?: now,
-                    updatedAtEpochMillis = now
+                    updatedAtEpochMillis = now,
+                    sourceRecordKey = existing?.sourceRecordKey
                 )
                 if (existing == null) dao.insertIncome(record)
                 else check(dao.updateIncome(record) == 1) { "Income record changed before it could be updated. Refresh and try again." }
