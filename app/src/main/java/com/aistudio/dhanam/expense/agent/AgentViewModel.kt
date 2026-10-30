@@ -140,7 +140,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             )
             viewModelScope.launch {
                 try {
-                    appendAssistant(buildSpendingAnalysis(analysisAction.month))
+                    appendAssistant(buildSpendingAnalysis(analysisAction.month, analysisAction.category))
                     _state.value = _state.value.copy(activity = "complete", status = "Analysis calculated from local financial records.")
                 } catch (error: kotlinx.coroutines.CancellationException) {
                     throw error
@@ -326,7 +326,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private suspend fun buildSpendingAnalysis(month: YearMonth): String {
+    private suspend fun buildSpendingAnalysis(month: YearMonth, category: String?): String {
         val today = if (month == YearMonth.now()) LocalDate.now() else month.atEndOfMonth()
         val expenses = dao.expensesSince(today.minusDays(365).toEpochDay())
         val budgets = dao.observeBudgetsForMonth(month.atDay(1).toEpochDay()).first()
@@ -336,37 +336,55 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         val snapshot = FinancialAnalysisEngine.analyze(expenses, budgets, loans, today)
         val monthStart = month.atDay(1).toEpochDay()
         val monthEnd = today.toEpochDay()
-        val monthExpenses = expenses.filter { it.occurredOnEpochDay in monthStart..monthEnd && it.amountPaise > 0 }
+        val allMonthExpenses = expenses.filter { it.occurredOnEpochDay in monthStart..monthEnd && it.amountPaise > 0 }
+        val monthExpenses = allMonthExpenses.filter { category == null || it.category.equals(category, ignoreCase = true) }
+        val selectedExpenseTotalPaise = monthExpenses.fold(0L) { total, expense -> Math.addExact(total, expense.amountPaise) }
         val incomeTotalPaise = incomes.fold(0L) { total, record -> Math.addExact(total, record.amountPaise) }
         val lines = mutableListOf<String>()
-        lines += "Spending review for $month"
-        lines += "Recorded expenses: ${MoneyParser.formatPaise(snapshot.totalSpentPaise)} across ${monthExpenses.size} transaction(s)."
+        lines += if (category == null) "Spending review for $month" else "$category spending review for $month"
+        val spendingLabel = if (category == null) "Recorded expenses" else "Recorded $category expenses"
+        lines += "$spendingLabel: ${MoneyParser.formatPaise(selectedExpenseTotalPaise)} across ${monthExpenses.size} transaction(s)."
         if (incomes.isEmpty()) {
             lines += "Income: no records entered for this month. Net cash flow is unknown, not zero."
         } else {
             lines += "Recorded income: ${MoneyParser.formatPaise(incomeTotalPaise)} across ${incomes.size} record(s)."
             lines += "Net recorded cash flow: ${MoneyParser.formatPaise(Math.subtractExact(incomeTotalPaise, snapshot.totalSpentPaise))}. This is not a bank balance."
         }
-        if (snapshot.categoryMovements.isNotEmpty()) {
+        val relevantMovements = snapshot.categoryMovements.filter {
+            category == null || it.category.equals(category, ignoreCase = true)
+        }
+        if (relevantMovements.isNotEmpty()) {
             lines += "Category movement versus the previous month:"
-            snapshot.categoryMovements.take(4).forEach { movement ->
+            relevantMovements.take(4).forEach { movement ->
                 val change = if (movement.changePaise >= 0) "increased by " else "decreased by "
                 lines += "• ${movement.category}: ${MoneyParser.formatPaise(movement.currentMonthPaise)} this month, ${MoneyParser.formatPaise(movement.previousMonthPaise)} previously; $change${MoneyParser.formatPaise(kotlin.math.abs(movement.changePaise))}."
             }
         }
-        if (snapshot.budgetOverruns.isNotEmpty()) {
+        val relevantOverruns = snapshot.budgetOverruns.filterKeys {
+            category == null || it.equals(category, ignoreCase = true)
+        }
+        if (relevantOverruns.isNotEmpty()) {
             lines += "Budget overruns:"
-            snapshot.budgetOverruns.toList().sortedByDescending { it.second }.take(4).forEach { (category, overrun) ->
+            relevantOverruns.toList().sortedByDescending { it.second }.take(4).forEach { (category, overrun) ->
                 lines += "• $category is over its recorded budget by ${MoneyParser.formatPaise(overrun)}."
             }
         }
-        if (snapshot.opportunities.isNotEmpty()) {
+        val relevantOpportunities = snapshot.opportunities.filter { opportunity ->
+            category == null || opportunity.title.contains(category, ignoreCase = true) ||
+                opportunity.description.contains(category, ignoreCase = true) ||
+                opportunity.action.contains(category, ignoreCase = true)
+        }
+        if (relevantOpportunities.isNotEmpty()) {
             lines += "Potential actions to review:"
-            snapshot.opportunities.take(5).forEach { opportunity ->
+            relevantOpportunities.take(5).forEach { opportunity ->
                 lines += "• ${opportunity.title}: ${opportunity.action} Confidence: ${opportunity.confidence.name.lowercase()}. No guaranteed saving amount is assumed."
             }
         } else {
-            lines += "No specific spending anomaly was identified in the available records. This does not prove that all spending is necessary."
+            lines += if (category == null) {
+                "No specific spending anomaly was identified in the available records. This does not prove that all spending is necessary."
+            } else {
+                "No specific $category spending anomaly was identified in the available records. This does not prove that all spending is necessary."
+            }
         }
         lines += "Khata outstanding: lent ${MoneyParser.formatPaise(snapshot.lentOutstandingPaise)}; borrowed ${MoneyParser.formatPaise(snapshot.borrowedOutstandingPaise)}."
         val openLoans = loans.filter { it.outstandingPaise > 0 }.sortedByDescending { it.outstandingPaise }
