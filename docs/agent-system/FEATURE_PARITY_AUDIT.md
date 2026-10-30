@@ -19,8 +19,8 @@ Repository: `iam816anonymous-commits/dhanam-ai`
 | Floating Jarvis overlay | Not present | Missing legacy UX; evaluate whether it belongs in a finance-only product |
 | Biometric unlock | Optional AndroidX strong-biometric prompt is now available alongside the PBKDF2 PIN fallback | Implemented in code; physical-device testing is still required for enrolled fingerprint/face sensors and Android 8.1 compatibility |
 | Repayment/budget notifications | New finance reminder section and WorkManager scheduling exist | Partial parity; verify exact schedules, notification channels and OEM behaviour |
-| Theme switching | Current app retains the emerald/gold visual system | Legacy app has a theme-mode preference; new app is currently dark-only |
-| Security and privacy settings | PBKDF2-backed PIN, local-only ledger, explicit file destinations and backup restrictions | Newer security foundation in some areas; biometric and screenshot privacy controls are restored in code; physical-device verification remains |
+| Theme switching | Current app retains the emerald/gold visual system | Dark/light preference is implemented with dark as the default; screenshot privacy can block captures and recent-app previews |
+| Security and privacy settings | PBKDF2-backed PIN, optional strong-biometric unlock, screenshot privacy, local-only ledger, explicit file destinations and backup restrictions | Core legacy security controls are restored in code; physical-device verification remains |
 
 ## 2. Earlier general Android agent
 
@@ -73,10 +73,10 @@ Each tier has two distinct model choices. All six entries use pinned HTTPS artif
 
 1. Restore voice input to the Agent screen with an offline-preferred recognizer, explicit English/Telugu selection, permission handling and graceful Android 8.1 fallback.
 2. Test the new optional biometric prompt on enrolled devices, confirm cancellation always leaves PIN entry available, and verify disabling the PIN also disables biometric unlock.
-3. Restore useful Khata contact actions (call and share/reminder) with safe intent handling and user confirmation.
-4. Audit and restore the original theme preference and any missing expense filters/sorting without changing the current emerald/gold visual identity.
-5. Run old-versus-new workflows against copied test data: expense CRUD, CSV import/export, Khata repayment, reminders, PDF report, PIN lock and app restart.
-6. Qualify every downloadable model on actual devices: download progress, checksum, engine initialization, a real prompt, peak RSS, thermal behaviour, battery and unload/reload. CI is not a substitute for this.
+3. Compare expense filters/sorting and report layouts against the original app; dark/light preference and screenshot privacy are restored.
+4. Run old-versus-new workflows against copied test data and fix any remaining functional gaps.
+5. Qualify every downloadable model on actual devices: download progress, checksum, engine initialization, a real prompt, peak RSS, thermal behaviour, battery and unload/reload. CI is not a substitute for this.
+6. Test the complete legacy workflow set on copied data: expense CRUD, CSV import/export, Khata repayment, reminders, PDF report, PIN/biometric lock and app restart.
 
 ## Acceptance rule
 
