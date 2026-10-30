@@ -42,6 +42,15 @@ class AgentActionPlannerTest {
         ).action)
     }
 
+    @Test fun spendingAnalysisRequestsAreReadOnlyAndDoNotCreateDrafts() {
+        val result = AgentActionPlanner.parse("How can I reduce my expenses?")
+        assertTrue(result.action is PlannedFinanceAction.AnalyzeSpending)
+        assertTrue(result.message.contains("read-only"))
+        assertEquals(null, AgentActionPlanner.parse("I spent 500 on lunch").action?.takeIf {
+            it is PlannedFinanceAction.AnalyzeSpending
+        })
+    }
+
     @Test fun incomeCommandsCreateValidatedFinancePreviews() {
         val salary = AgentActionPlanner.parse("salary 50000").action as PlannedFinanceAction.AddIncome
         assertEquals(5_000_000L, salary.amountPaise)
