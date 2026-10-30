@@ -8,6 +8,7 @@ import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.ThinkingConfig
 import com.aistudio.dhanam.expense.agent.SharedAgentCoordinator
 import com.aistudio.dhanam.expense.agent.learning.NightlyAgentLearningScheduler
 import java.time.LocalTime
@@ -228,7 +229,11 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
             activeAgentConversation = agentConversation
             val builder = StringBuilder()
             var chunksSinceUiUpdate = 0
-            agentConversation.sendMessageAsync(prompt).collect { chunk ->
+            agentConversation.sendMessageAsync(
+                prompt,
+                maxOutputToken = if (model.id == "phi4-mini-reasoning-int4-4096") 2048 else 512,
+                thinkingConfig = ThinkingConfig(enableThinking = false, thinkingTokenBudget = 0)
+            ).collect { chunk ->
                 val peakBytes = ProcessMemoryBudget.readPeakResidentBytes()
                 if (peakBytes == null || peakBytes >= model.maxProcessPeakBytes) {
                     shouldUnload = true
@@ -312,7 +317,11 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
             var outputLimitReached = false
             try {
                 checkNotNull(conversation) { "The local conversation is not available. Reload the model." }
-                    .sendMessageAsync(prompt)
+                    .sendMessageAsync(
+                prompt,
+                maxOutputToken = if (model.id == "phi4-mini-reasoning-int4-4096") 2048 else 512,
+                thinkingConfig = ThinkingConfig(enableThinking = false, thinkingTokenBudget = 0)
+            )
                     .collect { chunk ->
                         val peakBytes = ProcessMemoryBudget.readPeakResidentBytes()
                         if (peakBytes == null || peakBytes >= model.maxProcessPeakBytes) {
