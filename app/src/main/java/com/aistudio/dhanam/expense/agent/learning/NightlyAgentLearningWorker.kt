@@ -164,10 +164,10 @@ class NightlyAgentLearningWorker(
                 AgentLearningReportEntity(
                     reportDateEpochDay = today.toEpochDay(),
                     runStatus = if (modelReady) "MODEL_AND_RULE_LEARNING" else "RULE_LEARNING_ONLY",
-                    operationsSummary = operationsSummaryWithModel,
-                    intelligenceSummary = intelligenceSummary,
-                    skillSummary = skillSummary,
-                    nextImprovements = nextImprovements,
+                    operationsSummary = operationsSummaryWithModel.take(2_000),
+                    intelligenceSummary = intelligenceSummary.take(4_000),
+                    skillSummary = skillSummary.take(2_000),
+                    nextImprovements = nextImprovements.take(2_000),
                     durationMillis = (SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L),
                     createdAtEpochMillis = System.currentTimeMillis()
                 )
