@@ -41,6 +41,7 @@ fun AgentLearningSection() {
     val skills by db.financeDao().observeAgentSkills().collectAsState(initial = emptyList())
     val memories by db.financeDao().observeAgentMemories().collectAsState(initial = emptyList())
     val messages by db.financeDao().observeAgentMessages().collectAsState(initial = emptyList())
+    val recommendationFeedback by db.financeDao().observeRecommendationFeedback().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     var skillActionMessage by remember { mutableStateOf<String?>(null) }
 
@@ -133,6 +134,11 @@ fun AgentLearningSection() {
         Text("Active approved skills: $activeCount", style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
 
+        Text(
+            "Recommendation feedback: ${recommendationFeedback.count { it.decision == "HELPFUL" }} helpful · ${recommendationFeedback.count { it.decision == "NOT_USEFUL" }} not useful",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         val activeSkills = skills.filter { it.status == "ACTIVE" }
         activeSkills.forEach { skill ->
             val hasPreviousVersion = skills.any {
