@@ -15,13 +15,14 @@ object NightlyAgentLearningScheduler {
     const val ENABLED_PREFERENCE = "nightly_agent_learning_enabled"
     const val WORK_TAG = "dhanam-nightly-agent-learning"
 
-    fun scheduleNext(context: Context) {
+    fun scheduleNext(context: Context, forceTomorrow: Boolean = false) {
         val preferences = context.getSharedPreferences("agent_learning", Context.MODE_PRIVATE)
         if (!preferences.getBoolean(ENABLED_PREFERENCE, false)) return
 
         val now = ZonedDateTime.now()
         val todayOneAm = now.toLocalDate().atTime(NIGHT_START).atZone(now.zone)
         val target = when {
+            forceTomorrow -> todayOneAm.plusDays(1)
             now.isBefore(todayOneAm) -> todayOneAm
             isWithinWindow(now.toLocalTime()) -> now
             else -> todayOneAm.plusDays(1)
