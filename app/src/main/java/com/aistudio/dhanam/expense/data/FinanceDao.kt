@@ -35,6 +35,9 @@ interface FinanceDao {
     @Query("SELECT * FROM expenses ORDER BY occurred_on_epoch_day DESC, id DESC")
     fun observeExpenses(): Flow<List<ExpenseEntity>>
 
+    @Query("SELECT * FROM expenses WHERE occurred_on_epoch_day >= :startEpochDay ORDER BY occurred_on_epoch_day DESC, id DESC")
+    suspend fun expensesSince(startEpochDay: Long): List<ExpenseEntity>
+
     @Query("SELECT * FROM expenses WHERE id = :id LIMIT 1")
     suspend fun findExpense(id: Long): ExpenseEntity?
 
