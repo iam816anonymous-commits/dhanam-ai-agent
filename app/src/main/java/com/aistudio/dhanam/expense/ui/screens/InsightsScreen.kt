@@ -124,6 +124,39 @@ fun InsightsScreen() {
                 }
             }
         }
+        Text("Category spending movement", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        Text(
+            "Compares this month's recorded spending so far with the same number of days in the previous month. It is not a full-month comparison.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (financialSnapshot.categoryMovements.isEmpty()) {
+            Text("Category comparisons will appear after expenses are recorded in this month or the previous month.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            financialSnapshot.categoryMovements.take(6).forEach { movement ->
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(movement.category, fontWeight = FontWeight.SemiBold)
+                        Text("This month so far: ${MoneyParser.formatPaise(movement.currentMonthPaise)}")
+                        Text("Previous month, same period: ${MoneyParser.formatPaise(movement.previousMonthPaise)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        val movementLabel = when {
+                            movement.changePaise > 0 -> "Increased by "
+                            movement.changePaise < 0 -> "Decreased by "
+                            else -> "No change: "
+                        } + MoneyParser.formatPaise(kotlin.math.abs(movement.changePaise)) +
+                            (movement.changePercent?.let { " (${if (it > 0) "+" else ""}$it%)" } ?: "")
+                        Text(movementLabel,
+                            color = if (movement.changePaise > 0) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            }
+        }
+
         Text("Data coverage: ${financialSnapshot.dataCoverageDays} day(s) since the earliest recorded expense. Sparse history can make comparisons unreliable.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
