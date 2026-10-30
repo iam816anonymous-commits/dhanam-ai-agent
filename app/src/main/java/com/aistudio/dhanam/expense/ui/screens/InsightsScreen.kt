@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aistudio.dhanam.expense.data.FinanceDatabase
+import com.aistudio.dhanam.expense.data.RecommendationFeedbackEntity
 import com.aistudio.dhanam.expense.data.FinancePdfReportExporter
 import com.aistudio.dhanam.expense.domain.ExpenseInputValidator
 import com.aistudio.dhanam.expense.domain.FinanceCalculations
@@ -49,6 +50,7 @@ fun InsightsScreen() {
     var month by remember { mutableStateOf(YearMonth.now()) }
     val expenses by db.expenseDao().observeAll().collectAsState(initial = emptyList())
     val incomes by db.financeDao().observeIncome().collectAsState(initial = emptyList())
+    val recommendationFeedback by db.financeDao().observeRecommendationFeedback().collectAsState(initial = emptyList())
     val budgets by db.financeDao().observeBudgetsForMonth(month.atDay(1).toEpochDay()).collectAsState(initial = emptyList())
     val loans by db.financeDao().observeLoans().collectAsState(initial = emptyList())
     val intelligenceBudgets by db.financeDao().observeBudgetsForMonth(YearMonth.now().atDay(1).toEpochDay()).collectAsState(initial = emptyList())
@@ -133,6 +135,41 @@ fun InsightsScreen() {
                         Text("Confidence: ${opportunity.confidence.name.lowercase()} · Estimated monthly saving: " +
                             (opportunity.estimatedMonthlySavingsPaise?.let(MoneyParser::formatPaise) ?: "Not estimated"),
                             style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        val feedback = recommendationFeedback.firstOrNull {
+                            it.recommendationId == opportunity.id && it.periodMonth == month.toString()
+                        }
+                        Text(
+                            feedback?.let { "Your feedback: ${it.decision.replace("_", " ").lowercase()}" }
+                                ?: "Was this recommendation useful?",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = {
+                                scope.launch {
+                                    db.financeDao().upsertRecommendationFeedback(
+                                        RecommendationFeedbackEntity(
+                                            recommendationId = opportunity.id,
+                                            periodMonth = month.toString(),
+                                            decision = "HELPFUL",
+                                            createdAtEpochMillis = System.currentTimeMillis()
+                                        )
+                                    )
+                                }
+                            }) { Text(if (feedback?.decision == "HELPFUL") "✓ Helpful" else "Helpful") }
+                            TextButton(onClick = {
+                                scope.launch {
+                                    db.financeDao().upsertRecommendationFeedback(
+                                        RecommendationFeedbackEntity(
+                                            recommendationId = opportunity.id,
+                                            periodMonth = month.toString(),
+                                            decision = "NOT_USEFUL",
+                                            createdAtEpochMillis = System.currentTimeMillis()
+                                        )
+                                    )
+                                }
+                            }) { Text(if (feedback?.decision == "NOT_USEFUL") "✓ Not useful" else "Not useful") }
+                        }
                     }
                 }
             }
