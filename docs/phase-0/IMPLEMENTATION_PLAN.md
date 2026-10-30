@@ -91,9 +91,10 @@ Acceptance: exact time-window boundary tests, report persistence/migration tests
 
 ## Phase 10 — Persistent agent memory, evaluation and release qualification
 
-- Add bounded, role-specific local memories and structured inter-agent task/event history.
-- Use previous verified reports as context without treating model-generated text as trusted instructions.
-- Add feedback on recommendations, regression evaluation and rollback for skill versions.
+- [x] Add bounded, role-specific local memories and structured inter-agent handoff history.
+- [x] Use previous verified summaries as historical context without treating model-generated text as trusted instructions.
+- [x] Add user-controlled disable/restore for approved skill versions.
+- [ ] Add feedback on recommendations, regression evaluation and rollback metrics for financial recommendations.
 - Complete remaining feature parity, backup/restore, security review, APK/release signing and Android 8.1 acceptance.
 - Measure real-device RAM, thermal, battery and model inference behaviour.
 
