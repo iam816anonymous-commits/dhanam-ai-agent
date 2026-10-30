@@ -8,8 +8,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [ExpenseEntity::class, BudgetEntity::class, KhataLoanEntity::class, RepaymentEntity::class, AgentLearningReportEntity::class, AgentSkillEntity::class],
-    version = 6,
+    entities = [ExpenseEntity::class, BudgetEntity::class, KhataLoanEntity::class, RepaymentEntity::class, AgentLearningReportEntity::class, AgentSkillEntity::class, AgentMemoryEntity::class, AgentMessageEntity::class],
+    version = 7,
     exportSchema = true
 )
 abstract class FinanceDatabase : RoomDatabase() {
@@ -119,6 +119,34 @@ abstract class FinanceDatabase : RoomDatabase() {
             }
         }
 
+        /** Add bounded role-specific memory and structured inter-agent handoff history. */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""CREATE TABLE IF NOT EXISTS agent_memories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    agent_role TEXT NOT NULL,
+                    memory_key TEXT NOT NULL,
+                    memory_value TEXT NOT NULL,
+                    source_report_epoch_day INTEGER NOT NULL,
+                    confidence_percent INTEGER NOT NULL,
+                    updated_at_epoch_millis INTEGER NOT NULL
+                )""")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_agent_memories_agent_role_memory_key ON agent_memories(agent_role, memory_key)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_agent_memories_updated_at_epoch_millis ON agent_memories(updated_at_epoch_millis)")
+                db.execSQL("""CREATE TABLE IF NOT EXISTS agent_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    session_id TEXT NOT NULL,
+                    from_agent TEXT NOT NULL,
+                    to_agent TEXT NOT NULL,
+                    message_type TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    created_at_epoch_millis INTEGER NOT NULL
+                )""")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_agent_messages_session_id_created_at_epoch_millis ON agent_messages(session_id, created_at_epoch_millis)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_agent_messages_created_at_epoch_millis ON agent_messages(created_at_epoch_millis)")
+            }
+        }
+
         @Volatile private var instance: FinanceDatabase? = null
 
         fun getInstance(context: Context): FinanceDatabase =
@@ -127,7 +155,7 @@ abstract class FinanceDatabase : RoomDatabase() {
                     context.applicationContext,
                     FinanceDatabase::class.java,
                     DATABASE_NAME
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).build().also { instance = it }
             }
     }
 }
