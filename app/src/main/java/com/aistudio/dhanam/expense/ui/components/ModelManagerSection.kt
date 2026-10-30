@@ -118,7 +118,7 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
                     )
                 }
                 Text(
-                    "Safety gate: ${formatBytes(model.minTotalRamBytes)} total RAM, ${formatBytes(model.minAvailableRamBytes)} currently available RAM, and ${formatBytes(model.minFreeStorageBytes)} free app storage. Peak process budget: ${formatBytes(model.maxProcessPeakBytes)}. ${model.runtimeRequirement}",
+                    "Download gate: ${formatBytes(model.minTotalRamBytes)} physical total RAM, ${formatBytes(model.minAvailableRamBytes)} free app storage. Run-now also requires currently available RAM of ${formatBytes(model.minFreeStorageBytes)} free app storage. Peak process budget: ${formatBytes(model.maxProcessPeakBytes)}. ${model.runtimeRequirement}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
