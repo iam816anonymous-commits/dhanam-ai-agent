@@ -13,6 +13,8 @@ import com.aistudio.dhanam.expense.agent.DhanamAgentRole
 import com.aistudio.dhanam.expense.model.LocalInferenceRuntimeRegistry
 import com.aistudio.dhanam.expense.model.LocalInferenceViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import com.aistudio.dhanam.expense.data.AgentLearningReportEntity
 import com.aistudio.dhanam.expense.data.FinanceDatabase
 import com.aistudio.dhanam.expense.domain.MoneyParser
@@ -48,7 +50,7 @@ class NightlyAgentLearningWorker(
             val today = LocalDate.now()
             val monthStart = YearMonth.from(today).atDay(1).toEpochDay()
             val db = FinanceDatabase.getInstance(applicationContext)
-            val expenses = db.expenseDao().observeAll().first()
+            val expenses = db.financeDao().expensesSince(today.minusDays(365).toEpochDay())
             val budgets = db.financeDao().observeBudgetsForMonth(monthStart).first()
             val loans = db.financeDao().observeLoans().first()
             val snapshot = FinancialAnalysisEngine.analyze(expenses, budgets, loans, today)
@@ -193,7 +195,7 @@ class NightlyAgentLearningWorker(
             NightlyAgentLearningScheduler.scheduleNext(applicationContext, forceTomorrow = true)
             Result.success()
         } catch (cancelled: CancellationException) {
-            if (workerLoadedModel) workerModelOwner?.unloadModelIfIdle()
+            if (workerLoadedModel) withContext(NonCancellable) { workerModelOwner?.unloadModelIfIdle() }
             throw cancelled
         } catch (error: Exception) {
             if (workerLoadedModel) workerModelOwner?.unloadModelIfIdle()
