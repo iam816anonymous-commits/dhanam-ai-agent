@@ -14,7 +14,7 @@ Implemented in the current codebase:
 - A serialized inference gate so the model is never used concurrently by separate agents or interactive chat.
 - Finance Operations, Financial Intelligence and Skill Improvement specialist roles.
 - Nightly WorkManager scheduling between 01:00 and 06:00 local time, subject to Android battery/idle policies.
-- Versioned exact-description category skill proposals, leave-one-out validation and explicit user approval.
+- Versioned exact-description category skill proposals, leave-one-out validation, explicit user approval and rollback to the previous validated version.\n- Month-scoped helpful/not-useful recommendation feedback, reused as aggregate context in the next nightly intelligence review.
 - Local daily agent reports, role-isolated bounded memories, auditable inter-agent handoffs and skill review in Settings.
 - Income records are stored separately from expenses, included in monthly cash-flow summaries and nightly agent analysis, and support previewed, idempotent CSV import/export.
 
