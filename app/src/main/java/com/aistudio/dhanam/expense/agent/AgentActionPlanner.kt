@@ -114,7 +114,7 @@ object AgentActionPlanner {
             "save on", "overspend", "spending pattern", "spending trend", "financial summary",
             "cash flow", "how much did i spend", "how much have i spent", "what did i spend",
             "show my expenses", "what are my biggest expenses", "where is my money going",
-            "how can i save", "how can i reduce",
+            "how can i save", "how can i reduce", "reduce my", "cut my expenses", "where can i save",
             "how much have i lent", "who owes me", "how much do i owe",
             "khata summary", "lending summary", "outstanding loan"
         )
