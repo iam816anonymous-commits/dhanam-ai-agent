@@ -35,6 +35,22 @@ class ModelCatalogTest {
         assertTrue(compact.maxOf { it.maxProcessPeakBytes } < advanced.minOf { it.maxProcessPeakBytes })
     }
 
+    @Test fun smollmArtifactUsesPublishedExactSizeAndDigest() {
+        val model = ModelCatalog.models.first { it.id == "smollm2-360m-instruct" }
+        assertTrue(model.downloadUrl.contains("/resolve/507c99cfe6541ba2bcd84818786f7b025935e5e1/"))
+        assertEquals(373_719_040L, model.expectedBytes)
+        assertEquals("8e2834da211b439751af968ed650febdde5a8cb8d88bc6c1a3059f049caa5c2e", model.sha256)
+        assertEquals("Apache-2.0", model.license)
+    }
+
+    @Test fun qwen25ArtifactUsesPublishedExactSizeAndDigest() {
+        val model = ModelCatalog.models.first { it.id == "qwen25-1.5b-instruct-q8-4096" }
+        assertTrue(model.downloadUrl.contains("/resolve/8c784d74ad0e9a6f1bdbdbc898682a50e7866727/"))
+        assertEquals(1_597_931_520L, model.expectedBytes)
+        assertEquals("2ac49902133f729199bbd23ad6714df32b20585c786f2546d2293cc371f35278", model.sha256)
+        assertEquals("Apache-2.0", model.license)
+    }
+
     @Test fun qwen03ArtifactRemainsTheSmallDeviceBaseline() {
         val model = ModelCatalog.models.first { it.id == "qwen3-0.6b-int4-nothink-1280" }
         assertTrue(model.downloadUrl.contains("/resolve/6aa2daf8aba4aa456797fb8040b36a3948bcfda7/"))
