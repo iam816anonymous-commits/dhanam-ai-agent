@@ -91,9 +91,10 @@ Acceptance: exact time-window boundary tests, report persistence/migration tests
 
 ## Phase 10 — Persistent agent memory, evaluation and release qualification
 
-- Add bounded, role-specific local memories and structured inter-agent task/event history. (Implemented in Room v7: one latest bounded memory per role and 90-day handoff history, displayed in Settings.)
-- Use previous verified reports as context without treating model-generated text as trusted instructions. (Implemented for bounded prior role summaries; longitudinal evaluation remains.)
-- Add feedback on recommendations, regression evaluation and rollback for skill versions.
+- [x] Add bounded, role-specific local memories and structured inter-agent handoff history. (Room v7: one latest bounded memory per role and 90-day handoff history, displayed in Settings.)
+- [x] Use previous verified reports as context without treating model-generated text as trusted instructions. (Implemented for bounded prior role summaries; longitudinal evaluation remains.)
+- [x] Add user-controlled memory clearing and reversible disable/restore for approved skill versions. (Room v9 adds idempotent handoff keys.)
+- [ ] Add feedback on recommendations and regression evaluation for financial recommendations.
 - Complete remaining feature parity, backup/restore, security review, APK/release signing and Android 8.1 acceptance.
 - Measure real-device RAM, thermal, battery and model inference behaviour.
 
