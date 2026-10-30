@@ -56,7 +56,7 @@ The candidate is stored as a versioned data-only rule. It cannot contain code, r
 
 ## Model catalogue and device eligibility
 
-The model manager now offers six pinned LiteRT-LM artifacts in three tiers (two choices per tier): Compact (SmolLM2 360M, Qwen3 0.6B INT4), Balanced (Qwen3 1.7B INT4, Qwen2.5 1.5B INT8), and Advanced (Qwen3 4B Mixed INT4, Phi-4 Mini Reasoning INT4). Every artifact has a pinned revision, expected byte length and SHA-256.
+The model manager now offers six pinned LiteRT-LM artifacts in three tiers (two choices per tier): Compact (SmolLM2 360M, Qwen3 0.6B INT8), Balanced (Qwen3 1.7B INT4, Qwen2.5 1.5B INT8), and Advanced (Qwen3 4B Mixed INT4, Phi-4 Mini Reasoning INT4). Every artifact has a pinned revision, expected byte length and SHA-256.
 
 Download eligibility now checks Android-reported physical total RAM and free app storage only. Run-now eligibility additionally checks currently available system RAM. This prevents temporary RAM pressure from hiding a model that can be downloaded for later. The settings UI shows all six entries, each model's independent download/run status, and the exact Android-reported total RAM, available RAM and free app storage. After engine creation, process peak RSS is checked against the selected model's own budget.
 
