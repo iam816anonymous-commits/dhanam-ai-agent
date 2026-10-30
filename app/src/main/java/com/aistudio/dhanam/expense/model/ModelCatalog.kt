@@ -83,7 +83,7 @@ object ModelCatalog {
             displayName = "Qwen3 1.7B · INT4",
             tier = ModelTier.BALANCED,
             fileName = "Qwen3-1.7B_dynamic_wi4b32_afp32.litertlm",
-            downloadUrl = "https://huggingface.co/litert-community/Qwen3-1.7B/resolve/d9b8a91/Qwen3-1.7B_dynamic_wi4b32_afp32.litertlm",
+            downloadUrl = "https://huggingface.co/litert-community/Qwen3-1.7B/resolve/87603f0ff3fe74b9b77ed0477edb773b4b596f32/Qwen3-1.7B_dynamic_wi4b32_afp32.litertlm",
             expectedBytes = 977_184_032L,
             sha256 = "2eeffef7b51bc3e1225ea69fe7aa5f417397934b56a5b6c20cc068d6fd2c918b",
             license = "Apache-2.0",
