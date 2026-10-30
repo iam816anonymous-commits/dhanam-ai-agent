@@ -5,6 +5,7 @@ import com.aistudio.dhanam.expense.domain.KhataValidator
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.YearMonth
 
 class AgentActionPlannerTest {
     @Test fun expenseRequiresAnAmountAndCreatesAValidatedPreview() {
@@ -47,6 +48,8 @@ class AgentActionPlannerTest {
         assertTrue(result.action is PlannedFinanceAction.AnalyzeSpending)
         assertTrue(result.message.contains("read-only"))
         assertTrue(AgentActionPlanner.parse("who owes me money?").action is PlannedFinanceAction.AnalyzeSpending)
+        val lastMonth = AgentActionPlanner.parse("analyze my expenses for last month").action as PlannedFinanceAction.AnalyzeSpending
+        assertEquals(YearMonth.now().minusMonths(1), lastMonth.month)
         assertEquals(null, AgentActionPlanner.parse("I spent 500 on lunch").action?.takeIf {
             it is PlannedFinanceAction.AnalyzeSpending
         })
