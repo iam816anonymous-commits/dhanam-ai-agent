@@ -11,6 +11,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FinanceDao {
+    @Query("SELECT * FROM recommendation_feedback ORDER BY created_at_epoch_millis DESC")
+    fun observeRecommendationFeedback(): Flow<List<RecommendationFeedbackEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertRecommendationFeedback(feedback: RecommendationFeedbackEntity): Long
+
     @Query("SELECT * FROM agent_skills ORDER BY status, created_at_epoch_millis DESC")
     fun observeAgentSkills(): Flow<List<AgentSkillEntity>>
 
