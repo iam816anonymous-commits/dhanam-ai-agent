@@ -87,49 +87,6 @@ class NightlyAgentLearningWorker(
                 append("Outstanding lent: ${MoneyParser.formatPaise(snapshot.lentOutstandingPaise)}. ")
                 append("Outstanding borrowed: ${MoneyParser.formatPaise(snapshot.borrowedOutstandingPaise)}.")
             }
-            var intelligenceSummary = deterministicIntelligence
-            var modelSkillSummary = "The shared model was not loaded in this process during the nightly window; deterministic skill testing ran without model inference."
-            val modelOwner = LocalInferenceRuntimeRegistry.readyOwner()
-            if (modelOwner != null && NightlyAgentLearningScheduler.isWithinWindow(java.time.LocalTime.now())) {
-                try {
-                    val categoryEvidence = snapshot.categoryMovements.take(7).joinToString("\n") {
-                        "${it.category}: current ${it.currentMonthPaise} paise; comparable previous ${it.previousMonthPaise} paise; change ${it.changePaise} paise."
-                    }
-                    val financePrompt = buildString {
-                        append("Explain these deterministic local-ledger findings in concise user-facing language. ")
-                        append("Do not calculate new totals, invent facts, recommend cutting essential needs, or claim any action was taken. ")
-                        append("Treat all supplied values as authoritative evidence and distinguish observations from suggestions.\n")
-                        append("Current month total: ${snapshot.totalSpentPaise} paise. Comparable previous month-to-date total: ${snapshot.monthToDateComparablePaise} paise.\n")
-                        append(categoryEvidence)
-                        append("\nEvidence-backed opportunities:\n")
-                        append(deterministicIntelligence)
-                    }
-                    val modelInsight = modelOwner.sharedAgentCoordinator.run(
-                        AgentTaskRequest(DhanamAgentRole.FINANCIAL_INTELLIGENCE, financePrompt,
-                            AgentTaskPriority.BACKGROUND, requiresNightWindow = true)
-                    ).output.take(1_200)
-                    intelligenceSummary += "\n\nOn-device model explanation (verify against the evidence above):\n$modelInsight"
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (error: Exception) {
-                    intelligenceSummary += "\n\nOn-device model analysis was not completed: ${error.message ?: "runtime unavailable"}."
-                }
-                try {
-                    val skillEvidence = skillCandidates.take(12).joinToString("\n") {
-                        "${it.matchText} -> ${it.category}; examples=${it.exampleCount}; holdout=${it.testPassCount}/${it.testTotalCount}."
-                    }
-                    val skillPrompt = "Review these already-tested local finance workflow skill candidates. Suggest finance-only improvements or additional test cases. Do not approve, activate, or rewrite rules.\n$skillEvidence"
-                    modelSkillSummary = modelOwner.sharedAgentCoordinator.run(
-                        AgentTaskRequest(DhanamAgentRole.SKILL_IMPROVEMENT, skillPrompt,
-                            AgentTaskPriority.BACKGROUND, requiresNightWindow = true)
-                    ).output.take(1_200)
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (error: Exception) {
-                    modelSkillSummary = "Model-based skill review was not completed: ${error.message ?: "runtime unavailable"}."
-                }
-            }
-
             val modelOwner = LocalInferenceRuntimeRegistry.getOrCreate(applicationContext.applicationContext as Application)
             val modelWasReady = modelOwner.state.value.isReady
             val minutesLeft = Duration.between(java.time.LocalTime.now(), java.time.LocalTime.of(6, 0)).toMinutes()
@@ -206,7 +163,7 @@ class NightlyAgentLearningWorker(
             db.financeDao().upsertAgentLearningReport(
                 AgentLearningReportEntity(
                     reportDateEpochDay = today.toEpochDay(),
-                    runStatus = "RULE_LEARNING_ONLY",
+                    runStatus = if (modelReady) "MODEL_AND_RULE_LEARNING" else "RULE_LEARNING_ONLY",
                     operationsSummary = operationsSummaryWithModel,
                     intelligenceSummary = intelligenceSummary,
                     skillSummary = skillSummary,
