@@ -68,7 +68,9 @@ fun OfflineVoiceInput(
             recognizer?.cancel()
             recognizer?.destroy()
             val onDeviceApiAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-            if (onDeviceApiAvailable && !SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
+            if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+                status = "No Android speech-recognition service is installed or enabled. Install one or type your request."
+            } else if (onDeviceApiAvailable && !SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
                 status = "No dedicated on-device recognizer is available. Install an offline speech pack or type your request."
             } else {
                 // Android 12+ has a dedicated on-device recognizer API. Android 8–11 do not:
