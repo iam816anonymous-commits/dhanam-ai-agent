@@ -56,6 +56,30 @@ interface FinanceDao {
     @Query("SELECT * FROM income_records WHERE occurred_on_epoch_day >= :startEpochDay ORDER BY occurred_on_epoch_day DESC, id DESC")
     suspend fun incomeSince(startEpochDay: Long): List<IncomeEntity>
 
+    @Query("SELECT * FROM income_records ORDER BY occurred_on_epoch_day DESC, id DESC")
+    suspend fun allIncome(): List<IncomeEntity>
+
+    @Query("SELECT * FROM income_records WHERE source_record_key = :sourceId LIMIT 1")
+    suspend fun findIncomeBySourceRecordKey(sourceId: String): IncomeEntity?
+
+    @Query("SELECT * FROM income_records WHERE title = :title AND amount_paise = :amountPaise AND category = :category AND occurred_on_epoch_day = :dateEpochDay AND note = :note LIMIT 1")
+    suspend fun findExactIncome(title: String, amountPaise: Long, category: String, dateEpochDay: Long, note: String): IncomeEntity?
+
+    @Transaction
+    suspend fun importIncomeSkippingExactDuplicates(records: List<IncomeEntity>): Int {
+        var insertedCount = 0
+        for (record in records) {
+            val alreadyImported = record.sourceRecordKey?.let { findIncomeBySourceRecordKey(it) != null }
+                ?: (findExactIncome(record.title, record.amountPaise, record.category,
+                    record.occurredOnEpochDay, record.note) != null)
+            if (!alreadyImported) {
+                insertIncome(record)
+                insertedCount++
+            }
+        }
+        return insertedCount
+    }
+
     @Insert
     suspend fun insertIncome(income: IncomeEntity): Long
 
