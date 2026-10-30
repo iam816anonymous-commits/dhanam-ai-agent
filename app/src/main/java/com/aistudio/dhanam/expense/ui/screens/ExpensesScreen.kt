@@ -197,6 +197,8 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = viewModel()) {
                 }
             }
         }
+
+        IncomeSection()
     }
 
     pendingDelete?.let { expense ->
