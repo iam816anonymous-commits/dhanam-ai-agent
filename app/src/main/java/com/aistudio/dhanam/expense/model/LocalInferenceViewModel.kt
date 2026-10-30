@@ -410,7 +410,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                     } finally {
                         stopRequested = false
                     }
-                }} else if (model.id == "phi4-mini-reasoning-int4-4096") {
+                } else if (model.id == "phi4-mini-reasoning-int4-4096") {
                     // The published Phi-4 Mini reasoning bundle documents a LiteRT-LM 0.18.x
                     // multi-turn KV-cache issue. Keep this model strictly one-turn per conversation.
                     try {
