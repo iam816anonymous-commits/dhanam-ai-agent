@@ -6,6 +6,8 @@ A finance-only, local-first Android personal-finance application. The original [
 
 The existing five-destination Compose UI (Agent, Expenses, Khata, Insights, Settings) and dark emerald / warm-gold design are retained. The finance foundation is extended with a coordinated three-agent system and nightly learning workflow.
 
+The UI also restores the original app's dark/light preference (dark by default) and screenshot privacy control. Security includes a PBKDF2 PIN and optional strong-biometric unlock with PIN fallback. Voice capture supports persisted English, Telugu and Hindi selection; recognized text stays in the composer for review before it is sent.
+
 Implemented in the current codebase:
 - Local expense, income, budget, lending/borrowing and repayment workflows with validated financial writes.
 - Integer-paise calculations and deterministic ledger-backed insights.
