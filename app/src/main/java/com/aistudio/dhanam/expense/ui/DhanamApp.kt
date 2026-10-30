@@ -12,11 +12,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.platform.LocalContext
+import android.app.Application
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -24,6 +27,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.aistudio.dhanam.expense.agent.AgentViewModel
 import com.aistudio.dhanam.expense.model.LocalInferenceViewModel
+import com.aistudio.dhanam.expense.model.LocalInferenceRuntimeRegistry
 import com.aistudio.dhanam.expense.ui.screens.AgentScreen
 import com.aistudio.dhanam.expense.ui.screens.ExpensesScreen
 import com.aistudio.dhanam.expense.ui.screens.InsightsScreen
@@ -33,7 +37,10 @@ import com.aistudio.dhanam.expense.ui.screens.SettingsScreen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DhanamApp(agentViewModel: AgentViewModel = viewModel()) {
-    val inferenceViewModel: LocalInferenceViewModel = viewModel()
+    val context = LocalContext.current
+    val inferenceViewModel = remember(context) {
+        LocalInferenceRuntimeRegistry.getOrCreate(context.applicationContext as Application)
+    }
     agentViewModel.attachLocalInference(inferenceViewModel)
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
