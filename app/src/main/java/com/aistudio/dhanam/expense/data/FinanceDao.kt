@@ -11,6 +11,29 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FinanceDao {
+    @Query("SELECT * FROM agent_memories ORDER BY agent_role, memory_key")
+    fun observeAgentMemories(): Flow<List<AgentMemoryEntity>>
+
+    @Query("SELECT * FROM agent_memories WHERE agent_role = :agentRole AND memory_key = :memoryKey LIMIT 1")
+    suspend fun getAgentMemory(agentRole: String, memoryKey: String): AgentMemoryEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAgentMemory(memory: AgentMemoryEntity): Long
+
+    @Query("SELECT * FROM agent_messages ORDER BY created_at_epoch_millis DESC LIMIT 100")
+    fun observeRecentAgentMessages(): Flow<List<AgentMessageEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAgentMessage(message: AgentMessageEntity): Long
+
+    @Query("DELETE FROM agent_messages WHERE created_at_epoch_millis < :cutoffEpochMillis")
+    suspend fun pruneAgentMessages(cutoffEpochMillis: Long): Int
+
+    @Query("DELETE FROM agent_memories")
+    suspend fun clearAgentMemories(): Int
+
+    @Query("DELETE FROM agent_messages")
+    suspend fun clearAgentMessages(): Int
     @Query("SELECT * FROM agent_skills ORDER BY status, created_at_epoch_millis DESC")
     fun observeAgentSkills(): Flow<List<AgentSkillEntity>>
 
