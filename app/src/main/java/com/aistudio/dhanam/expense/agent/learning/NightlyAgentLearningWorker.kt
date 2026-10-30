@@ -21,9 +21,9 @@ import java.time.Duration
 import kotlinx.coroutines.flow.first
 
 /**
- * First safe nightly slice: prepare a local evidence report without claiming that model-based
- * learning occurred. AI tasks are added only after the shared runtime can be acquired safely
- * from a background worker without creating a second Engine.
+ * Nightly finance workflow. It uses deterministic local ledger analysis first, then optionally
+ * loads the user's already-downloaded preferred model through the same process-wide runtime
+ * used by the UI. All three specialist calls are serialized and remain inside the 01:00–06:00 window.
  */
 class NightlyAgentLearningWorker(
     appContext: Context,
