@@ -58,6 +58,7 @@ class NightlyAgentLearningWorker(
             val budgets = db.financeDao().observeBudgetsForMonth(monthStart).first()
             val loans = db.financeDao().observeLoans().first()
             val previousMemories = db.financeDao().observeAgentMemories().first()
+            db.financeDao().pruneRecommendationFeedback(YearMonth.from(today.minusMonths(12)).toString())
             val recommendationFeedback = db.financeDao().observeRecommendationFeedback().first()
             val snapshot = FinancialAnalysisEngine.analyze(expenses, budgets, loans, today)
             val incomeMonthToDatePaise = incomes.asSequence()
