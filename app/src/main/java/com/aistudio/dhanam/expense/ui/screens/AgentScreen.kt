@@ -69,15 +69,11 @@ fun AgentScreen(
     var voiceFeedbackEnabled by remember(context) {
         mutableStateOf(voicePreferences.getBoolean("voice_feedback_enabled", false))
     }
-    val voiceLanguage = remember(context) {
-        voicePreferences.getString("recognition_language", "en-IN") ?: "en-IN"
-    }
     val latestAssistantMessage = state.messages.lastOrNull()?.takeIf { it.role == "assistant" }
     AgentSpeechFeedback(
         messageId = latestAssistantMessage?.id,
         message = latestAssistantMessage?.text,
-        enabled = voiceFeedbackEnabled,
-        languageTag = voiceLanguage
+        enabled = voiceFeedbackEnabled
     )
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
