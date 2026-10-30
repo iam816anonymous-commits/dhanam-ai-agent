@@ -43,7 +43,12 @@ object AgentActionPlanner {
         val skill = activeSkills.asSequence()
             .filter { it.status == "ACTIVE" }
             .sortedByDescending { it.matchText.length }
-            .firstOrNull { lower.contains(it.matchText.lowercase()) }
+            .firstOrNull { skill ->
+                Regex(
+                    "(?<![\\\\p{L}\\\\p{N}])" + Regex.escape(skill.matchText) + "(?![\\\\p{L}\\\\p{N}])",
+                    RegexOption.IGNORE_CASE
+                ).containsMatchIn(input)
+            }
             ?: return parse(text)
         val amount = amountPattern.findAll(input).lastOrNull()?.groupValues?.get(1) ?: return parse(text)
         val hasExpenseVerb = listOf("spent", "spend", "expense", "bought", "buy", "paid", "purchase", "purchased", "add", "record", "log", "note", "cost")
