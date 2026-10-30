@@ -57,7 +57,7 @@ A feature is complete only when (1) it exists in the parity matrix, (2) the UI/a
 | 2A Expense CRUD | Implemented; prior CI passed | Device persistence/restart smoke test |
 | 2B Dashboard/search/filter | Monthly dashboard, category totals, text search and category filter implemented | Date-range filters, large-history query bounds and device checks |
 | 2C Budgets/safe-to-spend | Overall monthly budget and deterministic daily allowance implemented | Per-category budget editor and edge-case UI review |
-| 2D Khata/repayments | Local loans, direction, due date, outstanding balance and transactional repayments implemented | Edit workflow and visible repayment history |
+| 2D Khata/repayments | Local loans, direction, due date, outstanding balance, transactional repayments, edit workflow and visible repayment history implemented | Physical-device persistence and concurrent repayment/edit verification |
 | 2E Import/export/reports | Expense CSV import/export with metadata, full Khata/repayment/budget ledger CSV, monthly PDF report and previewed legacy DB import implemented | Device URI-provider checks and larger-file tests |
 | 2F Reminders/security/settings/migration | Budget/due-date reminders, optional PIN lock, legacy PIN continuity and previewed legacy DB migration implemented | Biometrics, encrypted-database protection, remaining preferences and device verification remain |
 
@@ -71,6 +71,14 @@ The app uses WorkManager for deferrable periodic reminders; Android/OEM battery 
 
 Legacy migration reads `dhanam_expense_database` read-only and only runs after preview/explicit confirmation. It imports expenses, loans, and category budgets in one transaction, with explicit HALF_UP conversion of legacy Double rupees to paise. It does not delete the old database. See the feature research log for source commit and limitations.
 
+
+## Income tracking parity (added 2026-10-30)
+
+| Feature | Target implementation | Remaining acceptance work |
+|---|---|---|
+| Income records | Separate Room income ledger, validated add/edit/delete UI within the existing Expenses destination, integer-paise storage | CSV import, migration fixture tests and Android 8.1 device verification |
+| Cash-flow overview | Monthly income, expense and net recorded cash-flow cards; nightly agent receives income/expense aggregates | Multi-month cash-flow trend, sparse-history warnings and scenario tests |
+| Income backup | Income rows included in the full finance ledger CSV export | Round-trip income import and duplicate-source idempotency |
 
 ## Coordinated finance-agent parity (added 2026-10-30)
 
