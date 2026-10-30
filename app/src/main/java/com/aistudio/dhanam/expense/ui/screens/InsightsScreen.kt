@@ -60,15 +60,16 @@ fun InsightsScreen() {
     val summary = remember(expenses, budgets, month) {
         FinanceCalculations.monthlySummary(expenses, budgets, month, LocalDate.now())
     }
-    val incomeTotalPaise = remember(incomes, month) {
+    val incomeEndEpochDay = if (month == YearMonth.now()) LocalDate.now().toEpochDay() else month.atEndOfMonth().toEpochDay()
+    val incomeTotalPaise = remember(incomes, month, incomeEndEpochDay) {
         val start = month.atDay(1).toEpochDay()
-        val end = month.atEndOfMonth().toEpochDay()
+        val end = incomeEndEpochDay
         incomes.asSequence()
             .filter { it.occurredOnEpochDay in start..end }
             .fold(0L) { total, record -> Math.addExact(total, record.amountPaise) }
     }
     val hasIncomeRecords = incomes.any {
-        it.occurredOnEpochDay in month.atDay(1).toEpochDay()..month.atEndOfMonth().toEpochDay()
+        it.occurredOnEpochDay in month.atDay(1).toEpochDay()..incomeEndEpochDay
     }
     val netCashFlowPaise = if (hasIncomeRecords) Math.subtractExact(incomeTotalPaise, summary.totalSpentPaise) else null
     var budgetAmount by remember(month, budgets) {
@@ -114,7 +115,7 @@ fun InsightsScreen() {
         SummaryCard("Spent this month", MoneyParser.formatPaise(summary.totalSpentPaise),
             "${summary.transactionCount} recorded transaction(s)")
         SummaryCard("Income recorded", if (hasIncomeRecords) MoneyParser.formatPaise(incomeTotalPaise) else "No income records",
-            "${incomes.count { it.occurredOnEpochDay in month.atDay(1).toEpochDay()..month.atEndOfMonth().toEpochDay() }} income record(s) · separate from expenses")
+            "${incomes.count { it.occurredOnEpochDay in month.atDay(1).toEpochDay()..incomeEndEpochDay }} income record(s) · separate from expenses")
         SummaryCard("Net cash flow", netCashFlowPaise?.let(MoneyParser::formatPaise) ?: "Not available",
             if (hasIncomeRecords) "Recorded income minus recorded expenses for ${month}. This is not a bank balance."
             else "Income has not been recorded for this month; net cash flow cannot be calculated.")
