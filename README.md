@@ -16,7 +16,7 @@ Implemented in the current codebase:
 - Nightly WorkManager scheduling between 01:00 and 06:00 local time, subject to Android battery/idle policies.
 - Versioned exact-description category skill proposals, leave-one-out validation, explicit user approval and rollback to the previous validated version.
 - Month-scoped helpful/not-useful recommendation feedback, reused as aggregate context in the next nightly intelligence review.
-- Local daily agent reports, role-isolated bounded memories, auditable inter-agent handoffs and skill review in Settings.
+- Local daily agent reports, role-isolated bounded memories, auditable per-day idempotent inter-agent handoffs, a user-controlled memory-clear action and skill review in Settings.
 - Income records are stored separately from expenses, included in monthly cash-flow summaries and nightly agent analysis, and support previewed, idempotent CSV import/export.
 
 This is an implementation milestone, not a claim of release completion. Physical-device qualification, remaining finance-parity items and extended migration/security tests are still required.
