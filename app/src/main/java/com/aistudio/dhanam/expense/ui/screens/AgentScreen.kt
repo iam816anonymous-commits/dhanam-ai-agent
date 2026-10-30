@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -51,16 +53,16 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aistudio.dhanam.expense.agent.AgentViewModel
 import com.aistudio.dhanam.expense.agent.PlannedFinanceAction
-import com.aistudio.dhanam.expense.ui.components.OfflineVoiceInput
 
 private data class QuickCommand(val label: String, val prompt: String)
 
 @Composable
-fun AgentScreen(viewModel: AgentViewModel = viewModel()) {
+fun AgentScreen(\n    viewModel: AgentViewModel = viewModel(),\n    isLocalModelReady: Boolean = false,\n    onOpenSettings: () -> Unit = {}\n) {
     val state by viewModel.state.collectAsState()
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -126,6 +128,27 @@ fun AgentScreen(viewModel: AgentViewModel = viewModel()) {
         }
 
         AgentHeroCard(activity = state.activity, status = state.status)
+
+        if (!isLocalModelReady) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("On-device AI is not loaded", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
+                        Text("Built-in finance commands still work. Load a verified model for flexible phrasing.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    OutlinedButton(onClick = onOpenSettings, enabled = !state.busy) { Text("Models") }
+                }
+            }
+        } else {
+            Text("LOCAL AI READY · requests run on this device", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        }
 
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("QUICK ACTIONS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
@@ -209,15 +232,16 @@ fun AgentScreen(viewModel: AgentViewModel = viewModel()) {
             minLines = 1,
             maxLines = 3,
             enabled = !state.busy,
-            shape = RoundedCornerShape(18.dp)
-        )
-        OfflineVoiceInput(
-            enabled = !state.busy,
-            onRecognized = { spoken ->
-                // Keep speech reviewable: the transcript fills the composer but is not sent
-                // until the user taps Send. Financial writes still require a separate confirm.
-                input = spoken.take(1000)
-            }
+            shape = RoundedCornerShape(18.dp),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+            keyboardActions = KeyboardActions(
+                onSend = {
+                    if (input.isNotBlank() && !state.busy) {
+                        viewModel.submit(input)
+                        input = ""
+                    }
+                }
+            )
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedButton(
