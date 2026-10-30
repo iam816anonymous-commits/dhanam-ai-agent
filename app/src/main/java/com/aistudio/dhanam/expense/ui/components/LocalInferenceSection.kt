@@ -36,7 +36,7 @@ fun LocalInferenceSection(viewModel: LocalInferenceViewModel, isPreferred: Boole
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Run the model on this phone", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
-                "This is a local inference smoke-test chat. It does not automatically read your expenses or perform financial actions. Prompts and replies stay in memory and are not uploaded or saved by Dhanam.",
+                "This is an interactive on-device model chat. The same loaded model is also used by Dhanam's finance agent to interpret flexible expense, income, budget, Khata and repayment requests. This test chat itself does not read or change financial records; financial writes still require your confirmation. Prompts and replies stay in memory and are not uploaded or saved by Dhanam.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
