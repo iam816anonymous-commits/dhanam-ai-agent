@@ -47,6 +47,24 @@ interface FinanceDao {
     @Query("DELETE FROM agent_messages WHERE created_at_epoch_millis < :cutoffEpochMillis")
     suspend fun pruneAgentMessages(cutoffEpochMillis: Long): Int
 
+    @Query("SELECT * FROM income_records ORDER BY occurred_on_epoch_day DESC, id DESC")
+    fun observeIncome(): Flow<List<IncomeEntity>>
+
+    @Query("SELECT * FROM income_records WHERE id = :id LIMIT 1")
+    suspend fun findIncome(id: Long): IncomeEntity?
+
+    @Query("SELECT * FROM income_records WHERE occurred_on_epoch_day >= :startEpochDay ORDER BY occurred_on_epoch_day DESC, id DESC")
+    suspend fun incomeSince(startEpochDay: Long): List<IncomeEntity>
+
+    @Insert
+    suspend fun insertIncome(income: IncomeEntity): Long
+
+    @Update
+    suspend fun updateIncome(income: IncomeEntity): Int
+
+    @Query("DELETE FROM income_records WHERE id = :id")
+    suspend fun deleteIncomeById(id: Long): Int
+
     @Query("SELECT * FROM expenses ORDER BY occurred_on_epoch_day DESC, id DESC")
     fun observeExpenses(): Flow<List<ExpenseEntity>>
 
