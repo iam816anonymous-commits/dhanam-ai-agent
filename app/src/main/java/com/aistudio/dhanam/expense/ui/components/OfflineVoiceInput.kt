@@ -64,6 +64,7 @@ fun OfflineVoiceInput(
     }
     var recognizer by remember { mutableStateOf<SpeechRecognizer?>(null) }
     var isListening by remember { mutableStateOf(false) }
+    var isProcessing by remember { mutableStateOf(false) }
     var partialTranscript by remember { mutableStateOf("") }
 
     val startListening: () -> Unit = {
@@ -100,9 +101,10 @@ fun OfflineVoiceInput(
                     }
                     override fun onRmsChanged(rmsdB: Float) = Unit
                     override fun onBufferReceived(buffer: ByteArray?) = Unit
-                    override fun onEndOfSpeech() { isListening = false; status = "Processing speech…" }
+                    override fun onEndOfSpeech() { isListening = false; isProcessing = true; status = "Processing speech…" }
                     override fun onError(error: Int) {
                         isListening = false
+                        isProcessing = false
                         status = when (error) {
                             SpeechRecognizer.ERROR_NO_MATCH -> "No speech was recognized. Check that an offline language pack is installed, then try again."
                             SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech detected. Try again."
@@ -113,6 +115,7 @@ fun OfflineVoiceInput(
                     }
                     override fun onResults(results: Bundle?) {
                         isListening = false
+                        isProcessing = false
                         val spoken = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim().orEmpty()
                         if (spoken.isNotBlank()) {
                             latestOnRecognized(spoken)
@@ -142,6 +145,7 @@ fun OfflineVoiceInput(
                 }
                 instance.startListening(intent)
                 isListening = true
+                isProcessing = false
                 status = if (onDeviceApiAvailable) {
                     "Starting on-device speech recognition…"
                 } else {
@@ -150,6 +154,7 @@ fun OfflineVoiceInput(
             }
         } catch (error: Exception) {
             isListening = false
+            isProcessing = false
             status = "Could not start speech recognition. Check the installed speech engine or type instead."
             try { recognizer?.destroy() } catch (_: Exception) { }
             recognizer = null
@@ -181,7 +186,7 @@ fun OfflineVoiceInput(
             TextButton(enabled = enabled, onClick = { selectLanguage("hi-IN") }) {
                 Text(if (language == "hi-IN") "✓ हिन्दी" else "हिन्दी")
             }
-            Button(enabled = enabled, onClick = {
+            Button(enabled = enabled && !isProcessing, onClick = {
                 if (isListening) {
                     try { recognizer?.stopListening() } catch (_: Exception) { }
                     status = "Finishing speech capture…"
@@ -190,7 +195,7 @@ fun OfflineVoiceInput(
                     if (granted) startListening() else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                 }
             }) {
-                Text(if (isListening) "Finish" else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) "Speak offline" else "Speak (offline preferred)")
+                Text(if (isProcessing) "Processing…" else if (isListening) "Finish" else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) "Speak offline" else "Speak (offline preferred)")
             }
         }
         Text(
