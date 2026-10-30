@@ -113,8 +113,8 @@ object AgentActionPlanner {
             "gift" to "Gift", "other" to "Other"
         )
         val categoryTerm = categoryAliases.keys.sortedByDescending { it.length }
-            .firstOrNull { Regex("""\\b${Regex.escape(it)}\\b""").containsMatchIn(lower) }
-        val hasIncomeIntent = categoryTerm != null || Regex("""\\b(?:income|earned|salary credited|credited salary)\\b""")
+            .firstOrNull { Regex("""\b${Regex.escape(it)}\b""").containsMatchIn(lower) }
+        val hasIncomeIntent = categoryTerm != null || Regex("""\b(?:income|earned|salary credited|credited salary)\b""")
             .containsMatchIn(lower)
         if (!hasIncomeIntent) return null
         val amount = amountPattern.findAll(input).lastOrNull()?.groupValues?.get(1)
@@ -197,7 +197,7 @@ object AgentActionPlanner {
             val amount = amountPattern.findAll(input).lastOrNull()?.groupValues?.get(1)
                 ?: return PlannerResult(message = "What amount should the budget be?", needsClarification = true)
             val categoryWord = categories.keys.sortedByDescending { it.length }
-                .firstOrNull { Regex("\\b" + Regex.escape(it) + "\\b").containsMatchIn(lower) }
+                .firstOrNull { Regex("\b" + Regex.escape(it) + "\b").containsMatchIn(lower) }
                 ?: return PlannerResult(message = "Which category is this budget for? Choose Food, Transport, Shopping, Bills, Health, Education or Other.", needsClarification = true)
             return try {
                 val paise = MoneyParser.parseRupeesToPaise(amount)
@@ -217,7 +217,7 @@ object AgentActionPlanner {
         val amountMatch = amountPattern.findAll(input).firstOrNull()
             ?: return PlannerResult(message = "I couldn't find an amount. Try “I spent 250 on lunch” or “Lunch 250”.", needsClarification = true)
         val categoryWord = categories.keys.sortedByDescending { it.length }
-            .firstOrNull { Regex("\\b" + Regex.escape(it) + "\\b").containsMatchIn(lower) }
+            .firstOrNull { Regex("\b" + Regex.escape(it) + "\b").containsMatchIn(lower) }
         val hasExpenseVerb = listOf(
             "spent", "spend", "expense", "bought", "buy", "paid", "purchase", "purchased",
             "add", "record", "log", "note", "cost", "ఖర్చు", "కొన్న", "చెల్లించ"
