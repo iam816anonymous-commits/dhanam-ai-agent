@@ -33,7 +33,7 @@ object FinanceLedgerCsvExporter {
             row(listOf(
                 "REPAYMENT", repayment.id.toString(), repayment.loanId.toString(), "", "", "", "", "", "", "", "", "",
                 LocalDate.ofEpochDay(repayment.paidOnEpochDay).toString(),
-                money(repayment.amountPaise), repayment.note, "", "", "", "", "", "", "", "", ""
+                money(repayment.amountPaise), repayment.note, "", "", "", "", "", "", "", ""
             ))
         }
         budgets.forEach { budget ->
