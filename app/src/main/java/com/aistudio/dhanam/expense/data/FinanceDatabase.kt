@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [ExpenseEntity::class, BudgetEntity::class, KhataLoanEntity::class, RepaymentEntity::class, AgentLearningReportEntity::class, AgentSkillEntity::class, AgentMemoryEntity::class, AgentMessageEntity::class, IncomeEntity::class, RecommendationFeedbackEntity::class],
-    version = 10,
+    version = 11,
     exportSchema = true
 )
 abstract class FinanceDatabase : RoomDatabase() {
@@ -187,6 +187,13 @@ abstract class FinanceDatabase : RoomDatabase() {
             }
         }
 
+        /** Prevent duplicate handoff rows when WorkManager retries a nightly session. */
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_agent_messages_session_id_from_agent_to_agent_message_type ON agent_messages(session_id, from_agent, to_agent, message_type)")
+            }
+        }
+
         @Volatile private var instance: FinanceDatabase? = null
 
         fun getInstance(context: Context): FinanceDatabase =
@@ -195,7 +202,7 @@ abstract class FinanceDatabase : RoomDatabase() {
                     context.applicationContext,
                     FinanceDatabase::class.java,
                     DATABASE_NAME
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11).build().also { instance = it }
             }
     }
 }
