@@ -20,13 +20,15 @@ class MainActivity : FragmentActivity() {
         setContent {
             var darkTheme by remember { mutableStateOf(uiPreferences.getBoolean("dark_theme", true)) }
             DhanamTheme(darkTheme = darkTheme) {
-                AppLockGate {
+                AppLockGate { onLock, canLock ->
                     DhanamApp(
                         isDarkTheme = darkTheme,
                         onThemeChange = { enabled ->
                             darkTheme = enabled
                             uiPreferences.edit().putBoolean("dark_theme", enabled).apply()
-                        }
+                        },
+                        onLockClick = onLock,
+                        canLock = canLock
                     )
                 }
             }
