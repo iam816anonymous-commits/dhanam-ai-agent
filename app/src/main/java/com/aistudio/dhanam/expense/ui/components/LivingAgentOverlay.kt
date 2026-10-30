@@ -1,14 +1,6 @@
 package com.aistudio.dhanam.expense.ui.components
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,18 +15,18 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.IntOffset
-import kotlin.math.roundToInt
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.aistudio.dhanam.expense.ui.AppDestination
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Brush
 
 /**
  * In-app floating assistant. It is composed above the NavHost, so it remains available
@@ -49,27 +41,10 @@ fun LivingAgentOverlay(
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
-    val transition = rememberInfiniteTransition(label = "living-agent")
-    val bob by transition.animateFloat(
-        initialValue = -3f,
-        targetValue = 3f,
-        animationSpec = infiniteRepeatable(tween(1150, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "bob"
-    )
-    val pulse by transition.animateFloat(
-        initialValue = 0.96f,
-        targetValue = if (activity == "acting" || activity == "thinking") 1.12f else 1.04f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(if (activity == "acting") 430 else 900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse"
-    )
+
 
     Column(
-        modifier = modifier.offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) },
+        modifier = modifier,
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -131,29 +106,21 @@ fun LivingAgentOverlay(
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
                 .padding(4.dp)
-                .size(68.dp)
-                .graphicsLayer { translationY = bob }
-                .scale(pulse)
-                .shadow(12.dp, CircleShape)
-                .pointerInput(Unit) {
-                    detectDragGestures { change, dragAmount ->
-                        change.consume()
-                        offsetX += dragAmount.x
-                        offsetY += dragAmount.y
-                    }
-                }
+                .size(60.dp)
+                .background(
+                    Brush.linearGradient(
+                        listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)
+                    ),
+                    CircleShape
+                )
                 .clickable { expanded = !expanded },
             contentAlignment = Alignment.Center
         ) {
-            JarvisLivingCore(
-                state = when (activity) {
-                    "thinking", "analyzing" -> JarvisCoreState.THINKING
-                    "acting" -> JarvisCoreState.PROCESSING
-                    "awaiting_confirmation" -> JarvisCoreState.NOTING
-                    "complete" -> JarvisCoreState.SPEAKING
-                    else -> JarvisCoreState.IDLE
-                },
-                coreSize = 62.dp
+            Icon(
+                imageVector = Icons.Default.AutoAwesome,
+                contentDescription = if (expanded) "Close Dhanam assistant menu" else "Open Dhanam assistant menu",
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(26.dp)
             )
         }
     }
