@@ -52,12 +52,12 @@ class ModelCatalogTest {
     }
 
     @Test fun qwen03ArtifactRemainsTheSmallDeviceBaseline() {
-        val model = ModelCatalog.models.first { it.id == "qwen3-0.6b-int4-nothink-1280" }
-        assertTrue(model.downloadUrl.contains("/resolve/6aa2daf8aba4aa456797fb8040b36a3948bcfda7/"))
-        assertEquals(347_251_840L, model.expectedBytes)
-        assertEquals("2df6821ec12702dafd33915e7a1a1adc7c4b053f3672fd9555dfaf3a114c4139", model.sha256)
+        val model = ModelCatalog.models.first { it.id == "qwen3-0.6b-int8-4096" }
+        assertTrue(model.downloadUrl.contains("/resolve/e6687177e00897731e7716267eebd4eba0dde7c2/"))
+        assertEquals(613_722_264L, model.expectedBytes)
+        assertEquals("c5f39b4191926786c3e6668b62af4d6eb15248dfc7a5348252a9b406f33f2108", model.sha256)
         assertEquals("Apache-2.0", model.license)
-        assertEquals(1280, model.contextTokens)
+        assertEquals(4096, model.contextTokens)
         assertEquals(2L * 1024L * 1024L * 1024L, model.maxProcessPeakBytes)
     }
 
