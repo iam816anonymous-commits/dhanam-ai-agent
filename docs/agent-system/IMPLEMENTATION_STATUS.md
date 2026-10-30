@@ -54,6 +54,10 @@ The candidate is stored as a versioned data-only rule. It cannot contain code, r
 - Room schema version 10 adds month-scoped recommendation feedback; the worker retains the latest 12 months and supplies aggregate helpful/not-useful feedback to Financial Intelligence. Version 11 normalizes old active skill versions and makes nightly inter-agent handoff rows idempotent across WorkManager retries. Skill approvals supersede the previous active version and Settings exposes transactional rollback to the prior validated version. The chat agent answers read-only current/previous-month spending, category-specific reduction and Khata outstanding queries from deterministic local analysis.
 - Financial amounts remain integer paise. LLM outputs are never used for financial arithmetic or direct writes.
 
+## Latest CI verification
+
+On 2026-10-30, Android CI run #277 completed its build job successfully in 2m57s. It passed `:app:testDebugUnitTest`, `:app:lintDebug`, `:app:assembleDebug`, `:app:assembleDebugAndroidTest` and `:app:assembleRelease`; the workflow also verified all three APK files and uploaded the `dhanam-ai-apk-artifacts` archive. This validates compilation and unit tests, not execution of instrumentation tests on a physical device or emulator.
+
 ## Current limitations / next phases
 
 1. **Physical-device qualification remains mandatory.** CI cannot prove model loading, peak memory, thermal behaviour, battery impact, WorkManager timing or Android 8.1 OEM background behaviour on the user's handset.
