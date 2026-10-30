@@ -55,7 +55,7 @@ class SharedAgentCoordinator(
             return inferenceLock.withLock {
                 if (request.requiresNightWindow) {
                     val time = now()
-                    check(!time.isBefore(NIGHT_START) && time.isBefore(NIGHT_END)) {
+                    check(isWithinNightWindow(time)) {
                         "Background agent work is allowed only between 01:00 and 06:00 device-local time."
                     }
                 }
@@ -81,5 +81,8 @@ class SharedAgentCoordinator(
         private const val MAX_TASK_PROMPT_CHARS = 4_000
         val NIGHT_START: LocalTime = LocalTime.of(1, 0)
         val NIGHT_END: LocalTime = LocalTime.of(6, 0)
+
+        fun isWithinNightWindow(time: LocalTime): Boolean =
+            !time.isBefore(NIGHT_START) && time.isBefore(NIGHT_END)
     }
 }
