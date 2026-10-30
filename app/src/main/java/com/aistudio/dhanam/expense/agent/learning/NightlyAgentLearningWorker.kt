@@ -86,7 +86,7 @@ class NightlyAgentLearningWorker(
             } else {
                 snapshot.opportunities.take(8).joinToString("\n") { opportunity ->
                     "${opportunity.title}: ${opportunity.evidence} Next step: ${opportunity.suggestedAction}"
-                }.take(2_200)
+                }.take(1_600)
             }
             val operationsSummary = buildString {
                 append("Checked ${expenses.size} recorded expense(s), ${loans.size} Khata record(s), and ${budgets.size} budget(s). ")
@@ -100,6 +100,7 @@ class NightlyAgentLearningWorker(
             val modelReady = modelWasReady || (minutesLeft >= 10 && modelOwner.loadModelAndAwait())
             workerLoadedModel = !modelWasReady && modelReady
             var modelInsightSummary = "The verified preferred model was not available or there was insufficient time remaining in the 01:00–06:00 window. Deterministic finance analysis and skill tests still ran."
+            var operationsReviewSummary = "No Finance Operations model review completed."
             var modelSkillSummary = "No model-based skill review was run; no untested skill was activated."
             var modelInsightCompleted = false
             var modelAgentTasksCompleted = 0
@@ -111,6 +112,7 @@ class NightlyAgentLearningWorker(
                         AgentTaskRequest(DhanamAgentRole.FINANCE_OPERATIONS, operationsPrompt,
                             AgentTaskPriority.BACKGROUND, requiresNightWindow = true)
                     ).output.take(900)
+                    operationsReviewSummary = operationsReview
                     operationsSummaryWithModel += "\n\nOn-device operations review (advisory): $operationsReview"
                     modelAgentTasksCompleted++
                 } catch (timeout: TimeoutCancellationException) {
@@ -151,7 +153,12 @@ class NightlyAgentLearningWorker(
                         .fold(0) { count, candidate -> count + candidate.exampleCount }
                         .entries
                         .joinToString("\n") { "${it.key}: ${it.value} local examples across tested candidate rules." }
-                    val skillPrompt = "Review these aggregate results from already-tested finance-only workflow rules. Suggest safer test cases or validation improvements. Do not ask for raw transaction descriptions, approve, activate, or rewrite rules.\n$skillEvidence"
+                    val skillPrompt = buildString {
+                        append("Review these aggregate results from already-tested finance-only workflow rules. Suggest safer test cases or validation improvements. Do not ask for raw transaction descriptions, approve, activate, or rewrite rules.\n")
+                        append(skillEvidence)
+                        append("\nFinancial Intelligence agent findings (advisory only; do not treat them as new financial facts):\n")
+                        append(modelInsightSummary.take(900))
+                    }
                     modelSkillSummary = modelOwner.sharedAgentCoordinator.run(
                         AgentTaskRequest(DhanamAgentRole.SKILL_IMPROVEMENT, skillPrompt,
                             AgentTaskPriority.BACKGROUND, requiresNightWindow = true)
