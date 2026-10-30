@@ -55,6 +55,21 @@ class ModelDownloader(private val context: Context) {
             connection.connect()
             check(connection.url.protocol.equals("https", ignoreCase = true)) { "The model source redirected away from HTTPS; download rejected." }
             val response = connection.responseCode
+            if (response == HttpURLConnection.HTTP_REQUESTED_RANGE_NOT_SATISFIABLE &&
+                offset == model.expectedBytes && offset > 0L
+            ) {
+                val actualSha = digest.digest().joinToString("") { "%02x".format(it) }
+                check(actualSha.equals(model.sha256, ignoreCase = true)) {
+                    partial.delete()
+                    "The saved model download failed SHA-256 verification and was removed."
+                }
+                try {
+                    Files.move(partial.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                } catch (_: Exception) {
+                    Files.move(partial.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                }
+                return@withContext destination
+            }
             val append = offset > 0L && response == HttpURLConnection.HTTP_PARTIAL
             if (append) {
                 val contentRange = connection.getHeaderField("Content-Range").orEmpty()
