@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -22,6 +23,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -36,6 +41,7 @@ fun AppLockGate(content: @Composable () -> Unit) {
     var locked by remember { mutableStateOf(configured) }
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    var biometricError by remember { mutableStateOf<String?>(null) }
 
     DisposableEffect(context, lifecycleOwner) {
         val prefs = context.getSharedPreferences(PinSecurity.PREFS, android.content.Context.MODE_PRIVATE)
@@ -95,6 +101,54 @@ fun AppLockGate(content: @Composable () -> Unit) {
                         error = "Incorrect PIN or temporary lockout. Try again shortly."
                     }
                 }, modifier = Modifier.fillMaxWidth().padding(top = 14.dp)) { Text("Unlock") }
+                if (PinSecurity.isBiometricEnabled(context)) {
+                    TextButton(
+                        onClick = {
+                            val activity = context as? FragmentActivity
+                            if (activity == null) {
+                                biometricError = "Biometric unlock is unavailable here. Use your PIN."
+                            } else {
+                                val availability = BiometricManager.from(activity).canAuthenticate(
+                                    BiometricManager.Authenticators.BIOMETRIC_STRONG
+                                )
+                                if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
+                                    biometricError = "No enrolled strong biometric is available. Use your PIN."
+                                } else {
+                                    val prompt = BiometricPrompt(
+                                        activity,
+                                        ContextCompat.getMainExecutor(activity),
+                                        object : BiometricPrompt.AuthenticationCallback() {
+                                            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                                                locked = false
+                                                pin = ""
+                                                error = null
+                                                biometricError = null
+                                            }
+                                            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                                                biometricError = errString.toString()
+                                            }
+                                            override fun onAuthenticationFailed() {
+                                                biometricError = "Biometric not recognized. Try again or use your PIN."
+                                            }
+                                        }
+                                    )
+                                    val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                                        .setTitle("Unlock Dhanam AI")
+                                        .setSubtitle("Authenticate to view financial records")
+                                        .setNegativeButtonText("Use PIN")
+                                        .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                                        .build()
+                                    prompt.authenticate(promptInfo)
+                                }
+                            }
+                        }
+                    ) { Text("Unlock with fingerprint or face") }
+                }
+                if (biometricError != null) Text(
+                    biometricError.orEmpty(),
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
             }
         }
     }
