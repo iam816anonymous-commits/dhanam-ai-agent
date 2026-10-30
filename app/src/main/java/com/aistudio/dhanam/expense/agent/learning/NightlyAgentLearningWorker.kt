@@ -187,7 +187,12 @@ class NightlyAgentLearningWorker(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            if (runAttemptCount < 2) Result.retry() else Result.failure()
+            if (runAttemptCount < 2) {
+                Result.retry()
+            } else {
+                NightlyAgentLearningScheduler.scheduleNext(applicationContext, forceTomorrow = true)
+                Result.failure()
+            }
         }
     }
 }
