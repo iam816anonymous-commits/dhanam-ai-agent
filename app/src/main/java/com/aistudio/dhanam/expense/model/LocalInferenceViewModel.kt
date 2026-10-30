@@ -23,6 +23,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -77,6 +78,20 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
             }
             _state.update { it.copy(eligibility = eligibility) }
         }
+    }
+
+    suspend fun loadModelAndAwait(): Boolean {
+        if (_state.value.isReady) return true
+        if (!_state.value.isLoading) loadModel()
+        val started = _state.first { it.isLoading || it.isReady || it.error != null }
+        val completed = if (started.isLoading) _state.first { !it.isLoading } else started
+        return completed.isReady
+    }
+
+    suspend fun unloadModelIfIdle(): Boolean = withContext(dispatcher) {
+        if (_state.value.isGenerating || _state.value.isLoading) return@withContext false
+        releaseLoadedModel()
+        true
     }
 
     fun loadModel() {
@@ -472,13 +487,21 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
 object LocalInferenceRuntimeRegistry {
     @Volatile private var owner: LocalInferenceViewModel? = null
 
+    @Synchronized
+    fun getOrCreate(application: Application): LocalInferenceViewModel =
+        owner ?: LocalInferenceViewModel(application).also { owner = it }
+
+    @Synchronized
     fun attach(viewModel: LocalInferenceViewModel) {
         owner = viewModel
     }
 
+    @Synchronized
     fun detach(viewModel: LocalInferenceViewModel) {
         if (owner === viewModel) owner = null
     }
+
+    fun currentOwner(): LocalInferenceViewModel? = owner
 
     fun readyOwner(): LocalInferenceViewModel? =
         owner?.takeIf { it.state.value.isReady && !it.state.value.isLoading }
