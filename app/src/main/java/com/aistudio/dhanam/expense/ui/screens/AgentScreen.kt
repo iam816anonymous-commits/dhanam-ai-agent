@@ -72,6 +72,7 @@ fun AgentScreen(viewModel: AgentViewModel = viewModel()) {
             QuickCommand("＋ Expense", "I spent ₹250 on lunch"),
             QuickCommand("◷ Budget", "set food budget to 3000"),
             QuickCommand("↩ Repayment", "record repayment 500 from Ravi"),
+            QuickCommand("📊 Spending analysis", "How can I reduce my expenses?"),
             QuickCommand("✦ Help", "help")
         )
     }
@@ -98,13 +99,14 @@ fun AgentScreen(viewModel: AgentViewModel = viewModel()) {
                     Box(Modifier.size(7.dp).background(
                         when (state.activity) {
                             "error" -> MaterialTheme.colorScheme.error
-                            "thinking", "acting" -> MaterialTheme.colorScheme.secondary
+                            "thinking", "acting", "analyzing" -> MaterialTheme.colorScheme.secondary
                             else -> MaterialTheme.colorScheme.primary
                         }, CircleShape
                     ))
                     Text(
                         when (state.activity) {
                             "thinking" -> "THINKING"
+                            "analyzing" -> "ANALYZING SPENDING"
                             "acting" -> "VERIFYING"
                             "awaiting_confirmation" -> "YOUR APPROVAL"
                             "complete" -> "VERIFIED"
@@ -245,9 +247,9 @@ private fun AgentHeroCard(activity: String, status: String?) {
     val transition = rememberInfiniteTransition(label = "dhanam-hero")
     val pulse by transition.animateFloat(
         initialValue = 0.96f,
-        targetValue = if (activity == "thinking" || activity == "acting") 1.08f else 1.02f,
+        targetValue = if (activity == "thinking" || activity == "acting" || activity == "analyzing") 1.08f else 1.02f,
         animationSpec = infiniteRepeatable(
-            animation = tween(if (activity == "acting") 500 else 1000, easing = FastOutSlowInEasing),
+            animation = tween(if (activity == "acting") 500 else if (activity == "analyzing") 700 else 1000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulse"
@@ -255,6 +257,7 @@ private fun AgentHeroCard(activity: String, status: String?) {
     val label = when (activity) {
         "thinking" -> "THINKING & UNDERSTANDING"
         "acting" -> "CHECKING LOCAL RECORDS"
+        "analyzing" -> "ANALYZING YOUR SPENDING"
         "awaiting_confirmation" -> "READY FOR YOUR APPROVAL"
         "complete" -> "ACTION VERIFIED"
         "error" -> "ACTION NEEDS ATTENTION"
