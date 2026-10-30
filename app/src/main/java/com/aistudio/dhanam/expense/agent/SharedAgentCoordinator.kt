@@ -28,7 +28,7 @@ data class AgentTaskRequest(
     val role: DhanamAgentRole,
     val prompt: String,
     val priority: AgentTaskPriority = AgentTaskPriority.BACKGROUND,
-    val requiresNightWindow: Boolean = priority == AgentTaskPriority.BACKGROUND
+    val requiresNightWindow: Boolean = true
 )
 
 data class AgentTaskResult(val role: DhanamAgentRole, val output: String)
