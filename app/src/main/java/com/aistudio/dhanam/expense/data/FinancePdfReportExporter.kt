@@ -9,7 +9,13 @@ import com.aistudio.dhanam.expense.domain.MoneyParser
 import java.io.IOException
 
 object FinancePdfReportExporter {
-    fun write(resolver: ContentResolver, uri: Uri, summary: MonthlyFinanceSummary) {
+    fun write(
+        resolver: ContentResolver,
+        uri: Uri,
+        summary: MonthlyFinanceSummary,
+        incomeTotalPaise: Long? = null,
+        netCashFlowPaise: Long? = null
+    ) {
         val document = PdfDocument()
         try {
             val page = document.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())
@@ -25,6 +31,10 @@ object FinancePdfReportExporter {
             canvas.drawText("Recorded spending: ${MoneyParser.formatPaise(summary.totalSpentPaise)}", 40f, y, paint)
             y += 22f
             canvas.drawText("Transactions: ${summary.transactionCount}", 40f, y, paint)
+            y += 22f
+            canvas.drawText("Recorded income: ${incomeTotalPaise?.let(MoneyParser::formatPaise) ?: "Not recorded"}", 40f, y, paint)
+            y += 22f
+            canvas.drawText("Net recorded cash flow: ${netCashFlowPaise?.let(MoneyParser::formatPaise) ?: "Not available"}", 40f, y, paint)
             y += 22f
             canvas.drawText("Monthly budget: ${summary.overallBudgetPaise?.let(MoneyParser::formatPaise) ?: "Not set"}", 40f, y, paint)
             y += 22f
