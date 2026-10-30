@@ -39,6 +39,8 @@ import android.content.pm.PackageManager
 fun OfflineVoiceInput(
     enabled: Boolean,
     onRecognized: (String) -> Unit,
+    showLanguageSelector: Boolean = false,
+    showStatus: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -176,15 +178,17 @@ fun OfflineVoiceInput(
 
     androidx.compose.foundation.layout.Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Voice language", style = MaterialTheme.typography.labelMedium)
-            TextButton(enabled = enabled, onClick = { selectLanguage("en-IN") }) {
-                Text(if (language == "en-IN") "✓ English" else "English")
-            }
-            TextButton(enabled = enabled, onClick = { selectLanguage("te-IN") }) {
-                Text(if (language == "te-IN") "✓ తెలుగు" else "తెలుగు")
-            }
-            TextButton(enabled = enabled, onClick = { selectLanguage("hi-IN") }) {
-                Text(if (language == "hi-IN") "✓ हिन्दी" else "हिन्दी")
+            if (showLanguageSelector) {
+                Text("Voice language", style = MaterialTheme.typography.labelMedium)
+                TextButton(enabled = enabled, onClick = { selectLanguage("en-IN") }) {
+                    Text(if (language == "en-IN") "✓ English" else "English")
+                }
+                TextButton(enabled = enabled, onClick = { selectLanguage("te-IN") }) {
+                    Text(if (language == "te-IN") "✓ తెలుగు" else "తెలుగు")
+                }
+                TextButton(enabled = enabled, onClick = { selectLanguage("hi-IN") }) {
+                    Text(if (language == "hi-IN") "✓ हिन्दी" else "हिन्दी")
+                }
             }
             Button(enabled = enabled && !isProcessing, onClick = {
                 if (isListening) {
@@ -195,15 +199,25 @@ fun OfflineVoiceInput(
                     if (granted) startListening() else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                 }
             }) {
-                Text(if (isProcessing) "Processing…" else if (isListening) "Finish" else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) "Speak offline" else "Speak (offline preferred)")
+                Text(
+                    when {
+                        isProcessing -> "Processing…"
+                        isListening -> "Finish"
+                        showLanguageSelector && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> "Speak offline"
+                        showLanguageSelector -> "Speak (offline preferred)"
+                        else -> "Mic"
+                    }
+                )
             }
         }
-        Text(
-            partialTranscript.takeIf { it.isNotBlank() } ?: status,
-            modifier = Modifier.padding(start = 4.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2
-        )
+        if (showStatus) {
+            Text(
+                partialTranscript.takeIf { it.isNotBlank() } ?: status,
+                modifier = Modifier.padding(start = 4.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2
+            )
+        }
     }
 }
