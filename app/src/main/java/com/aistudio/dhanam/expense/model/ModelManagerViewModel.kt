@@ -156,13 +156,9 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
                 )
                 refresh()
             } catch (cancelled: CancellationException) {
-                val savedBytes = withContext(Dispatchers.IO) {
-                    ModelCatalog.partialFile(getApplication(), selected)
-                        .takeIf { it.isFile }?.length()?.coerceAtMost(selected.expectedBytes) ?: 0L
-                }
+                val savedBytes = _state.value.downloadedBytes
                 _state.value = _state.value.copy(
                     isDownloading = false,
-                    downloadedBytes = savedBytes,
                     totalBytes = selected.expectedBytes,
                     progress = (savedBytes.toDouble() / selected.expectedBytes.coerceAtLeast(1L)).toFloat().coerceIn(0f, 1f),
                     message = if (savedBytes > 0L) "Download paused. Your progress is saved and will resume next time." else "Download paused."
