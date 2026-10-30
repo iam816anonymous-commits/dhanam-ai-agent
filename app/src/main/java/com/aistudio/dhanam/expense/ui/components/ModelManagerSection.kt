@@ -40,6 +40,27 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        val deviceResources = state.eligibilityByModel.values.firstOrNull() ?: state.eligibility
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Device resource report", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                if (deviceResources == null) {
+                    Text("Reading Android memory and app-storage metrics…", style = MaterialTheme.typography.bodySmall)
+                } else {
+                    Text("Physical RAM reported by Android: ${formatBytes(deviceResources.totalRamBytes)}", style = MaterialTheme.typography.bodySmall)
+                    Text("Currently available system RAM: ${formatBytes(deviceResources.availableRamBytes)}", style = MaterialTheme.typography.bodySmall)
+                    Text("Free app-private storage: ${formatBytes(deviceResources.freeStorageBytes)}", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        "Model eligibility uses Android's physical-memory report, not the phone manufacturer's advertised RAM Plus / Memory Fusion / virtual RAM figure. Download eligibility and run-now eligibility are separate checks.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
         Text("Choose a model", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Text(
             "You can install multiple model files. Only one model is loaded into RAM at a time because all three agents share one LiteRT runtime; unload it before switching.",
