@@ -62,7 +62,11 @@ import com.aistudio.dhanam.expense.agent.PlannedFinanceAction
 private data class QuickCommand(val label: String, val prompt: String)
 
 @Composable
-fun AgentScreen(\n    viewModel: AgentViewModel = viewModel(),\n    isLocalModelReady: Boolean = false,\n    onOpenSettings: () -> Unit = {}\n) {
+fun AgentScreen(
+    viewModel: AgentViewModel = viewModel(),
+    isLocalModelReady: Boolean = false,
+    onOpenSettings: () -> Unit = {}
+) {
     val state by viewModel.state.collectAsState()
     var input by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
