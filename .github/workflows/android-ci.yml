@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   build:
-    name: Lint, unit tests and debug APK
+    name: Lint, unit tests and debug/release APKs
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -37,23 +37,26 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Run unit tests, lint and assemble
-        run: ./gradlew --no-daemon clean :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Run unit tests, lint and assemble debug/release APKs
+        run: ./gradlew --no-daemon clean :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease
 
       - name: Verify APK exists
         shell: bash
         run: |
           test -s app/build/outputs/apk/debug/app-debug.apk
           test -s app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          test -s app/build/outputs/apk/release/app-release-unsigned.apk
           echo "Debug APK exists: $(stat -c '%s bytes' app/build/outputs/apk/debug/app-debug.apk)"
           echo "Instrumented-test APK exists: $(stat -c '%s bytes' app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk)"
+          echo "Unsigned release APK exists: $(stat -c '%s bytes' app/build/outputs/apk/release/app-release-unsigned.apk)"
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: dhanam-ai-debug-apk
+          name: dhanam-ai-apk-artifacts
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            app/build/outputs/apk/release/app-release-unsigned.apk
           if-no-files-found: error
           retention-days: 14
