@@ -54,6 +54,7 @@ class AgentActionPlannerTest {
 
         assertTrue(AgentActionPlanner.parse("income 25000").needsClarification)
         assertTrue(AgentActionPlanner.parse("I got paid 50000").needsClarification)
+        assertEquals(null, AgentActionPlanner.parse("interest payment 500").action)
         assertEquals(null, AgentActionPlanner.parse("how much income did I receive").action)
         assertEquals(null, AgentActionPlanner.parse("write code 50000").action)
     }
