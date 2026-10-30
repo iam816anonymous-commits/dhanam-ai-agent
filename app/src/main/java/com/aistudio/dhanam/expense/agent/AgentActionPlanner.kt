@@ -116,8 +116,8 @@ object AgentActionPlanner {
         )
         val categoryTerm = categoryAliases.keys.sortedByDescending { it.length }
             .firstOrNull { Regex("""\b${Regex.escape(it)}\b""").containsMatchIn(lower) }
-        val hasExpenseVerb = listOf("spent", "spend", "expense", "bought", "buy", "purchase", "purchased")
-            .any { lower.contains(it) }
+        val hasExpenseVerb = listOf("spent", "spend", "expense", "bought", "buy", "purchase", "purchased", "payment", "paying")
+            .any { lower.contains(it) } || (lower.contains("paid") && !lower.contains("got paid"))
         if (hasExpenseVerb) return null
         val hasIncomeVerb = Regex("""\b(?:income|earned|received|got paid|salary credited|credited salary)\b""")
             .containsMatchIn(lower)
