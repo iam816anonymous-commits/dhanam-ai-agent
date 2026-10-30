@@ -75,6 +75,19 @@ class AgentActionPlannerTest {
         assertTrue(action is PlannedFinanceAction.AddIncome)
     }
 
+    @Test fun incomeCorrectionsOnlyChangeTheStagedIncomeDraft() {
+        val original = AgentActionPlanner.parse("salary 50000").action as PlannedFinanceAction.AddIncome
+        val correctedAmount = AgentActionPlanner.applyCorrection(original, "actually change amount to 60000")!!
+            .action as PlannedFinanceAction.AddIncome
+        assertEquals(6_000_000L, correctedAmount.amountPaise)
+        assertEquals("Salary", correctedAmount.category)
+
+        val correctedTitle = AgentActionPlanner.applyCorrection(original, "change description to monthly payroll")!!
+            .action as PlannedFinanceAction.AddIncome
+        assertEquals("monthly payroll", correctedTitle.title)
+        assertEquals(5_000_000L, correctedTitle.amountPaise)
+    }
+
     @Test fun strictModelIncomeProposalIsValidated() {
         val result = AgentActionPlanner.parseModelProposal(
             """{"intent":"income","amount":"12500.50","title":"Monthly salary","category":"Salary","date":"2026-10-30","message":""}"""
