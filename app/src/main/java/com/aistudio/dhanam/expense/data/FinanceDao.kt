@@ -106,6 +106,22 @@ interface FinanceDao {
     suspend fun findLoanByLegacySourceId(sourceId: String): KhataLoanEntity?
     @Update suspend fun updateLoan(loan: KhataLoanEntity): Int
 
+    @Transaction
+    suspend fun updateLoanIfUnchanged(loan: KhataLoanEntity, expectedPaidPaise: Long): Boolean {
+        val current = findLoan(loan.id) ?: return false
+        require(current.paidPaise == expectedPaidPaise) {
+            "A repayment was recorded while this Khata record was being edited. Refresh and review the new balance."
+        }
+        require(current.direction == loan.direction) { "The lending/borrowing direction cannot be changed." }
+        require(loan.principalPaise >= current.paidPaise) { "Principal cannot be lower than repayments already recorded." }
+        return updateLoan(
+            loan.copy(
+                paidPaise = current.paidPaise,
+                isSettled = loan.principalPaise == current.paidPaise
+            )
+        ) == 1
+    }
+
     @Query("""SELECT * FROM khata_loans
         WHERE person_name = :personName AND direction = :direction
         AND principal_paise = :principalPaise AND paid_paise = :paidPaise
