@@ -47,7 +47,8 @@ The candidate is stored as a versioned data-only rule. It cannot contain code, r
 
 - Room schema version 5 adds `agent_learning_reports`.
 - Room schema version 6 adds versioned `agent_skills`.
-- Migrations 4→5 and 5→6 are additive. Existing expense, budget, Khata and repayment records are preserved.
+- Room schema version 7 adds bounded role-specific `agent_memories` and structured `agent_messages` handoff history.
+- Migrations 4→5, 5→6 and 6→7 are additive. Existing expense, budget, Khata and repayment records are preserved.
 - Financial amounts remain integer paise. LLM outputs are never used for financial arithmetic or direct writes.
 
 ## Current limitations / next phases
@@ -56,8 +57,9 @@ The candidate is stored as a versioned data-only rule. It cannot contain code, r
 2. **WorkManager is not a five-hour guaranteed reservation.** It runs eligible work when Android permits; the worker is checkpoint-safe at task boundaries but cannot guarantee the full window.
 3. **No neural-weight training occurs.** "Self-improvement" currently means validated, versioned local rules and model-generated review suggestions. It does not fine-tune Qwen or rewrite source code.
 4. **The specialist queue is serialized, not preemptive.** A currently running inference is allowed to finish or time out; a user request cannot interrupt a token already being generated.
-5. **Broader financial planning** (income forecasting, cash-flow runway, debt payoff scenarios, user-defined savings targets and multi-month trend confidence) remains to be implemented and tested.
-6. **Release qualification** still requires the final CI result, APK artifact verification, migration testing on a copy of existing user data, and real-device smoke tests.
+5. **Persistent memory is currently bounded to the latest verified summary per role plus 90 days of handoff history.** Recommendation feedback, longitudinal evaluation and rollback workflows remain to be implemented.
+6. **Broader financial planning** (income forecasting, cash-flow runway, debt payoff scenarios, user-defined savings targets and multi-month trend confidence) remains to be implemented and tested.
+7. **Release qualification** still requires the final CI result, APK artifact verification, migration testing on a copy of existing user data, and real-device smoke tests.
 
 ## Verification policy
 
