@@ -135,7 +135,7 @@ fun AgentLearningSection() {
                         Text(memory.agentRole.replace('_', ' '), fontWeight = FontWeight.SemiBold)
                         Text(memory.memoryValue, style = MaterialTheme.typography.bodySmall)
                         Text(
-                            "Updated \${LocalDate.ofEpochDay(memory.sourceReportEpochDay)} · confidence \${memory.confidencePercent}%",
+                            "Updated ${LocalDate.ofEpochDay(memory.sourceReportEpochDay)} · confidence ${memory.confidencePercent}%",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -155,12 +155,12 @@ fun AgentLearningSection() {
                 ) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            "\${message.fromAgent.replace('_', ' ')} → \${message.toAgent.replace('_', ' ')}",
+                            "${message.fromAgent.replace('_', ' ')} → ${message.toAgent.replace('_', ' ')}",
                             fontWeight = FontWeight.Medium
                         )
                         Text(message.summary, style = MaterialTheme.typography.bodySmall)
                         Text(
-                            "\${message.sessionId} · \${message.messageType}",
+                            "${message.sessionId} · ${message.messageType}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
