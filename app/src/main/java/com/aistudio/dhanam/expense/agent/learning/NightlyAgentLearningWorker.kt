@@ -5,6 +5,7 @@ import android.os.SystemClock
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.aistudio.dhanam.expense.agent.FinancialAnalysisEngine
+import com.aistudio.dhanam.expense.agent.SkillLearningEngine
 import com.aistudio.dhanam.expense.data.AgentLearningReportEntity
 import com.aistudio.dhanam.expense.data.FinanceDatabase
 import com.aistudio.dhanam.expense.domain.MoneyParser
@@ -41,6 +42,31 @@ class NightlyAgentLearningWorker(
             val budgets = db.financeDao().observeBudgetsForMonth(monthStart).first()
             val loans = db.financeDao().observeLoans().first()
             val snapshot = FinancialAnalysisEngine.analyze(expenses, budgets, loans, today)
+            val skillCandidates = SkillLearningEngine.propose(expenses)
+            var newSkillProposals = 0
+            skillCandidates.forEach { candidate ->
+                val latest = db.financeDao().latestAgentSkill(candidate.skillKey)
+                val shouldPropose = latest == null ||
+                    (latest.category != candidate.category && latest.status != "PROPOSED")
+                if (shouldPropose) {
+                    val nextVersion = (latest?.version ?: 0) + 1
+                    val inserted = db.financeDao().insertAgentSkillIfMissing(
+                        com.aistudio.dhanam.expense.data.AgentSkillEntity(
+                            skillKey = candidate.skillKey,
+                            version = nextVersion,
+                            title = candidate.title,
+                            matchText = candidate.matchText,
+                            category = candidate.category,
+                            exampleCount = candidate.exampleCount,
+                            testPassCount = candidate.testPassCount,
+                            testTotalCount = candidate.testTotalCount,
+                            status = "PROPOSED",
+                            createdAtEpochMillis = System.currentTimeMillis()
+                        )
+                    )
+                    if (inserted != -1L) newSkillProposals++
+                }
+            }
 
             val intelligenceSummary = if (snapshot.opportunities.isEmpty()) {
                 "No high-confidence savings review was identified from the available ledger data."
@@ -54,17 +80,24 @@ class NightlyAgentLearningWorker(
                 append("Outstanding lent: ${MoneyParser.formatPaise(snapshot.lentOutstandingPaise)}. ")
                 append("Outstanding borrowed: ${MoneyParser.formatPaise(snapshot.borrowedOutstandingPaise)}.")
             }
-            val skillSummary =
-                "Preparation-only run. No AI skill was learned, tested, activated, or changed. The skill agent is waiting for the background-safe shared model runtime and approval pipeline."
-            val nextImprovements = if (snapshot.opportunities.isEmpty()) {
-                "Collect a longer transaction history; do not infer savings from missing data."
+            val skillSummary = if (newSkillProposals == 0) {
+                "The skill agent tested repeated expense descriptions but found no new category rule that passed leave-one-out validation. No skill was activated."
             } else {
-                "Review the evidence-backed opportunities above, verify each underlying transaction, and test only reversible discretionary changes."
+                "Proposed $newSkillProposals tested exact-description category skill(s). Candidates passed leave-one-out checks against local history. None was activated automatically; user approval is required."
+            }
+            val nextImprovements = buildString {
+                if (snapshot.opportunities.isEmpty()) {
+                    append("Collect a longer transaction history; do not infer savings from missing data. ")
+                } else {
+                    append("Review evidence-backed savings opportunities and test only reversible discretionary changes. ")
+                }
+                if (newSkillProposals > 0) append("Review and approve or reject the proposed category skills in Settings.")
+                else append("Continue collecting consistent transaction descriptions so the skill agent can evaluate them.")
             }
             db.financeDao().upsertAgentLearningReport(
                 AgentLearningReportEntity(
                     reportDateEpochDay = today.toEpochDay(),
-                    runStatus = "PREPARATION_ONLY",
+                    runStatus = "RULE_LEARNING_ONLY",
                     operationsSummary = operationsSummary,
                     intelligenceSummary = intelligenceSummary,
                     skillSummary = skillSummary,
