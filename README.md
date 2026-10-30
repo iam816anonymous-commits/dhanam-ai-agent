@@ -14,6 +14,7 @@ Implemented in the current codebase:
 - A serialized inference gate so the model is never used concurrently by separate agents or interactive chat.
 - Finance Operations, Financial Intelligence and Skill Improvement specialist roles.
 - Nightly WorkManager scheduling between 01:00 and 06:00 local time, subject to Android battery/idle policies.
+- All three agents and the Settings model test console are restricted to model inference during 01:00–06:00 local time; deterministic daytime financial commands and local analysis remain available.
 - Versioned exact-description category skill proposals, leave-one-out validation, explicit user approval and rollback to the previous validated version.
 - Month-scoped helpful/not-useful recommendation feedback, reused as aggregate context in the next nightly intelligence review.
 - Local daily agent reports, role-isolated bounded memories, auditable inter-agent handoffs, a confirmed memory-clear control and skill review in Settings.
