@@ -40,6 +40,7 @@ fun FinanceDataSection() {
     val expenses by db.expenseDao().observeAll().collectAsState(initial = emptyList())
     var message by remember { mutableStateOf<String?>(null) }
     var preview by remember { mutableStateOf<CsvImportPreview?>(null) }
+    var incomePreview by remember { mutableStateOf<com.aistudio.dhanam.expense.data.IncomeCsvImportPreview?>(null) }
     var busy by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
@@ -68,6 +69,31 @@ fun FinanceDataSection() {
             catch (e: Exception) { message = e.message ?: "Ledger export failed." }
         }
     }
+    val incomeExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) scope.launch {
+            try {
+                val text = withContext(Dispatchers.IO) {
+                    FinanceCsvTransfer.exportIncomeCsv(db.financeDao().allIncome())
+                }
+                withContext(Dispatchers.IO) { FinanceCsvTransfer.writeText(context.contentResolver, uri, text) }
+                message = "Exported income records to CSV."
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { message = e.message ?: "Income export failed." }
+        }
+    }
+    val incomeImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            try {
+                busy = true
+                incomePreview = withContext(Dispatchers.IO) {
+                    FinanceCsvTransfer.parseIncomeCsv(FinanceCsvTransfer.readText(context.contentResolver, uri))
+                }
+                message = null
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { message = e.message ?: "Could not read income CSV." }
+            finally { busy = false }
+        }
+    }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
             try {
@@ -93,12 +119,56 @@ fun FinanceDataSection() {
             Button(onClick = { ledgerExportLauncher.launch("dhanam-khata-ledger.csv") }, modifier = Modifier.fillMaxWidth()) {
                 Text("Export full finance ledger (Khata, budgets, income)")
             }
+            Button(onClick = { incomeExportLauncher.launch("dhanam-income.csv") }, modifier = Modifier.fillMaxWidth()) {
+                Text("Export income to CSV")
+            }
+            Button(onClick = { incomeImportLauncher.launch(arrayOf("text/*", "application/csv", "application/vnd.ms-excel")) },
+                enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                Text(if (busy) "Reading CSV…" else "Import income from CSV")
+            }
             Button(onClick = { importLauncher.launch(arrayOf("text/*", "application/csv", "application/vnd.ms-excel")) },
                 enabled = !busy, modifier = Modifier.fillMaxWidth()) {
                 Text(if (busy) "Reading CSV…" else "Import expenses from CSV")
             }
             if (message != null) Text(message.orEmpty(), color = MaterialTheme.colorScheme.primary)
         }
+    }
+
+    incomePreview?.let { result ->
+        AlertDialog(
+            onDismissRequest = { incomePreview = null },
+            title = { Text("Review income CSV import") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("${result.income.size} valid income row(s) ready. Re-importing the same file is idempotent.")
+                    if (result.errors.isNotEmpty()) {
+                        Text("${result.errors.size} row error(s):", color = MaterialTheme.colorScheme.error)
+                        result.errors.take(8).forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
+                        if (result.errors.size > 8) Text("Only the first 8 errors are shown.")
+                        Text("Fix the CSV and import again. No income rows have been added.")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = result.errors.isEmpty() && result.income.isNotEmpty(),
+                    onClick = {
+                        val ready = result
+                        incomePreview = null
+                        scope.launch {
+                            try {
+                                val count = withContext(Dispatchers.IO) {
+                                    db.financeDao().importIncomeSkippingExactDuplicates(ready.income)
+                                }
+                                message = "Imported $count new income record(s); duplicate rows from this file were skipped."
+                            } catch (e: CancellationException) { throw e }
+                            catch (e: Exception) { message = e.message ?: "Income import failed; no partial import was committed." }
+                        }
+                    }
+                ) { Text("Import income") }
+            },
+            dismissButton = { TextButton(onClick = { incomePreview = null }) { Text("Cancel") } }
+        )
     }
 
     preview?.let { result ->
