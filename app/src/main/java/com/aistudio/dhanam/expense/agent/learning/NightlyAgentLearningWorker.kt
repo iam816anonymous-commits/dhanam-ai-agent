@@ -237,6 +237,7 @@ class NightlyAgentLearningWorker(
             db.financeDao().insertAgentMessage(
                 AgentMessageEntity(
                     sessionId = sessionId,
+                    messageKey = "$sessionId:FINANCE_OPERATIONS:FINANCIAL_INTELLIGENCE:LEDGER_REVIEW",
                     fromAgent = "FINANCE_OPERATIONS",
                     toAgent = "FINANCIAL_INTELLIGENCE",
                     messageType = "LEDGER_REVIEW",
@@ -247,6 +248,7 @@ class NightlyAgentLearningWorker(
             db.financeDao().insertAgentMessage(
                 AgentMessageEntity(
                     sessionId = sessionId,
+                    messageKey = "$sessionId:FINANCIAL_INTELLIGENCE:SKILL_IMPROVEMENT:ANALYSIS_HANDOFF",
                     fromAgent = "FINANCIAL_INTELLIGENCE",
                     toAgent = "SKILL_IMPROVEMENT",
                     messageType = "ANALYSIS_HANDOFF",
