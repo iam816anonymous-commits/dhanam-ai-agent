@@ -62,10 +62,10 @@ object ModelCatalog {
             maxProcessPeakBytes = 1536L * MIB
         ),
         ModelSpec(
-            id = "qwen3-0.6b-int4-nothink-1280",
-            displayName = "Qwen3 0.6B · INT4 No-Think",
+            id = "qwen3-0.6b-int8-4096",
+            displayName = "Qwen3 0.6B · INT8",
             tier = ModelTier.COMPACT,
-            fileName = "qwen3_0.6b_nothink_q4_block32_ekv1280.litertlm",
+            fileName = "Qwen3-0.6B.litertlm",
             downloadUrl = "https://huggingface.co/litert-community/Qwen3-0.6B-int4/resolve/6aa2daf8aba4aa456797fb8040b36a3948bcfda7/qwen3_0.6b_nothink_q4_block32_ekv1280.litertlm",
             expectedBytes = 347_251_840L,
             sha256 = "2df6821ec12702dafd33915e7a1a1adc7c4b053f3672fd9555dfaf3a114c4139",
