@@ -33,7 +33,6 @@ import com.aistudio.dhanam.expense.ui.components.FinanceDataSection
 import com.aistudio.dhanam.expense.ui.components.LegacyMigrationSection
 import com.aistudio.dhanam.expense.ui.components.ModelManagerSection
 import com.aistudio.dhanam.expense.model.LocalInferenceViewModel
-import com.aistudio.dhanam.expense.ui.theme.MutedText
 
 @Composable
 fun SettingsScreen(
