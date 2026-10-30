@@ -55,7 +55,7 @@ class ModelDownloader(private val context: Context) {
             connection.connect()
             check(connection.url.protocol.equals("https", ignoreCase = true)) { "The model source redirected away from HTTPS; download rejected." }
             val response = connection.responseCode
-            if (response == HttpURLConnection.HTTP_REQUESTED_RANGE_NOT_SATISFIABLE &&
+            if (response == 416 &&
                 offset == model.expectedBytes && offset > 0L
             ) {
                 val actualSha = digest.digest().joinToString("") { "%02x".format(it) }
