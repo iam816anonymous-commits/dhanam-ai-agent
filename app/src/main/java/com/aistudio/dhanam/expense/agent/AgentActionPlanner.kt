@@ -13,7 +13,7 @@ sealed interface PlannedFinanceAction {
     data class AddExpense(val title: String, val amountPaise: Long, val category: String, val date: LocalDate, val note: String = "") : PlannedFinanceAction {
         override val summary = "Record expense: $title · ${MoneyParser.formatPaise(amountPaise)} · $category · $date"
     }
-    data class AnalyzeSpending(val month: YearMonth = YearMonth.now()) : PlannedFinanceAction {
+    data class AnalyzeSpending(val month: YearMonth = YearMonth.now(), val category: String? = null) : PlannedFinanceAction {
         override val summary = "Analyze recorded spending for $month"
     }
     data class AddIncome(
@@ -112,8 +112,9 @@ object AgentActionPlanner {
         val queryPhrases = listOf(
             "analyze", "analysis", "reduce my spending", "reduce expenses", "save money",
             "save on", "overspend", "spending pattern", "spending trend", "financial summary",
-            "cash flow", "how much did i spend", "what are my biggest expenses",
-            "where is my money going", "how can i save", "how can i reduce",
+            "cash flow", "how much did i spend", "how much have i spent", "what did i spend",
+            "show my expenses", "what are my biggest expenses", "where is my money going",
+            "how can i save", "how can i reduce",
             "how much have i lent", "who owes me", "how much do i owe",
             "khata summary", "lending summary", "outstanding loan"
         )
@@ -123,9 +124,12 @@ object AgentActionPlanner {
         } else {
             YearMonth.now()
         }
+        val category = categories.keys.sortedByDescending { it.length }
+            .firstOrNull { Regex("""\b${Regex.escape(it)}\b""").containsMatchIn(lower) }
+            ?.let { categories[it] }
         return PlannerResult(
-            PlannedFinanceAction.AnalyzeSpending(month),
-            "I'll review your recorded expenses, budgets and Khata balances for $month. This is read-only; no financial records will be changed."
+            PlannedFinanceAction.AnalyzeSpending(month, category),
+            "I'll review your recorded ${category?.lowercase()?.plus(" ") ?: ""}expenses, budgets and Khata balances for $month. This is read-only; no financial records will be changed."
         )
     }
 
