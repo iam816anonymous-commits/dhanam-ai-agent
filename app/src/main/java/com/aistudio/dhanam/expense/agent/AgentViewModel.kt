@@ -369,6 +369,17 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             lines += "No specific spending anomaly was identified in the available records. This does not prove that all spending is necessary."
         }
         lines += "Khata outstanding: lent ${MoneyParser.formatPaise(snapshot.lentOutstandingPaise)}; borrowed ${MoneyParser.formatPaise(snapshot.borrowedOutstandingPaise)}."
+        val openLoans = loans.filter { it.outstandingPaise > 0 }.sortedByDescending { it.outstandingPaise }
+        if (openLoans.isEmpty()) {
+            lines += "No open lending or borrowing records."
+        } else {
+            lines += "Open Khata records:"
+            openLoans.take(5).forEach { loan ->
+                val relation = if (loan.direction == KhataValidator.LENT) "You lent to" else "You borrowed from"
+                val due = loan.dueOnEpochDay?.let { " · due ${LocalDate.ofEpochDay(it)}" }.orEmpty()
+                lines += "• $relation ${loan.personName}: ${MoneyParser.formatPaise(loan.outstandingPaise)} outstanding$due."
+            }
+        }
         lines += "Recorded expense history coverage: ${snapshot.dataCoverageDays} day(s). Recommendations are less reliable when history is sparse."
         return lines.joinToString("\n")
     }
