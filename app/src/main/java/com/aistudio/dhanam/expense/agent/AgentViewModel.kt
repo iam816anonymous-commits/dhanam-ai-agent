@@ -373,13 +373,13 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         }
         val relevantOpportunities = snapshot.opportunities.filter { opportunity ->
             category == null || opportunity.title.contains(category, ignoreCase = true) ||
-                opportunity.description.contains(category, ignoreCase = true) ||
-                opportunity.action.contains(category, ignoreCase = true)
+                opportunity.evidence.contains(category, ignoreCase = true) ||
+                opportunity.suggestedAction.contains(category, ignoreCase = true)
         }
         if (relevantOpportunities.isNotEmpty()) {
             lines += "Potential actions to review:"
             relevantOpportunities.take(5).forEach { opportunity ->
-                lines += "• ${opportunity.title}: ${opportunity.action} Confidence: ${opportunity.confidence.name.lowercase()}. No guaranteed saving amount is assumed."
+                lines += "• ${opportunity.title}: ${opportunity.suggestedAction} Evidence: ${opportunity.evidence} Confidence: ${opportunity.confidence.name.lowercase()}. No guaranteed saving amount is assumed."
             }
         } else {
             lines += if (category == null) {
