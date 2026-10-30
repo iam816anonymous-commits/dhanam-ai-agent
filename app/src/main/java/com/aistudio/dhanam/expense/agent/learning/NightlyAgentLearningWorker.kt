@@ -73,7 +73,7 @@ class NightlyAgentLearningWorker(
                     createdAtEpochMillis = System.currentTimeMillis()
                 )
             )
-            NightlyAgentLearningScheduler.scheduleNext(applicationContext)
+            NightlyAgentLearningScheduler.scheduleNext(applicationContext, forceTomorrow = true)
             Result.success()
         } catch (error: Exception) {
             if (runAttemptCount < 2) Result.retry() else Result.failure()
