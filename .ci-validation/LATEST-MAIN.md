@@ -1,0 +1,1 @@
+Temporary validation marker. This branch is based on the latest main snapshot and exists only to inspect the PR-triggered Android CI run. Do not merge.
