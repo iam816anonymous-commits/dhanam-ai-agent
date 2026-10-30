@@ -13,6 +13,9 @@ sealed interface PlannedFinanceAction {
     data class AddExpense(val title: String, val amountPaise: Long, val category: String, val date: LocalDate, val note: String = "") : PlannedFinanceAction {
         override val summary = "Record expense: $title · ${MoneyParser.formatPaise(amountPaise)} · $category · $date"
     }
+    data class AnalyzeSpending(val month: YearMonth = YearMonth.now()) : PlannedFinanceAction {
+        override val summary = "Analyze recorded spending for $month"
+    }
     data class AddIncome(
         val title: String,
         val amountPaise: Long,
@@ -65,7 +68,7 @@ object AgentActionPlanner {
         val input = text.trim().replace(Regex("""\s+"""), " ").take(1000)
         val lower = input.lowercase()
         if (input.isEmpty() || lower.contains("budget") || lower.contains("repayment") ||
-            parseIncomeCommand(input) != null ||
+            parseIncomeCommand(input) != null || parseFinancialQuery(input) != null ||
             listOf("how much", "what did i spend", "show ", "list ", "history", "what is").any { lower.startsWith(it) }) {
             return parse(text)
         }
@@ -102,6 +105,22 @@ object AgentActionPlanner {
         } catch (error: Exception) {
             PlannerResult(message = error.message ?: "I could not validate this learned expense entry.", needsClarification = true)
         }
+    }
+
+    private fun parseFinancialQuery(input: String): PlannerResult? {
+        val lower = input.lowercase()
+        if (lower.contains("budget")) return null
+        val queryPhrases = listOf(
+            "analyze", "analysis", "reduce my spending", "reduce expenses", "save money",
+            "save on", "overspend", "spending pattern", "spending trend", "financial summary",
+            "cash flow", "how much did i spend", "what are my biggest expenses",
+            "where is my money going", "how can i save", "how can i reduce"
+        )
+        if (queryPhrases.none { lower.contains(it) }) return null
+        return PlannerResult(
+            PlannedFinanceAction.AnalyzeSpending(),
+            "I'll review your recorded expenses, budgets and Khata balances. This is read-only; no financial records will be changed."
+        )
     }
 
     private fun parseIncomeCommand(input: String): PlannerResult? {
@@ -192,6 +211,7 @@ object AgentActionPlanner {
         parseTelugu(input)?.let { return it }
         parseLoanCommand(input)?.let { return it }
         parseIncomeCommand(input)?.let { return it }
+        parseFinancialQuery(input)?.let { return it }
         if (lower.startsWith("i lent") || lower.startsWith("lent ") ||
             lower.startsWith("i borrowed") || lower.startsWith("borrowed ")) {
             return PlannerResult(message = "I can record this in Khata. Specify both the amount and the person's name, for example “I lent 500 to Ravi” or “I borrowed 500 from Ravi”.", needsClarification = true)
