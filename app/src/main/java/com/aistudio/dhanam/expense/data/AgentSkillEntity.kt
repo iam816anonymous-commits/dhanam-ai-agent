@@ -39,6 +39,6 @@ data class AgentSkillEntity(
         require(exampleCount >= 3)
         require(testTotalCount >= 3)
         require(testPassCount in 0..testTotalCount)
-        require(status in setOf("PROPOSED", "ACTIVE", "REJECTED"))
+        require(status in setOf("PROPOSED", "ACTIVE", "REJECTED", "DISABLED"))
     }
 }
