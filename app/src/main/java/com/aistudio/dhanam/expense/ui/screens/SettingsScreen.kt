@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aistudio.dhanam.expense.security.PinSettingsSection
+import com.aistudio.dhanam.expense.agent.learning.AgentLearningSection
 import com.aistudio.dhanam.expense.reminders.FinanceReminderSection
 import com.aistudio.dhanam.expense.ui.components.FinanceDataSection
 import com.aistudio.dhanam.expense.ui.components.LegacyMigrationSection
@@ -39,6 +40,7 @@ fun SettingsScreen(inferenceViewModel: LocalInferenceViewModel) {
         FinanceDataSection()
         LegacyMigrationSection()
         ModelManagerSection(inferenceViewModel = inferenceViewModel)
+        AgentLearningSection()
         PinSettingsSection()
         FinanceReminderSection()
         SettingsInfoCard(
