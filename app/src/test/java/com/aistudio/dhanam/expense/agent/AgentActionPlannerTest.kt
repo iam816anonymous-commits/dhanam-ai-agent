@@ -138,4 +138,24 @@ class AgentActionPlannerTest {
         assertTrue(result.needsClarification)
     }
 
+    @Test fun learnedSkillDoesNotMatchInsideALongerWord() {
+        val skill = AgentSkillEntity(
+            skillKey = "c".repeat(64),
+            version = 1,
+            title = "Category rule: metro card",
+            matchText = "metro card",
+            category = "Transport",
+            exampleCount = 4,
+            testPassCount = 4,
+            testTotalCount = 4,
+            status = "ACTIVE",
+            createdAtEpochMillis = 1L,
+            approvedAtEpochMillis = 2L
+        )
+        val result = AgentActionPlanner.parseWithLearnedSkills("I spent 80 on Metro Cardigan", listOf(skill))
+        val action = result.action as PlannedFinanceAction.AddExpense
+        assertEquals("Other", action.category)
+        assertEquals("Metro Cardigan", action.title)
+    }
+
 }
