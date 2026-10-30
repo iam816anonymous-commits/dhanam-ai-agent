@@ -93,6 +93,8 @@ class NightlyAgentLearningWorker(
             val modelReady = modelWasReady || (minutesLeft >= 10 && modelOwner.loadModelAndAwait())
             var modelInsightSummary = "The verified preferred model was not available or there was insufficient time remaining in the 01:00–06:00 window. Deterministic finance analysis and skill tests still ran."
             var modelSkillSummary = "No model-based skill review was run; no untested skill was activated."
+            var modelInsightCompleted = false
+            var modelAgentTasksCompleted = 0
             var operationsSummaryWithModel = operationsSummary
             if (modelReady && NightlyAgentLearningScheduler.isWithinWindow(java.time.LocalTime.now())) {
                 try {
@@ -102,6 +104,7 @@ class NightlyAgentLearningWorker(
                             AgentTaskPriority.BACKGROUND, requiresNightWindow = true)
                     ).output.take(900)
                     operationsSummaryWithModel += "\n\nOn-device operations review (advisory): $operationsReview"
+                    modelAgentTasksCompleted++
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
@@ -123,20 +126,25 @@ class NightlyAgentLearningWorker(
                         AgentTaskRequest(DhanamAgentRole.FINANCIAL_INTELLIGENCE, financePrompt,
                             AgentTaskPriority.BACKGROUND, requiresNightWindow = true)
                     ).output.take(1_200)
+                    modelInsightCompleted = true
+                    modelAgentTasksCompleted++
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
                     modelInsightSummary = "Model financial explanation not completed: ${error.message ?: "runtime unavailable"}."
                 }
                 try {
-                    val skillEvidence = skillCandidates.take(12).joinToString("\n") {
-                        "${it.matchText} -> ${it.category}; examples=${it.exampleCount}; holdout=${it.testPassCount}/${it.testTotalCount}."
-                    }
-                    val skillPrompt = "Review these already-tested local finance workflow skill candidates. Suggest finance-only improvements or additional tests. Do not approve, activate, or rewrite rules.\n$skillEvidence"
+                    val skillEvidence = skillCandidates
+                        .groupingBy { it.category }
+                        .fold(0) { count, candidate -> count + candidate.exampleCount }
+                        .entries
+                        .joinToString("\n") { "${it.key}: ${it.value} local examples across tested candidate rules." }
+                    val skillPrompt = "Review these aggregate results from already-tested finance-only workflow rules. Suggest safer test cases or validation improvements. Do not ask for raw transaction descriptions, approve, activate, or rewrite rules.\n$skillEvidence"
                     modelSkillSummary = modelOwner.sharedAgentCoordinator.run(
                         AgentTaskRequest(DhanamAgentRole.SKILL_IMPROVEMENT, skillPrompt,
                             AgentTaskPriority.BACKGROUND, requiresNightWindow = true)
                     ).output.take(1_200)
+                    modelAgentTasksCompleted++
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
@@ -144,7 +152,8 @@ class NightlyAgentLearningWorker(
                 }
             }
             val intelligenceSummary = deterministicIntelligence +
-                if (modelReady) "\n\nOn-device model explanation (advisory; verify against the evidence above):\n$modelInsightSummary" else "\n\n$modelInsightSummary"
+                if (modelInsightCompleted) "\n\nOn-device model explanation (advisory; verify against the evidence above):\n$modelInsightSummary"
+                else "\n\n$modelInsightSummary"
 
             val skillSummary = if (newSkillProposals == 0) {
                 "The skill agent tested repeated expense descriptions but found no new category rule that passed leave-one-out validation. No skill was activated. $modelSkillSummary"
@@ -163,7 +172,7 @@ class NightlyAgentLearningWorker(
             db.financeDao().upsertAgentLearningReport(
                 AgentLearningReportEntity(
                     reportDateEpochDay = today.toEpochDay(),
-                    runStatus = if (modelReady) "MODEL_AND_RULE_LEARNING" else "RULE_LEARNING_ONLY",
+                    runStatus = if (modelAgentTasksCompleted > 0) "MODEL_AND_RULE_LEARNING" else "RULE_LEARNING_ONLY",
                     operationsSummary = operationsSummaryWithModel.take(2_000),
                     intelligenceSummary = intelligenceSummary.take(4_000),
                     skillSummary = skillSummary.take(2_000),
