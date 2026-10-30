@@ -34,7 +34,7 @@ A user-facing request is not gated by the nightly window. Background agent tasks
 - The worker rechecks the exact time window before each model task. Each background model call is bounded by the remaining time and a 120-second per-task cap. A completed nightly report is saved after the three specialist stages.
 - WorkManager is best-effort Android background execution, not a guarantee that the phone will execute for five continuous hours. Doze, battery state, OEM restrictions and force-stop can delay or prevent execution. A cancelled or failed run is retried and the next date is rescheduled after the retry limit.
 - The worker first performs deterministic analysis and skill validation. If the preferred model is unavailable, incompatible, not selected or there is insufficient time, the deterministic work still runs and the report says model inference was skipped.
-- Reports are stored locally in Room. The report shows operations checks, financial findings, skill proposals, model status and next improvements.
+- Reports are stored locally in Room. The report shows operations checks, financial findings, skill proposals, model status and next improvements.\n- Room v7 stores one bounded latest memory per role and a 90-day structured inter-agent handoff history. The Settings screen exposes both. Previous memories are passed back as untrusted historical context, never as current financial evidence.
 - Report rows store summaries, not raw model prompts. Skill rules are data-only exact-match mappings.
 
 ## Skill governance
