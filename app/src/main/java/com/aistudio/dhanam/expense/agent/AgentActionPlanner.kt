@@ -15,7 +15,25 @@ sealed interface PlannedFinanceAction {
     data class SetBudget(val category: String, val amountPaise: Long, val month: YearMonth) : PlannedFinanceAction {
         override val summary = "Set ${category} budget to ${MoneyParser.formatPaise(amountPaise)} for ${month}"
     }
-    data class RecordRepayment(val personName: String, val amountPaise: Long, val loanId: Long, val date: LocalDate, val requestId: String) : PlannedFinanceAction {
+    data class AddLoan(
+        val personName: String,
+        val direction: String,
+        val principalPaise: Long,
+        val openedOn: LocalDate,
+        val dueOn: LocalDate? = null,
+        val note: String = "",
+        val phoneNumber: String = ""
+    ) : PlannedFinanceAction {
+        override val summary = if (direction == KhataValidator.LENT) {
+            "Record money lent to $personName · ${MoneyParser.formatPaise(principalPaise)} · $openedOn"
+        } else {
+            "Record money borrowed from $personName · ${MoneyParser.formatPaise(principalPaise)} · $openedOn"
+        }
+    }
+    data class RecordRepayment(
+        val personName: String, val amountPaise: Long, val loanId: Long,
+        val date: LocalDate, val requestId: String, val direction: String = KhataValidator.LENT
+    ) : PlannedFinanceAction {
         override val summary = "Record repayment of ${MoneyParser.formatPaise(amountPaise)} for ${personName} on ${date}"
     }
 }
@@ -75,13 +93,54 @@ object AgentActionPlanner {
         }
     }
 
+    private fun parseLoanCommand(input: String): PlannerResult? {
+        val pattern = Regex("""(?i)^(?:i\\s+)?(lent|loaned|gave|borrowed|took)\\s+(?:₹\\s*)?([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\s+(to|from)\\s+(.+)$""")
+        val match = pattern.matchEntire(input) ?: return null
+        val verb = match.groupValues[1].lowercase()
+        val amount = match.groupValues[2]
+        val preposition = match.groupValues[3].lowercase()
+        val person = match.groupValues[4].trim().trimEnd('.', '!', '?').take(100)
+        val direction = when {
+            verb in setOf("lent", "loaned", "gave") && preposition == "to" -> KhataValidator.LENT
+            verb in setOf("borrowed", "took") && preposition == "from" -> KhataValidator.BORROWED
+            else -> return PlannerResult(
+                message = "Please clarify whether you lent money to this person or borrowed money from them.",
+                needsClarification = true
+            )
+        }
+        return try {
+            val validated = KhataValidator.validate(
+                person, direction, amount, LocalDate.now().toString(), "", "", ""
+            )
+            PlannerResult(
+                PlannedFinanceAction.AddLoan(
+                    personName = validated.personName,
+                    direction = validated.direction,
+                    principalPaise = validated.principalPaise,
+                    openedOn = validated.openedOn,
+                    dueOn = validated.dueOn,
+                    note = validated.note,
+                    phoneNumber = validated.phoneNumber
+                ),
+                "Review this Khata entry before saving."
+            )
+        } catch (error: Exception) {
+            PlannerResult(message = error.message ?: "I could not validate this Khata entry.", needsClarification = true)
+        }
+    }
+
     fun parse(text: String): PlannerResult {
         val input = text.trim().replace(Regex("""\s+"""), " ").take(1000)
         if (input.isEmpty()) return PlannerResult(message = "Tell me what you want to do.")
         val lower = input.lowercase()
         parseTelugu(input)?.let { return it }
+        parseLoanCommand(input)?.let { return it }
+        if (lower.startsWith("i lent") || lower.startsWith("lent ") ||
+            lower.startsWith("i borrowed") || lower.startsWith("borrowed ")) {
+            return PlannerResult(message = "I can record this in Khata. Specify both the amount and the person's name, for example “I lent 500 to Ravi” or “I borrowed 500 from Ravi”.", needsClarification = true)
+        }
         if (lower in setOf("help", "what can you do", "commands")) {
-            return PlannerResult(message = "Try “Lunch 250”, “I spent 250 on lunch”, “paid 120 for bus”, “set food budget to 3000”, or “record repayment 500 from Ravi”. I'll preview every change before saving.")
+            return PlannerResult(message = "Try “Lunch 250”, “I spent 250 on lunch”, “I lent 500 to Ravi”, “I borrowed 300 from Ravi”, “set food budget to 3000”, “record repayment 500 from Ravi”, or “record repayment 300 to Ravi”. I'll preview every change before saving.")
         }
         if (lower.contains("budget")) {
             val amount = amountPattern.findAll(input).lastOrNull()?.groupValues?.get(1)
@@ -273,6 +332,30 @@ object AgentActionPlanner {
                     categoryWord != null && (lower.contains("category") || lower.contains("change") || lower.contains("actually")) ->
                         PlannerResult(action.copy(category = categories.getValue(categoryWord)), "Updated the budget category. Review it before saving.")
                     else -> null
+                }
+                is PlannedFinanceAction.AddLoan -> {
+                    val personMatch = Regex("""(?i)(?:to|from|person)\\s+(.+)$""").find(input)
+                    when {
+                        amountIntent && amountMatch != null -> {
+                            val validated = KhataValidator.validate(
+                                action.personName, action.direction, amountMatch.groupValues[1],
+                                action.openedOn.toString(), action.dueOn?.toString().orEmpty(),
+                                action.note, action.phoneNumber
+                            )
+                            PlannerResult(action.copy(principalPaise = validated.principalPaise), "Updated the Khata amount. Review it before saving.")
+                        }
+                        personMatch != null -> {
+                            val validated = KhataValidator.validate(
+                                personMatch.groupValues[1].trim().trimEnd('.', '!', '?'),
+                                action.direction,
+                                java.math.BigDecimal.valueOf(action.principalPaise, 2).toPlainString(),
+                                action.openedOn.toString(), action.dueOn?.toString().orEmpty(),
+                                action.note, action.phoneNumber
+                            )
+                            PlannerResult(action.copy(personName = validated.personName), "Updated the Khata person. Review it before saving.")
+                        }
+                        else -> null
+                    }
                 }
                 is PlannedFinanceAction.RecordRepayment -> if (amountIntent && amountMatch != null) {
                     PlannerResult(
