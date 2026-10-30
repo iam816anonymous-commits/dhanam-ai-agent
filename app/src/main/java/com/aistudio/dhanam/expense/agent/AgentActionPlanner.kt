@@ -213,7 +213,7 @@ object AgentActionPlanner {
             }
         }
         if (listOf("how much", "what did i spend", "show ", "list ", "history", "total spent", "remaining budget").any { lower.startsWith(it) }) {
-            return PlannerResult(message = "That sounds like a question about your existing records. Open Insights for saved totals, or ask me a more specific question.", needsClarification = true)
+            return PlannerResult(message = "That sounds like a question about your saved financial records. Open Insights for recorded income, spending and budgets, or ask me a more specific question.", needsClarification = true)
         }
         if (lower.contains("repayment") || lower.contains("pay back") || lower.contains("paid back") ||
             lower.contains("returned") || lower.contains("చెల్లించాడు") || lower.contains("తిరిగి ఇచ్చాడు")) {
