@@ -3,17 +3,20 @@ package com.aistudio.dhanam.expense.data
 import android.content.ContentResolver
 import android.net.Uri
 import com.aistudio.dhanam.expense.domain.ExpenseInputValidator
+import com.aistudio.dhanam.expense.domain.IncomeInputValidator
 import java.nio.charset.StandardCharsets
 import java.time.LocalDate
 import java.security.MessageDigest
 
 data class CsvImportPreview(val expenses: List<ExpenseEntity>, val errors: List<String>)
+data class IncomeCsvImportPreview(val income: List<IncomeEntity>, val errors: List<String>)
 
 object FinanceCsvTransfer {
     private const val MAX_BYTES = 10 * 1024 * 1024
     private const val MAX_ROWS = 50_000
     private val header = listOf("description", "amount_rupees", "category", "date", "note", "payment_mode", "detected_language")
     private val legacyHeader = header.take(5)
+    private val incomeHeader = listOf("description", "amount_rupees", "category", "date", "note")
 
     fun exportCsv(expenses: List<ExpenseEntity>): String = buildString {
         append(header.joinToString(",")).append("\r\n")
@@ -24,6 +27,54 @@ object FinanceCsvTransfer {
                 expense.paymentMode, expense.detectedLanguage)
             append(values.joinToString(",") { escape(it) }).append("\r\n")
         }
+    }
+
+    fun exportIncomeCsv(income: List<IncomeEntity>): String = buildString {
+        append(incomeHeader.joinToString(",")).append("\r\n")
+        income.forEach { record ->
+            val amount = "%d.%02d".format(java.util.Locale.ROOT, record.amountPaise / 100, record.amountPaise % 100)
+            val values = listOf(record.title, amount, record.category,
+                LocalDate.ofEpochDay(record.occurredOnEpochDay).toString(), record.note)
+            append(values.joinToString(",") { escape(it) }).append("\r\n")
+        }
+    }
+
+    fun parseIncomeCsv(text: String, nowMillis: Long = System.currentTimeMillis()): IncomeCsvImportPreview {
+        require(text.toByteArray(StandardCharsets.UTF_8).size <= MAX_BYTES) { "CSV is larger than the 10 MB import limit." }
+        val normalizedText = text.removePrefix("\uFEFF")
+        val rows = parseRows(normalizedText)
+        require(rows.isNotEmpty()) { "CSV file is empty." }
+        val normalizedHeader = rows.first().map { it.trim().lowercase() }
+        require(normalizedHeader == incomeHeader) {
+            "Income CSV headers must be: ${incomeHeader.joinToString(", ")}."
+        }
+        require(rows.size - 1 <= MAX_ROWS) { "CSV contains too many rows. Limit: ${MAX_ROWS}." }
+        val parsed = mutableListOf<IncomeEntity>()
+        val errors = mutableListOf<String>()
+        val sourceHash = MessageDigest.getInstance("SHA-256")
+            .digest(normalizedText.toByteArray(StandardCharsets.UTF_8)).joinToString("") { "%02x".format(it) }
+        rows.drop(1).forEachIndexed { index, row ->
+            if (row.size != incomeHeader.size) {
+                errors += "Row ${index + 2}: expected ${incomeHeader.size} columns."
+            } else {
+                try {
+                    val valid = IncomeInputValidator.validate(row[0], row[1], row[2], row[3], row[4])
+                    parsed += IncomeEntity(
+                        title = valid.title,
+                        amountPaise = valid.amountPaise,
+                        category = valid.category,
+                        occurredOnEpochDay = valid.occurredOn.toEpochDay(),
+                        note = valid.note,
+                        createdAtEpochMillis = nowMillis,
+                        updatedAtEpochMillis = nowMillis,
+                        sourceRecordKey = "income-csv:$sourceHash:${index + 2}"
+                    )
+                } catch (error: Exception) {
+                    errors += "Row ${index + 2}: ${error.message ?: "invalid income record"}"
+                }
+            }
+        }
+        return IncomeCsvImportPreview(parsed, errors)
     }
 
     fun parseCsv(text: String, nowMillis: Long = System.currentTimeMillis()): CsvImportPreview {
