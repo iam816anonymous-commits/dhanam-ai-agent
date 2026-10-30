@@ -11,6 +11,7 @@ Implemented in the current codebase:
 - Integer-paise calculations and deterministic ledger-backed insights.
 - Monthly/category spending movement, income-versus-expense cash-flow summaries, budget-overrun checks, recurring-expense candidates and Khata outstanding analysis. The finance agent can answer read-only spending-reduction and lending-summary questions directly from the local ledger.
 - One process-wide LiteRT-LM model owner shared by the UI and all three specialist agents.
+- Six opt-in LiteRT-LM model artifacts across three tiers: Compact (SmolLM2 360M, Qwen3 0.6B), Balanced (Qwen3 1.7B, Qwen2.5 1.5B), and Advanced (Qwen3 4B, Phi-4 Mini Reasoning). Every entry pins an artifact revision, exact byte length and SHA-256.
 - A serialized inference gate so the model is never used concurrently by separate agents or interactive chat.
 - Finance Operations, Financial Intelligence and Skill Improvement specialist roles.
 - Nightly WorkManager scheduling between 01:00 and 06:00 local time, subject to Android battery/idle policies.
@@ -21,6 +22,10 @@ Implemented in the current codebase:
 - Income records are stored separately from expenses, included in monthly cash-flow summaries and nightly agent analysis, can be created through the finance agent, and support previewed, idempotent CSV import/export.
 
 This is an implementation milestone, not a claim of release completion. Physical-device qualification, remaining finance-parity items and extended migration/security tests are still required.
+
+## Model resource checks
+
+The model manager shows every model in its tier, with independent download and run-now eligibility. Downloads require sufficient Android-reported physical RAM and free app storage; loading additionally requires enough currently available system RAM. RAM expansion/swap is not counted as physical RAM. The app reports Android's detected total RAM, current available RAM and free app storage. These are conservative estimates, not a substitute for device-specific peak-RSS and thermal testing. Phi-4 Mini Reasoning uses a fresh one-turn conversation after each answer because its publisher documents a LiteRT-LM 0.18.x multi-turn cache issue.
 
 ## Agent boundaries
 
