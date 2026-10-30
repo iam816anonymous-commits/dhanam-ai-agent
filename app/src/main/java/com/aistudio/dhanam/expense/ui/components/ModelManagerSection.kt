@@ -75,8 +75,8 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
                         )
                         Text(
                             if (runtimeCheck == null) "Run now: checking…"
-                            else if (runtimeCheck.allowed) "Run now: current RAM and storage checks pass"
-                            else "Run now: ${runtimeCheck.reasons.joinToString(" ")}",
+                            else if (runtimeCheck.allowed) "Device memory: load-eligible"
+                            else "Device memory: load blocked · ${runtimeCheck.reasons.joinToString(" ")}",
                             color = if (runtimeCheck?.allowed == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -96,7 +96,7 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
             }
         }
         Text(
-            "Download eligibility checks physical RAM and storage. Run-now eligibility also checks current free RAM. Android memory expansion/swap is not treated as physical RAM. A model switch is disabled while inference is loaded or running.",
+            "Download eligibility checks physical RAM and storage. Device memory readiness also checks current free RAM; it is separate from the 01:00–06:00 model-inference window. Android memory expansion/swap is not treated as physical RAM. A model switch is disabled while inference is loaded or running.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
