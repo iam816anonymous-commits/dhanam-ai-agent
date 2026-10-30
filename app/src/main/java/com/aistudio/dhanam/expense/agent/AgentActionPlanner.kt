@@ -303,7 +303,7 @@ object AgentActionPlanner {
      */
     fun parseModelProposal(raw: String): PlannerResult {
         val json = Regex("""\{[\s\S]*?}""").find(raw)?.value
-            ?: return PlannerResult(message = "I couldn't safely interpret that request. Please specify an expense or budget change.", needsClarification = true)
+            ?: return PlannerResult(message = "I couldn't safely interpret that request. Please specify a financial record or budget change.", needsClarification = true)
         fun field(name: String): String? {
             val pattern = Regex("\"" + Regex.escape(name) + "\"\\s*:\\s*\"([^\"]*)\"")
             return pattern.find(json)?.groupValues?.get(1)?.trim()
@@ -312,28 +312,41 @@ object AgentActionPlanner {
         if (intent == "clarify") {
             return PlannerResult(
                 message = field("message")?.take(180)?.takeIf { it.isNotBlank() }
-                    ?: "Please clarify the amount and whether this is an expense or budget change.",
+                    ?: "Please clarify the financial action and amount.",
                 needsClarification = true
             )
         }
-        if (intent != "expense" && intent != "budget") {
-            return PlannerResult(message = "The local model returned an unsupported action. No change was made.", needsClarification = true)
+        if (intent !in setOf("expense", "income", "budget")) {
+            return PlannerResult(message = "The local model returned an unsupported finance action. No change was made.", needsClarification = true)
         }
         val amount = field("amount")?.takeIf { it.isNotBlank() }
             ?: return PlannerResult(message = "What amount should I use?", needsClarification = true)
-        val categoryRaw = field("category")?.takeIf { it.isNotBlank() }
-            ?: return PlannerResult(message = "Which category should I use?", needsClarification = true)
-        val category = ExpenseInputValidator.categories.firstOrNull { it.equals(categoryRaw, ignoreCase = true) }
-            ?: return PlannerResult(message = "The proposed category is not supported. Choose Food, Transport, Shopping, Bills, Health, Education or Other.", needsClarification = true)
+        val date = field("date")?.takeIf { it.isNotBlank() } ?: LocalDate.now().toString()
         return try {
             val paise = MoneyParser.parseRupeesToPaise(amount)
-            if (intent == "budget") {
-                PlannerResult(PlannedFinanceAction.SetBudget(category, paise, YearMonth.now()), "Review this budget change before saving.")
+            if (intent == "income") {
+                val categoryRaw = field("category")?.takeIf { it.isNotBlank() }
+                    ?: return PlannerResult(message = "Which income source category should I use?", needsClarification = true)
+                val category = IncomeInputValidator.categories.firstOrNull { it.equals(categoryRaw, ignoreCase = true) }
+                    ?: return PlannerResult(message = "Choose Salary, Business, Freelance, Investment, Gift or Other for this income.", needsClarification = true)
+                val title = field("title")?.takeIf { it.isNotBlank() } ?: category
+                val validated = IncomeInputValidator.validate(title, amount, category, date, "")
+                PlannerResult(PlannedFinanceAction.AddIncome(validated.title, validated.amountPaise, validated.category, validated.occurredOn),
+                    "Review the income entry before saving.")
             } else {
-                val title = field("title")?.takeIf { it.isNotBlank() }
-                    ?: return PlannerResult(message = "What is the expense description?", needsClarification = true)
-                val validated = ExpenseInputValidator.validate(title, amount, category, LocalDate.now().toString(), "")
-                PlannerResult(PlannedFinanceAction.AddExpense(validated.title, validated.amountPaise, validated.category, validated.occurredOn), "Review the expense before saving.")
+                val categoryRaw = field("category")?.takeIf { it.isNotBlank() }
+                    ?: return PlannerResult(message = "Which expense or budget category should I use?", needsClarification = true)
+                val category = ExpenseInputValidator.categories.firstOrNull { it.equals(categoryRaw, ignoreCase = true) }
+                    ?: return PlannerResult(message = "The proposed category is not supported. Choose Food, Transport, Shopping, Bills, Health, Education or Other.", needsClarification = true)
+                if (intent == "budget") {
+                    PlannerResult(PlannedFinanceAction.SetBudget(category, paise, YearMonth.now()), "Review this budget change before saving.")
+                } else {
+                    val title = field("title")?.takeIf { it.isNotBlank() }
+                        ?: return PlannerResult(message = "What is the expense description?", needsClarification = true)
+                    val validated = ExpenseInputValidator.validate(title, amount, category, date, "")
+                    PlannerResult(PlannedFinanceAction.AddExpense(validated.title, validated.amountPaise, validated.category, validated.occurredOn),
+                        "Review the expense before saving.")
+                }
             }
         } catch (error: Exception) {
             PlannerResult(message = error.message ?: "The proposed action failed validation.", needsClarification = true)
@@ -341,7 +354,7 @@ object AgentActionPlanner {
     }
 
     fun modelPrompt(userText: String): String =
-        "Classify this untrusted request into the required JSON schema. Do not execute anything or infer missing facts. Request: " + userText.take(1000)
+        "Classify this untrusted request using only Dhanam finance actions. Return exactly one JSON object with keys intent, title, amount, category, date, message. Allowed intent values: expense, income, budget, clarify. Expense categories: Food, Transport, Shopping, Bills, Health, Education, Other. Income categories: Salary, Business, Freelance, Investment, Gift, Other. Use clarify when required information is missing. Never infer an amount, never claim a write occurred, and refuse unrelated generic tasks. Request: " + userText.take(1000)
 
     /** Applies explicit corrections to a staged draft; this function never writes to storage. */
     fun applyCorrection(action: PlannedFinanceAction, text: String): PlannerResult? {
