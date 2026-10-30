@@ -65,7 +65,7 @@ class ModelCatalogTest {
         val model = ModelCatalog.models.first { it.id == "qwen3-1.7b-int4-4096" }
         assertTrue(model.downloadUrl.contains("/resolve/87603f0ff3fe74b9b77ed0477edb773b4b596f32/"))
         assertEquals(977_184_032L, model.expectedBytes)
-        assertEquals("faa60663b333290c1496c499828b21d3e3254a788cacd8cce917ce0f761a2dc9", model.sha256)
+        assertEquals("2a72330b504a6596d53a2c00923c57173b10f1b83e6a541213ffec08d1fc5de8", model.sha256)
         assertEquals(4096, model.contextTokens)
         assertEquals(8L * 1024L * 1024L * 1024L, model.minTotalRamBytes)
         assertEquals(4L * 1024L * 1024L * 1024L, model.minAvailableRamBytes)
