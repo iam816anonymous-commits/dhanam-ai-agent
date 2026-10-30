@@ -38,6 +38,7 @@ import java.util.UUID
 fun KhataScreen(viewModel: KhataViewModel = viewModel()) {
     val loans by viewModel.loans.collectAsState()
     val message by viewModel.message.collectAsState()
+    var editingLoanId by remember { mutableStateOf<Long?>(null) }
     var person by remember { mutableStateOf("") }
     var direction by remember { mutableStateOf(KhataValidator.LENT) }
     var amount by remember { mutableStateOf("") }
@@ -59,7 +60,7 @@ fun KhataScreen(viewModel: KhataViewModel = viewModel()) {
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("New Khata record", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text(if (editingLoanId == null) "New Khata record" else "Edit Khata record", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                 OutlinedTextField(person, { person = it }, label = { Text("Person's name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(direction == KhataValidator.LENT, { direction = KhataValidator.LENT }, label = { Text("I lent money") })
@@ -70,8 +71,25 @@ fun KhataScreen(viewModel: KhataViewModel = viewModel()) {
                 OutlinedTextField(due, { due = it }, label = { Text("Due date (optional, YYYY-MM-DD)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(phoneNumber, { phoneNumber = it }, label = { Text("Phone (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(note, { note = it }, label = { Text("Note (optional)") }, modifier = Modifier.fillMaxWidth())
-                Button(onClick = { viewModel.addLoan(person, direction, amount, opened, due, note, phoneNumber) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Save Khata record")
+                Button(onClick = {
+                    val id = editingLoanId
+                    if (id == null) viewModel.addLoan(person, direction, amount, opened, due, note, phoneNumber)
+                    else viewModel.updateLoan(id, person, direction, amount, opened, due, note, phoneNumber)
+                }, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (editingLoanId == null) "Save Khata record" else "Update Khata record")
+                }
+                if (editingLoanId != null) {
+                    TextButton(onClick = {
+                        editingLoanId = null
+                        person = ""
+                        direction = KhataValidator.LENT
+                        amount = ""
+                        opened = LocalDate.now().toString()
+                        due = ""
+                        note = ""
+                        phoneNumber = ""
+                        viewModel.clearMessage()
+                    }) { Text("Cancel edit") }
                 }
             }
         }
@@ -86,6 +104,17 @@ fun KhataScreen(viewModel: KhataViewModel = viewModel()) {
                 KhataLoanCard(
                     loan = loan,
                     viewModel = viewModel,
+                    onEdit = {
+                        editingLoanId = loan.id
+                        person = loan.personName
+                        direction = loan.direction
+                        amount = "%d.%02d".format(loan.principalPaise / 100, loan.principalPaise % 100)
+                        opened = LocalDate.ofEpochDay(loan.openedOnEpochDay).toString()
+                        due = loan.dueOnEpochDay?.let { LocalDate.ofEpochDay(it).toString() }.orEmpty()
+                        note = loan.note
+                        phoneNumber = loan.phoneNumber
+                        viewModel.clearMessage()
+                    },
                     onRepay = {
                         repaymentFor = loan
                         repaymentAmount = ""
@@ -133,6 +162,7 @@ fun KhataScreen(viewModel: KhataViewModel = viewModel()) {
 private fun KhataLoanCard(
     loan: KhataLoanEntity,
     viewModel: KhataViewModel,
+    onEdit: () -> Unit,
     onRepay: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -152,6 +182,7 @@ private fun KhataLoanCard(
             if (loan.phoneNumber.isNotBlank()) Text("Phone: ${loan.phoneNumber}", style = MaterialTheme.typography.bodySmall)
             if (loan.note.isNotBlank()) Text(loan.note, style = MaterialTheme.typography.bodySmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onEdit) { Text("Edit") }
                 Button(onClick = onRepay, enabled = loan.outstandingPaise > 0) { Text("Record repayment") }
                 TextButton(onClick = onDelete) { Text("Delete") }
             }
