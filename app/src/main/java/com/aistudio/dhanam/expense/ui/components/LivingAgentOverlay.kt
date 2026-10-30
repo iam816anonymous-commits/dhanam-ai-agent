@@ -6,17 +6,17 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -25,16 +25,20 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.aistudio.dhanam.expense.ui.AppDestination
+import com.aistudio.dhanam.expense.ui.components.JarvisCoreState
+import com.aistudio.dhanam.expense.ui.components.JarvisLivingCore
 
 /**
  * In-app floating assistant. It is composed above the NavHost, so it remains available
@@ -49,6 +53,8 @@ fun LivingAgentOverlay(
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
     val transition = rememberInfiniteTransition(label = "living-agent")
     val bob by transition.animateFloat(
         initialValue = -3f,
@@ -67,7 +73,7 @@ fun LivingAgentOverlay(
     )
 
     Column(
-        modifier = modifier,
+        modifier = modifier.offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) },
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -129,22 +135,29 @@ fun LivingAgentOverlay(
         androidx.compose.foundation.layout.Box(
             modifier = Modifier
                 .padding(4.dp)
-                .size(62.dp)
+                .size(68.dp)
                 .graphicsLayer { translationY = bob }
                 .scale(pulse)
                 .shadow(12.dp, CircleShape)
-                .background(
-                    Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)),
-                    CircleShape
-                )
+                .pointerInput(Unit) {
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        offsetX += dragAmount.x
+                        offsetY += dragAmount.y
+                    }
+                }
                 .clickable { expanded = !expanded },
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                Icons.Default.AutoAwesome,
-                contentDescription = if (expanded) "Close Dhanam assistant menu" else "Open Dhanam living assistant",
-                tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(28.dp)
+            JarvisLivingCore(
+                state = when (activity) {
+                    "thinking", "analyzing" -> JarvisCoreState.THINKING
+                    "acting" -> JarvisCoreState.PROCESSING
+                    "awaiting_confirmation" -> JarvisCoreState.NOTING
+                    "complete" -> JarvisCoreState.SPEAKING
+                    else -> JarvisCoreState.IDLE
+                },
+                coreSize = 62.dp
             )
         }
     }
