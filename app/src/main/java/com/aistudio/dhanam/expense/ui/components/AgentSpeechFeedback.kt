@@ -49,9 +49,11 @@ fun AgentSpeechFeedback(
         }
         if (!initialized || lastSpokenId == messageId) return@LaunchedEffect
 
+        // Speak the script actually returned by the assistant. Never send English text
+        // through a Telugu/Hindi voice merely because that is the selected input language.
         val locale = when {
-            languageTag.startsWith("te", ignoreCase = true) -> Locale("te", "IN")
-            languageTag.startsWith("hi", ignoreCase = true) -> Locale("hi", "IN")
+            message.any { it in '\u0C00'..'\u0C7F' } -> Locale("te", "IN")
+            message.any { it in '\u0900'..'\u097F' } -> Locale("hi", "IN")
             else -> Locale("en", "IN")
         }
         val availability = engine.isLanguageAvailable(locale)
