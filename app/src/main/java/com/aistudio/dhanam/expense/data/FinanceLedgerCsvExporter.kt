@@ -2,7 +2,7 @@ package com.aistudio.dhanam.expense.data
 
 import java.time.LocalDate
 
-/** CSV export for Khata loans, repayment ledger rows and budgets; values remain exact paise-to-rupee decimals. */
+/** Full ledger CSV export for Khata loans, repayments, budgets and income; money remains exact paise-to-rupee decimals. */
 object FinanceLedgerCsvExporter {
     fun export(
         loans: List<KhataLoanEntity>,
