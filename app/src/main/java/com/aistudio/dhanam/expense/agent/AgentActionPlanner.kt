@@ -227,13 +227,13 @@ object AgentActionPlanner {
             return PlannerResult(message = "I can record this in Khata. Specify both the amount and the person's name, for example “I lent 500 to Ravi” or “I borrowed 500 from Ravi”.", needsClarification = true)
         }
         if (lower in setOf("help", "what can you do", "commands")) {
-            return PlannerResult(message = "Try “Lunch 250”, “I spent 250 on lunch”, “salary 50000”, “I lent 500 to Ravi”, “I borrowed 300 from Ravi”, “set food budget to 3000”, “record repayment 500 from Ravi”, or “record repayment 300 to Ravi”. I'll preview every change before saving.")
+            return PlannerResult(message = "Try “Lunch 250”, “I spent 250 on lunch”, “salary 50000”, “I lent 500 to Ravi”, “I borrowed 300 from Ravi”, “set food budget to 3000”, “record repayment 500 from Ravi”, or “record repayment 300 to Ravi”. Ask “How can I reduce my expenses?” or “who owes me money?” for a read-only financial review. I'll preview every financial change before saving.")
         }
         if (lower.contains("budget")) {
             val amount = amountPattern.findAll(input).lastOrNull()?.groupValues?.get(1)
                 ?: return PlannerResult(message = "What amount should the budget be?", needsClarification = true)
             val categoryWord = categories.keys.sortedByDescending { it.length }
-                .firstOrNull { Regex("\b" + Regex.escape(it) + "\b").containsMatchIn(lower) }
+                .firstOrNull { Regex("\\b" + Regex.escape(it) + "\\b").containsMatchIn(lower) }
                 ?: return PlannerResult(message = "Which category is this budget for? Choose Food, Transport, Shopping, Bills, Health, Education or Other.", needsClarification = true)
             return try {
                 val paise = MoneyParser.parseRupeesToPaise(amount)
@@ -253,7 +253,7 @@ object AgentActionPlanner {
         val amountMatch = amountPattern.findAll(input).firstOrNull()
             ?: return PlannerResult(message = "I couldn't find an amount. Try “I spent 250 on lunch” or “Lunch 250”.", needsClarification = true)
         val categoryWord = categories.keys.sortedByDescending { it.length }
-            .firstOrNull { Regex("\b" + Regex.escape(it) + "\b").containsMatchIn(lower) }
+            .firstOrNull { Regex("\\b" + Regex.escape(it) + "\\b").containsMatchIn(lower) }
         val hasExpenseVerb = listOf(
             "spent", "spend", "expense", "bought", "buy", "paid", "purchase", "purchased",
             "add", "record", "log", "note", "cost", "ఖర్చు", "కొన్న", "చెల్లించ"
