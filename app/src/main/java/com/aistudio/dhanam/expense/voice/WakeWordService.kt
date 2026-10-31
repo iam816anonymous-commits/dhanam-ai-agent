@@ -208,9 +208,8 @@ class WakeWordService : Service() {
             .setStyle(NotificationCompat.BigTextStyle().bigText("Recognized: $transcript\nTap to review it in Dhanam. No financial changes are saved automatically."))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
-            .setOngoing(true)
             .build()
-        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification)
+        getSystemService(NotificationManager::class.java).notify(COMMAND_NOTIFICATION_ID, notification)
     }
 
     private fun finishUtteranceAndRearm() {
@@ -294,6 +293,7 @@ class WakeWordService : Service() {
         const val EXTRA_LANGUAGE = "voice_language"
         const val PREFS = "dhanam_wake_word"
         const val KEY_ENABLED = "enabled"
+        const val COMMAND_NOTIFICATION_ID = 7042
         private const val CHANNEL_ID = "dhanam_hey_jarvis"
         private const val NOTIFICATION_ID = 7041
         private const val REARM_DELAY_MS = 1200L
