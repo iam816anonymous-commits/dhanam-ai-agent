@@ -42,6 +42,7 @@ import com.aistudio.dhanam.expense.voice.WakeCommandBus
 import com.aistudio.dhanam.expense.voice.WakeWordService
 import com.aistudio.dhanam.expense.voice.VoiceCommandRouter
 import com.aistudio.dhanam.expense.ui.components.VoiceTranslationEngine
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -130,6 +131,8 @@ fun DhanamApp(
                     command.languageTag
                 )
                 handleVoiceText(command.transcript, translation.normalizedText)
+            } catch (error: CancellationException) {
+                throw error
             } catch (error: Exception) {
                 if (command.languageTag.startsWith("en", ignoreCase = true)) {
                     handleVoiceText(command.transcript, command.transcript)
