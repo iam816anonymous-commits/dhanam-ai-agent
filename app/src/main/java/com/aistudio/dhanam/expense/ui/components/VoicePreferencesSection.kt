@@ -102,12 +102,12 @@ fun VoicePreferencesSection() {
                 }
             }
             Text(
-                "Microphone permission: \${if (permissionGranted) "Granted" else "Not granted"}",
+                "Microphone permission: " + (if (permissionGranted) "Granted" else "Not granted"),
                 color = if (permissionGranted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
-                "Speech service: \${if (recognitionAvailable) "Available" else "Not found"}",
+                "Speech service: " + (if (recognitionAvailable) "Available" else "Not found"),
                 color = if (recognitionAvailable) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyMedium
             )

@@ -384,6 +384,8 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 _state.value = _state.value.copy(pendingAction = null, activity = "complete", status = "Action verified against the local database.", undoDescription = lastUndoAction?.description)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 _state.value = _state.value.copy(activity = "error", status = e.message ?: "Action failed. No success is claimed.")
                 appendAssistant(e.message ?: "The action failed. Check the record before retrying.")

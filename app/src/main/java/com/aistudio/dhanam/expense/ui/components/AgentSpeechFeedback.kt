@@ -11,10 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import java.util.Locale
 
-/**
- * Optional local TTS for assistant replies. It is not initialized until the user enables
- * voice feedback, and it never sends text to a remote service.
- */
+/** Optional local TTS. The engine exists only while enabled and is shut down with the composition. */
 @Composable
 fun AgentSpeechFeedback(
     messageId: String?,
@@ -22,25 +19,28 @@ fun AgentSpeechFeedback(
     enabled: Boolean
 ) {
     val context = LocalContext.current
-    var initialized by remember { mutableStateOf(false) }
+    var engine by remember(context) { mutableStateOf<TextToSpeech?>(null) }
+    var initialized by remember(context) { mutableStateOf(false) }
     var lastSpokenId by remember { mutableStateOf<String?>(null) }
-    val engine = remember(context, enabled) {
-        initialized = false
-        if (enabled) {
-            TextToSpeech(context.applicationContext) { result ->
-                initialized = result == TextToSpeech.SUCCESS
-            }
-        } else {
-            null
-        }
-    }
 
-    DisposableEffect(engine) {
-        onDispose {
-            try {
-                engine?.stop()
-                engine?.shutdown()
-            } catch (_: Exception) {
+    DisposableEffect(context, enabled) {
+        if (!enabled) {
+            engine = null
+            initialized = false
+            onDispose { }
+        } else {
+            var disposed = false
+            val instance = TextToSpeech(context.applicationContext) { result ->
+                if (!disposed) initialized = result == TextToSpeech.SUCCESS
+            }
+            engine = instance
+            initialized = false
+            onDispose {
+                disposed = true
+                engine = null
+                initialized = false
+                try { instance.stop() } catch (_: Exception) { }
+                try { instance.shutdown() } catch (_: Exception) { }
             }
         }
     }
@@ -51,24 +51,24 @@ fun AgentSpeechFeedback(
             lastSpokenId = messageId
             return@LaunchedEffect
         }
-        if (engine == null || !initialized || lastSpokenId == messageId) return@LaunchedEffect
+        val activeEngine = engine
+        if (activeEngine == null || !initialized || lastSpokenId == messageId) return@LaunchedEffect
         if (lastSpokenId == null && message.startsWith("Hi, I'm Dhanam.")) {
             lastSpokenId = messageId
             return@LaunchedEffect
         }
 
-        // Speak the script actually returned by the assistant. Never send English text
-        // through a Telugu/Hindi voice merely because that is the selected input language.
         val locale = when {
             message.any { it in '\u0C00'..'\u0C7F' } -> Locale("te", "IN")
             message.any { it in '\u0900'..'\u097F' } -> Locale("hi", "IN")
             else -> Locale("en", "IN")
         }
-        val availability = engine.isLanguageAvailable(locale)
-        if (availability < TextToSpeech.LANG_AVAILABLE) return@LaunchedEffect
-
-        engine.language = locale
-        engine.speak(message.take(1200), TextToSpeech.QUEUE_FLUSH, null, messageId)
-        lastSpokenId = messageId
+        if (activeEngine.isLanguageAvailable(locale) < TextToSpeech.LANG_AVAILABLE) {
+            lastSpokenId = messageId
+            return@LaunchedEffect
+        }
+        activeEngine.language = locale
+        val result = activeEngine.speak(message.take(1200), TextToSpeech.QUEUE_FLUSH, null, messageId)
+        if (result == TextToSpeech.SUCCESS) lastSpokenId = messageId
     }
 }
