@@ -14,5 +14,5 @@ fun OfflineVoiceInput(
     showStatus: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    AgentVoiceControl(enabled = enabled, onRecognized = onRecognized, modifier = modifier)
+    AgentVoiceControl(enabled = enabled, onRecognized = { _, translated -> onRecognized(translated) }, modifier = modifier)
 }

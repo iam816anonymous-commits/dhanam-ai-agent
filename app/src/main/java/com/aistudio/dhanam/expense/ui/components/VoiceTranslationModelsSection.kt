@@ -22,8 +22,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.google.android.gms.tasks.Tasks
-import com.google.mlkit.nl.translate.DownloadConditions
-import com.google.mlkit.nl.translate.RemoteModelManager
+import com.google.mlkit.common.model.DownloadConditions
+import com.google.mlkit.common.model.RemoteModelManager
 import com.google.mlkit.nl.translate.TranslateRemoteModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

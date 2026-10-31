@@ -328,7 +328,7 @@ fun AgentVoiceControl(
                         status = "Identifying language and translating on-device…"
                         translationScope.launch {
                             try {
-                                val result = VoiceTranslationEngine.translateToEnglish(context, transcript, language)
+                                val result = VoiceTranslationEngine.translateToEnglish(transcript, language)
                                 translatedTranscript = result.normalizedText
                                 status = if (result.wasTranslated) "${result.sourceLanguage} translated on-device. Check the English interpretation before sending."
                                 else "English detected. Review the transcript before sending."

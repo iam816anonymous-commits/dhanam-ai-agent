@@ -1,9 +1,8 @@
 package com.aistudio.dhanam.expense.ui.components
 
-import android.content.Context
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.nl.languageid.LanguageIdentification
-import com.google.mlkit.nl.translate.RemoteModelManager
+import com.google.mlkit.common.model.RemoteModelManager
 import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.TranslateRemoteModel
 import com.google.mlkit.nl.translate.Translation
@@ -25,7 +24,6 @@ data class VoiceTranslationResult(
  */
 object VoiceTranslationEngine {
     suspend fun translateToEnglish(
-        context: Context,
         text: String,
         preferredLanguageTag: String
     ): VoiceTranslationResult = withContext(Dispatchers.IO) {
