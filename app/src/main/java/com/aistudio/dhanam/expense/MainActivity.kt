@@ -3,10 +3,16 @@ package com.aistudio.dhanam.expense
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.fragment.app.FragmentActivity
+import androidx.core.content.ContextCompat
+import android.Manifest
+import android.content.pm.PackageManager
+import android.content.Intent
 import androidx.activity.compose.setContent
 import com.aistudio.dhanam.expense.security.AppLockGate
 import com.aistudio.dhanam.expense.ui.DhanamApp
 import com.aistudio.dhanam.expense.ui.theme.DhanamTheme
+import com.aistudio.dhanam.expense.voice.WakeCommandBus
+import com.aistudio.dhanam.expense.voice.WakeWordService
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -15,6 +21,7 @@ import androidx.compose.runtime.setValue
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        dispatchWakeCommand(intent)
         applyScreenshotPrivacy()
         val uiPreferences = getSharedPreferences("dhanam_ui", MODE_PRIVATE)
         setContent {
@@ -35,8 +42,42 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        dispatchWakeCommand(intent)
+    }
+
+    private fun restoreWakeWordServiceIfEnabled() {
+        val preferences = getSharedPreferences(WakeWordService.PREFS, MODE_PRIVATE)
+        if (!preferences.getBoolean(WakeWordService.KEY_ENABLED, false)) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            preferences.edit().putBoolean(WakeWordService.KEY_ENABLED, false).apply()
+            return
+        }
+        runCatching {
+            ContextCompat.startForegroundService(
+                this,
+                Intent(this, WakeWordService::class.java).setAction(WakeWordService.ACTION_START)
+            )
+        }.onFailure {
+            preferences.edit().putBoolean(WakeWordService.KEY_ENABLED, false).apply()
+        }
+    }
+
+    private fun dispatchWakeCommand(intent: android.content.Intent?) {
+        if (intent?.action != WakeWordService.ACTION_OPEN_VOICE_COMMAND) return
+        val transcript = intent.getStringExtra(WakeWordService.EXTRA_TRANSCRIPT).orEmpty()
+        val language = intent.getStringExtra(WakeWordService.EXTRA_LANGUAGE) ?: "en-IN"
+        WakeCommandBus.offer(transcript, language)
+        intent.action = null
+        intent.removeExtra(WakeWordService.EXTRA_TRANSCRIPT)
+        intent.removeExtra(WakeWordService.EXTRA_LANGUAGE)
+    }
+
     override fun onResume() {
         super.onResume()
+        restoreWakeWordServiceIfEnabled()
         applyScreenshotPrivacy()
     }
 

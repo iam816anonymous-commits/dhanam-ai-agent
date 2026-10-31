@@ -9,6 +9,8 @@ class FinanceDomainPolicyTest {
         assertTrue(FinanceDomainPolicy.normalizeRequest("Dhanam, record repayment 500 from Ravi") == "record repayment 500 from Ravi")
         assertTrue(FinanceDomainPolicy.normalizeRequest("Hey Dhanam, what can you do") == "what can you do")
         assertTrue(FinanceDomainPolicy.isSupportedRequest("Hey Dhanam, what can you do"))
+        assertTrue(FinanceDomainPolicy.normalizeRequest("Hey Jarvis, note an expense of 250 for lunch") == "note an expense of 250 for lunch")
+        assertTrue(FinanceDomainPolicy.isSupportedRequest("Hey Jarvis, note an expense of 250 for lunch"))
     }
 
     @Test fun permitsSupportedDhanamFinanceWorkflows() {
