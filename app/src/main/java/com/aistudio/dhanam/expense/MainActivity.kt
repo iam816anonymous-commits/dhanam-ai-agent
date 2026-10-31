@@ -7,6 +7,8 @@ import androidx.activity.compose.setContent
 import com.aistudio.dhanam.expense.security.AppLockGate
 import com.aistudio.dhanam.expense.ui.DhanamApp
 import com.aistudio.dhanam.expense.ui.theme.DhanamTheme
+import com.aistudio.dhanam.expense.voice.WakeCommandBus
+import com.aistudio.dhanam.expense.voice.WakeWordService
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -15,6 +17,7 @@ import androidx.compose.runtime.setValue
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        dispatchWakeCommand(intent)
         applyScreenshotPrivacy()
         val uiPreferences = getSharedPreferences("dhanam_ui", MODE_PRIVATE)
         setContent {
@@ -33,6 +36,22 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        dispatchWakeCommand(intent)
+    }
+
+    private fun dispatchWakeCommand(intent: android.content.Intent?) {
+        if (intent?.action != WakeWordService.ACTION_OPEN_VOICE_COMMAND) return
+        val transcript = intent.getStringExtra(WakeWordService.EXTRA_TRANSCRIPT).orEmpty()
+        val language = intent.getStringExtra(WakeWordService.EXTRA_LANGUAGE) ?: "en-IN"
+        WakeCommandBus.offer(transcript, language)
+        intent.action = null
+        intent.removeExtra(WakeWordService.EXTRA_TRANSCRIPT)
+        intent.removeExtra(WakeWordService.EXTRA_LANGUAGE)
     }
 
     override fun onResume() {
