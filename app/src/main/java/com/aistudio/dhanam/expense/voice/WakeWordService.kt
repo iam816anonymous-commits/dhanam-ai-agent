@@ -89,6 +89,7 @@ class WakeWordService : Service() {
         val key = WakeWordSecrets.read(this)
         val model = WakeWordModelInstaller.modelFile(this)
         if (key.isNullOrBlank() || !model.isFile || model.length() == 0L) {
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
             updateNotification("Hey Jarvis is not configured. Open Dhanam Settings.")
             stopSelf()
             return
@@ -105,6 +106,7 @@ class WakeWordService : Service() {
             porcupineManager?.start()
             updateNotification("Listening for Hey Jarvis · on-device")
         } catch (error: Exception) {
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
             updateNotification("Wake-word engine could not start: ${error.message?.take(100) ?: "check setup"}")
             stopWakeWordEngine()
             stopSelf()
@@ -239,7 +241,7 @@ class WakeWordService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentTitle("Dhanam · Hey Jarvis enabled")
             .setContentText("On-device wake-word detection is active.")
             .setContentIntent(openApp)
@@ -249,16 +251,14 @@ class WakeWordService : Service() {
     }
 
     private fun updateNotification(message: String) {
-        getSystemService(NotificationManager::class.java)
-            .notify(NOTIFICATION_ID, buildListeningNotification().let {
-                NotificationCompat.Builder(this, CHANNEL_ID)
-                    .setSmallIcon(R.drawable.ic_launcher_foreground)
-                    .setContentTitle("Dhanam · Hey Jarvis")
-                    .setContentText(message)
-                    .setOngoing(true)
-                    .setCategory(NotificationCompat.CATEGORY_SERVICE)
-                    .build()
-            })
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setContentTitle("Dhanam · Hey Jarvis")
+            .setContentText(message)
+            .setOngoing(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .build()
+        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification)
     }
 
     private fun createNotificationChannel() {
