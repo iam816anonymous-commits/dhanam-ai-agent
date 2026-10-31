@@ -22,7 +22,6 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         dispatchWakeCommand(intent)
-        restoreWakeWordServiceIfEnabled()
         applyScreenshotPrivacy()
         val uiPreferences = getSharedPreferences("dhanam_ui", MODE_PRIVATE)
         setContent {
@@ -78,6 +77,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        restoreWakeWordServiceIfEnabled()
         applyScreenshotPrivacy()
     }
 
