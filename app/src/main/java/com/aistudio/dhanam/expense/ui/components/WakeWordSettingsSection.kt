@@ -73,6 +73,20 @@ fun WakeWordSettingsSection() {
         else if (!granted) status = "Microphone permission is required for wake-word detection."
         pendingStart = false
     }
+    val notificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (!granted) status = "Notification permission was denied. Android may hide the persistent listening notification."
+        if (pendingStart) {
+            val microphoneGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+            if (microphoneGranted) {
+                startService()
+                pendingStart = false
+            } else {
+                microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+    }
 
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -138,10 +152,19 @@ fun WakeWordSettingsSection() {
                     enabled = modelReady && !busy,
                     onCheckedChange = { enabled ->
                         if (enabled) {
-                            val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-                            if (granted) startService() else {
-                                pendingStart = true
-                                microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+                            pendingStart = true
+                            if (Build.VERSION.SDK_INT >= 33 &&
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                            ) {
+                                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                                if (granted) {
+                                    startService()
+                                    pendingStart = false
+                                } else {
+                                    microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+                                }
                             }
                         } else {
                             preferences.edit().putBoolean(WakeWordService.KEY_ENABLED, false).apply()
