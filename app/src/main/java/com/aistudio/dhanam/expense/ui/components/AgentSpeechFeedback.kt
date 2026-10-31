@@ -30,11 +30,11 @@ fun AgentSpeechFeedback(
             onDispose { }
         } else {
             var disposed = false
+            initialized = false
             val instance = TextToSpeech(context.applicationContext) { result ->
                 if (!disposed) initialized = result == TextToSpeech.SUCCESS
             }
             engine = instance
-            initialized = false
             onDispose {
                 disposed = true
                 engine = null

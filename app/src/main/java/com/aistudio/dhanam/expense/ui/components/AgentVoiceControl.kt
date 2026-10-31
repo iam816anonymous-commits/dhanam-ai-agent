@@ -57,6 +57,10 @@ fun AgentVoiceControl(
     val context = LocalContext.current
     val latestOnRecognized by rememberUpdatedState(onRecognized)
     val preferences = remember(context) { context.getSharedPreferences("dhanam_voice", 0) }
+    val dedicatedOnDeviceAvailable = remember(context) {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            runCatching { SpeechRecognizer.isOnDeviceRecognitionAvailable(context) }.getOrDefault(false)
+    }
     var language by remember(context) {
         mutableStateOf(preferences.getString("recognition_language", "en-IN") ?: "en-IN")
     }
@@ -95,8 +99,7 @@ fun AgentVoiceControl(
         transcript = ""
         status = "Preparing the speech service…"
         try {
-            val onDeviceAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+            val onDeviceAvailable = dedicatedOnDeviceAvailable
             val instance = if (onDeviceAvailable) {
                 SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
             } else {
@@ -232,7 +235,13 @@ fun AgentVoiceControl(
             title = { Text("Dhanam voice input") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Choose a language and speak a finance request. Android 8.1 uses the installed system speech service with an offline preference; it cannot guarantee that recognition stays offline.")
+                    Text(
+                        when {
+                            dedicatedOnDeviceAvailable -> "The dedicated on-device speech recognizer is available. The selected language pack is checked when recognition starts."
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> "No dedicated on-device recognizer is installed. The system recognizer may use network services."
+                            else -> "Android 8–11 use the installed system speech service with an offline preference. This API cannot guarantee offline recognition; test with airplane mode."
+                        }
+                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         listOf("en-IN" to "English", "te-IN" to "తెలుగు", "hi-IN" to "हिन्दी").forEach { (code, label) ->
                             FilterChip(
