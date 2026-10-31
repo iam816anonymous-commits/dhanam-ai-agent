@@ -22,7 +22,6 @@ import androidx.core.content.ContextCompat
 import ai.picovoice.porcupine.PorcupineManager
 import ai.picovoice.porcupine.PorcupineManagerCallback
 import com.aistudio.dhanam.expense.MainActivity
-import com.aistudio.dhanam.expense.R
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -201,7 +200,7 @@ class WakeWordService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentTitle("Jarvis understood your command")
             .setContentText(transcript.take(100))
             .setStyle(NotificationCompat.BigTextStyle().bigText("Recognized: $transcript\nTap to review it in Dhanam. No financial changes are saved automatically."))
