@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.app.NotificationManagerCompat
 import com.aistudio.dhanam.expense.voice.WakeCommandBus
 import com.aistudio.dhanam.expense.voice.WakeWordService
 import com.aistudio.dhanam.expense.voice.VoiceCommandRouter
@@ -109,6 +110,7 @@ fun DhanamApp(
                 val transcript = intent?.getStringExtra(WakeWordService.EXTRA_TRANSCRIPT).orEmpty()
                 val language = intent?.getStringExtra(WakeWordService.EXTRA_LANGUAGE) ?: "en-IN"
                 WakeCommandBus.offer(transcript, language)
+                NotificationManagerCompat.from(context).cancel(WakeWordService.COMMAND_NOTIFICATION_ID)
             }
         }
         ContextCompat.registerReceiver(
