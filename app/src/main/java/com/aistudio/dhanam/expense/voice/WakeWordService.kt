@@ -6,6 +6,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
@@ -36,6 +38,7 @@ class WakeWordService : Service() {
     private val handlingUtterance = AtomicBoolean(false)
     private var porcupineManager: PorcupineManager? = null
     private var speechRecognizer: SpeechRecognizer? = null
+    private var wakeTone: ToneGenerator? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -116,8 +119,24 @@ class WakeWordService : Service() {
     private fun onWakeWordDetected() {
         if (!handlingUtterance.compareAndSet(false, true)) return
         stopWakeWordEngine()
+        playWakeTone()
         updateNotification("Jarvis heard you · listening for your command")
         startSpeechToText()
+    }
+
+    private fun playWakeTone() {
+        runCatching {
+            wakeTone?.release()
+            val tone = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 70)
+            wakeTone = tone
+            tone.startTone(ToneGenerator.TONE_PROP_BEEP, 140)
+            mainHandler.postDelayed({
+                if (wakeTone === tone) {
+                    tone.release()
+                    wakeTone = null
+                }
+            }, 300L)
+        }
     }
 
     private fun startSpeechToText() {
@@ -250,10 +269,17 @@ class WakeWordService : Service() {
     }
 
     private fun updateNotification(message: String) {
+        val openApp = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentTitle("Dhanam · Hey Jarvis")
             .setContentText(message)
+            .setContentIntent(openApp)
             .setOngoing(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .build()
@@ -279,6 +305,8 @@ class WakeWordService : Service() {
             runCatching { it.destroy() }
         }
         speechRecognizer = null
+        wakeTone?.release()
+        wakeTone = null
         super.onDestroy()
     }
 
