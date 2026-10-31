@@ -14,11 +14,11 @@ object VoiceCommandRouter {
         if (text.isBlank()) return null
 
         return when {
-            matches(text, "open expenses", "show expenses", "go to expenses", "navigate to expenses", "my expenses", "expense list") ->
+            matches(text, "open expenses", "show expenses", "go to expenses", "navigate to expenses", "my expenses", "expense list", "open budget", "show budget", "open budgets", "show budgets", "go to budget") ->
                 AppDestination.EXPENSES
             matches(text, "open khata", "show khata", "go to khata", "open loans", "show loans", "lending and borrowing") ->
                 AppDestination.KHATA
-            matches(text, "open insights", "show insights", "go to insights", "open analytics", "show analytics", "spending dashboard") ->
+            matches(text, "open insights", "show insights", "go to insights", "open analytics", "show analytics", "spending dashboard", "open dashboard", "show dashboard") ->
                 AppDestination.INSIGHTS
             matches(text, "open settings", "show settings", "go to settings", "settings and models") ->
                 AppDestination.SETTINGS
