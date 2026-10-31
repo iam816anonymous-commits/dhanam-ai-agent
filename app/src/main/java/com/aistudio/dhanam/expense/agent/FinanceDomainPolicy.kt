@@ -34,7 +34,7 @@ object FinanceDomainPolicy {
     )
 
     fun isSupportedRequest(input: String, hasPendingFinanceAction: Boolean = false): Boolean {
-        val normalized = input.trim().replace(Regex("""(?i)^(?:hey\\s+)?dhanam[,!:\\s]+"""), "")
+        val normalized = input.trim().replace(Regex("""(?i)^(?:hey\s+)?dhanam[,!:\s]+"""), "")
         if (normalized.isEmpty()) return false
         val lower = normalized.lowercase()
         if (lower in helpCommands) return true
