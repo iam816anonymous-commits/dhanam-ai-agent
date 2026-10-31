@@ -44,7 +44,12 @@ fun WakeWordSettingsSection() {
         context.getSharedPreferences(WakeWordService.PREFS, 0)
     }
     var accessKey by remember { mutableStateOf("") }
-    var modelReady by remember(context) { mutableStateOf(WakeWordModelInstaller.modelFile(context).let { it.isFile && it.length() > 0L }) }
+    var modelReady by remember(context) {
+        mutableStateOf(
+            WakeWordModelInstaller.modelFile(context).let { it.isFile && it.length() > 0L } &&
+                !WakeWordSecrets.read(context).isNullOrBlank()
+        )
+    }
     var listening by remember(context) { mutableStateOf(preferences.getBoolean(WakeWordService.KEY_ENABLED, false)) }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Wake-word listening is off.") }
@@ -92,7 +97,7 @@ fun WakeWordSettingsSection() {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Hey Jarvis · hands-free assistant", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
-                "Say “Hey Jarvis”, wait for the listening prompt, then speak your command. Dhanam converts speech to text and routes it through the existing finance agent. The finance LLM is not used for wake-word detection or speech recognition.",
+                "Say “Hey Jarvis”, wait for the short beep, then speak your command. Dhanam converts speech to text and routes it through the existing finance agent. The finance LLM is not used for wake-word detection or speech recognition.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
