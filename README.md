@@ -6,7 +6,7 @@ A finance-only, local-first Android personal-finance application. The original [
 
 The existing five-destination Compose UI (Agent, Expenses, Khata, Insights, Settings) and dark emerald / warm-gold design are retained. The finance foundation is extended with a coordinated three-agent system and nightly learning workflow.
 
-The UI also restores the original app's dark/light preference (dark by default) and screenshot privacy control. Security includes a PBKDF2 PIN and optional strong-biometric unlock with PIN fallback. Voice capture supports persisted English, Telugu and Hindi selection; recognized text stays in the composer for review before it is sent.
+The UI also restores the original app's dark/light preference (dark by default) and screenshot privacy control. Security includes a PBKDF2 PIN and optional strong-biometric unlock with PIN fallback. Voice capture supports persisted English, Telugu and Hindi selection; recognized text stays in the composer for review before it is sent. An optional Hey Jarvis wake-word service provides hands-free speech-to-text and voice navigation without loading the finance LLM.
 
 Implemented in the current codebase:
 - Local expense, income, budget, lending/borrowing and repayment workflows with validated financial writes.
@@ -49,9 +49,19 @@ All agents share the same local model runtime. The nightly worker invokes them s
 
 Android background execution is best-effort. Doze, OEM battery management, force-stop, low battery or insufficient time can delay or skip a run. The app does not promise an exact five-hour execution window.
 
+## Hey Jarvis voice assistant
+
+- Enable **Hey Jarvis · hands-free assistant** in Settings. A Picovoice AccessKey is required once to generate the custom English “Hey Jarvis” keyword model; the key is encrypted with Android Keystore and never committed to the repository.
+- Keyword-model generation requires an Internet connection. Wake-word detection itself runs on-device. The finance LLM is not loaded for wake-word detection or speech recognition.
+- The user explicitly enables/disables the microphone foreground service. While enabled, Android shows a persistent notification and the service can continue while the screen is locked. Start it from the visible app; Android 14+ restricts starting microphone foreground services from the background.
+- After the wake phrase, wait for the listening beep and speak the command. Android SpeechRecognizer converts the utterance to text using the selected English, Telugu or Hindi language. Android 8.1 accepts an offline preference but cannot guarantee offline speech recognition; an installed provider and language pack are required.
+- Commands such as “open expenses”, “open budget”, “show insights” and “open Khata” navigate to the corresponding screen. Finance commands are routed to the shared AgentViewModel and retain the existing validation, preview and explicit confirmation before writes.
+- If Dhanam is not active, Android background-activity restrictions mean a recognized command is surfaced as a notification; tap it to review the transcript in Dhanam. Force-stop, OEM battery management and microphone permission revocation can stop background listening.
+- Speech is not saved as an audio recording. The service only uses the live microphone stream for wake-word detection and speech recognition.
+
 ## Privacy and safety
 
-- Financial records and analysis remain local; the Internet permission is used for explicit model downloads only.
+- Financial records and analysis remain local. The Internet permission is used for explicit model downloads and user-initiated Picovoice wake-word model creation/AccessKey validation; no financial records or finance prompts are sent to Picovoice.
 - No cloud inference or automatic financial transfers.
 - No generic device-control or AccessibilityService automation.
 - Model output cannot directly write financial records or alter permissions.
