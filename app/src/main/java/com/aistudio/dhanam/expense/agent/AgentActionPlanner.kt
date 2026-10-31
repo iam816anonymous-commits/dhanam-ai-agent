@@ -231,7 +231,8 @@ object AgentActionPlanner {
                 "help", "what can you do", "commands", "what are your features",
                 "what are the agents", "what do the agents do", "tell me about dhanam",
                 "tell me about dhanam ai", "explain dhanam ai", "what can the model do",
-                "what are the financial agents", "tell me about financial agents"
+                "what are the financial agents", "tell me about financial agents", "what does the model do",
+                "how do the agents work", "how does the agent work"
             ) || lower.contains("financial agent") || lower.contains("agent roles")) {
             return PlannerResult(message =
                 "Dhanam uses one shared on-device model with three finance-only specialists. " +
@@ -360,8 +361,8 @@ object AgentActionPlanner {
         val intent = field("intent")?.lowercase()
         if (intent == "clarify") {
             return PlannerResult(
-                message = field("message")?.take(180)?.takeIf { it.isNotBlank() }
-                    ?: "Please clarify the financial action and amount.",
+                message = field("message")?.takeIf { FinanceDomainPolicy.isSafeModelClarification(it) }
+                    ?: "Please clarify the financial action, amount or category.",
                 needsClarification = true
             )
         }

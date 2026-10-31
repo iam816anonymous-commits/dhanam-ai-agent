@@ -13,13 +13,13 @@ object FinanceDomainPolicy {
         Regex("""(?i)\b(?:translate this|translation|weather forecast|sports score|news headlines|email draft)\b""")
     )
     private val financeTerms = listOf(
-        Regex("""(?i)(?<![\p{L}\p{N}])(?:finance|financial|expense|expenses|spent|spend|spending|income|salary|payroll|budget|khata|ledger|loan|loans|lent|borrow|borrowed|repayment|repayments|debt|money|cash flow|rupees?|rs\.?|upi|transaction|transactions|balance|balances|saving|savings|interest|credit|debit|investment|tax|insurance|bill|bills|receipt|receipts|payment|payments|purchase|purchased|cost|lunch|dinner|breakfast|groceries|grocery|petrol|fuel|bus|transport|shopping|rent|medicine|medical|education|fees|category|categories|merchant|subscription|subscriptions|owed|owe)(?![\p{L}\p{N}])"""),
+        Regex("""(?i)(?<![\p{L}\p{N}])(?:finance|financial|expense|expenses|spent|spend|spending|paid|earned|received|income|salary|payroll|budget|khata|ledger|loan|loans|lent|borrow|borrowed|repayment|repayments|debt|money|cash flow|rupees?|rs\.?|upi|transaction|transactions|balance|balances|saving|savings|interest|credit|debit|investment|tax|insurance|bill|bills|receipt|receipts|payment|payments|purchase|purchased|cost|lunch|dinner|breakfast|groceries|grocery|petrol|fuel|bus|transport|shopping|rent|medicine|medical|education|fees|category|categories|merchant|subscription|subscriptions|owed|owe|amount)(?![\p{L}\p{N}])"""),
         Regex("""[₹]"""),
-        Regex("""[ఖర్చుఆదాయబడ్జెట్అప్పుఖాతాడబ్బుజీతంవడ్డీచెల్లింపు]"""),
-        Regex("""[खर्चआयबजटउधारकर्जपैसावेतनब्याजकिस्त]""")
+        Regex("""(?:ఖర్చు|ఆదాయం|బడ్జెట్|అప్పు|ఖాతా|డబ్బు|జీతం|వడ్డీ|చెల్లింపు|భోజనం|లంచ్|డిన్నర్|టిఫిన్|కిరాణా|రవాణా|పెట్రోల్|బస్సు|ప్రయాణం|షాపింగ్|బట్టలు|బిల్లు|కరెంట్|అద్దె|ఆరోగ్యం|మందులు|వైద్యం|విద్య|ఫీజు|కొన్న)"""),
+        Regex("""(?:खर्च|आय|बजट|उधार|कर्ज|पैसा|वेतन|ब्याज|किस्त|भुगतान|कमाई|खरीदा)""")
     )
     private val appTerms = listOf(
-        Regex("""(?i)\b(?:dhanam|financial agent|finance agent|agent roles?|local ai|on-device model|offline model|voice input|microphone permission|speech recognition|voice language|model manager|model download|backup|restore|csv export|pdf report|reminder|privacy settings|security settings)\b""")
+        Regex("""(?i)\b(?:dhanam|financial agent|finance agent|agent roles?|agent|assistant|model|local ai|on-device model|offline model|voice input|voice|microphone|microphone permission|speech recognition|speech|voice language|model manager|model download|backup|restore|csv export|pdf report|reminder|privacy settings|security settings)\b""")
     )
     private val correctionPattern = Regex(
         """(?i)^(?:actually|change that|correct that|instead|make it|set it|change the amount|change the category|change the description|change description|change title|change item|to\s+₹?\s*[0-9])"""
@@ -34,8 +34,15 @@ object FinanceDomainPolicy {
         if (unsupportedTaskPatterns.any { it.containsMatchIn(normalized) }) return false
         if (financeTerms.any { it.containsMatchIn(normalized) }) return true
         if (appTerms.any { it.containsMatchIn(normalized) }) return true
-        if (Regex("""(?i)\b(?:model|agent|assistant|voice|offline|speech)\b""").containsMatchIn(normalized) &&
-            Regex("""(?i)\b(?:dhanam|finance|financial|local|on-device|ai)\b""").containsMatchIn(normalized)) return true
         return false
+    }
+
+    fun isSafeModelClarification(message: String): Boolean {
+        val normalized = message.trim()
+        if (normalized.isEmpty() || normalized.length > 180) return false
+        if (unsupportedTaskPatterns.any { it.containsMatchIn(normalized) }) return false
+        return Regex("""(?i)\b(?:finance|financial|expense|income|budget|khata|repayment|amount|category|money|loan|borrow|lend|transaction|record|payment|spending)\b""")
+            .containsMatchIn(normalized) ||
+            Regex("""(?:ఖర్చు|ఆదాయం|బడ్జెట్|అప్పు|ఖాతా|డబ్బు|మొత్తం)""").containsMatchIn(normalized)
     }
 }

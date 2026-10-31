@@ -206,6 +206,8 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                         activity = if (proposal.action != null) "awaiting_confirmation" else "idle",
                         busy = false
                     )
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
                 } catch (error: Exception) {
                     appendAssistant("I couldn't safely interpret that with the local model. No changes were made. Try a specific command or clarify the amount/category. ${error.message ?: ""}".trim())
                     _state.value = _state.value.copy(pendingAction = null, activity = "idle", busy = false)

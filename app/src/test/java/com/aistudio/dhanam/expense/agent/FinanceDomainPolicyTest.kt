@@ -34,6 +34,12 @@ class FinanceDomainPolicyTest {
         ).forEach { assertFalse("Should be out of scope: $it", FinanceDomainPolicy.isSupportedRequest(it)) }
     }
 
+    @Test fun refusesModelClarificationTextThatEscapesTheFinanceDomain() {
+        assertFalse(FinanceDomainPolicy.isSafeModelClarification("Here is a joke for you."))
+        assertFalse(FinanceDomainPolicy.isSafeModelClarification("I can write code for you."))
+        assertTrue(FinanceDomainPolicy.isSafeModelClarification("What amount should I use for this expense?"))
+    }
+
     @Test fun pendingFinanceDraftAllowsOnlyRecognisedCorrections() {
         assertTrue(FinanceDomainPolicy.isSupportedRequest("actually change that to 300", hasPendingFinanceAction = true))
         assertTrue(FinanceDomainPolicy.isSupportedRequest("change category to transport", hasPendingFinanceAction = true))
