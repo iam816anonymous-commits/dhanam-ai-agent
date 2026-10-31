@@ -173,9 +173,12 @@ fun DhanamApp(
                 activity = agentState.activity,
                 status = agentState.status,
                 onNavigate = ::navigateTo,
-                onVoiceRecognized = { spoken ->
+                onVoiceRecognized = { original, translated ->
                     navigateTo(AppDestination.AGENT)
-                    agentViewModel.submit(spoken)
+                    agentViewModel.submit(
+                        translated,
+                        displayText = "🎙️ $original\\nEnglish interpretation: $translated"
+                    )
                 },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
             )

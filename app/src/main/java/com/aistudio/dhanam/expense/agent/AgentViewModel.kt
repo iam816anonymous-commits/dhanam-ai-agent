@@ -67,13 +67,13 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     }
 
 
-    fun submit(text: String) {
+    fun submit(text: String, displayText: String = text) {
         val input = text.trim().take(1000)
         val commandInput = FinanceDomainPolicy.normalizeRequest(input)
         if (input.isEmpty() || _state.value.busy) return
         val previousPending = _state.value.pendingAction
         _state.value = _state.value.copy(
-            messages = (_state.value.messages + AgentChatMessage(role = "user", text = input)).takeLast(MAX_CHAT_MESSAGES - 1),
+            messages = (_state.value.messages + AgentChatMessage(role = "user", text = displayText.take(2000))).takeLast(MAX_CHAT_MESSAGES - 1),
             status = null, activity = "thinking"
         )
 

@@ -34,6 +34,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -54,7 +56,7 @@ import java.util.concurrent.atomic.AtomicReference
 @Composable
 fun AgentVoiceControl(
     enabled: Boolean,
-    onRecognized: (String) -> Unit,
+    onRecognized: (String, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -72,6 +74,9 @@ fun AgentVoiceControl(
     var isListening by remember { mutableStateOf(false) }
     var isProcessing by remember { mutableStateOf(false) }
     var transcript by remember { mutableStateOf("") }
+    var translatedTranscript by remember { mutableStateOf("") }
+    var translating by remember { mutableStateOf(false) }
+    val translationScope = rememberCoroutineScope()
     var status by remember { mutableStateOf<String?>(null) }
     val recognizerRef = remember { AtomicReference<SpeechRecognizer?>(null) }
 
@@ -101,6 +106,7 @@ fun AgentVoiceControl(
         }
         releaseRecognizer(cancel = true)
         transcript = ""
+        translatedTranscript = ""
         status = "Preparing the speech service…"
         try {
             val onDeviceAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && dedicatedOnDeviceAvailable
@@ -237,6 +243,7 @@ fun AgentVoiceControl(
             language = preferences.getString("recognition_language", "en-IN") ?: "en-IN"
             status = null
             transcript = ""
+            translatedTranscript = ""
             showDialog = true
         },
         enabled = enabled,
@@ -268,6 +275,7 @@ fun AgentVoiceControl(
                                     language = code
                                     preferences.edit().putString("recognition_language", code).apply()
                                     transcript = ""
+                                    translatedTranscript = ""
                                     status = "Voice language set to $label."
                                 },
                                 label = { Text(label) }
@@ -277,15 +285,19 @@ fun AgentVoiceControl(
                     if (transcript.isNotBlank()) {
                         OutlinedTextField(
                             value = transcript,
-                            onValueChange = { transcript = it.take(1000) },
+                            onValueChange = { transcript = it.take(1000); translatedTranscript = "" },
                             modifier = Modifier.fillMaxWidth(),
                             label = { Text("Review transcript") },
                             minLines = 2,
                             maxLines = 4
                         )
                     }
+                    if (translatedTranscript.isNotBlank()) {
+                        Text("English interpretation", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                        Text(translatedTranscript, style = MaterialTheme.typography.bodyMedium)
+                    }
                     status?.let {
-                        Text(it, color = if (it.contains("denied", true) || it.contains("failed", true) || it.contains("error", true))
+                        Text(it, color = if (it.contains("denied", true) || it.contains("failed", true) || it.contains("error", true) || it.contains("not installed", true))
                             MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall)
                     }
@@ -304,12 +316,30 @@ fun AgentVoiceControl(
                             status = "Could not finish the speech session. Try again."
                         }
                     }) { Text("Finish") }
-                    isProcessing -> Button(enabled = false, onClick = {}) { Text("Processing…") }
-                    transcript.isNotBlank() -> Button(onClick = {
-                        val reviewed = transcript.trim()
-                        if (reviewed.isNotBlank()) latestOnRecognized(reviewed)
+                    isProcessing || translating -> Button(enabled = false, onClick = {}) { Text(if (translating) "Translating…" else "Processing…") }
+                    translatedTranscript.isNotBlank() -> Button(onClick = {
+                        val original = transcript.trim()
+                        val normalized = translatedTranscript.trim()
+                        if (original.isNotBlank() && normalized.isNotBlank()) latestOnRecognized(original, normalized)
                         closeDialog()
-                    }) { Text("Use transcript") }
+                    }) { Text("Send English to Dhanam") }
+                    transcript.isNotBlank() -> Button(onClick = {
+                        translating = true
+                        status = "Identifying language and translating on-device…"
+                        translationScope.launch {
+                            try {
+                                val result = VoiceTranslationEngine.translateToEnglish(context, transcript, language)
+                                translatedTranscript = result.normalizedText
+                                status = if (result.wasTranslated) "${result.sourceLanguage} translated on-device. Check the English interpretation before sending."
+                                else "English detected. Review the transcript before sending."
+                            } catch (error: Exception) {
+                                translatedTranscript = ""
+                                status = error.message ?: "Translation failed. Your original transcript is still available; nothing was sent."
+                            } finally {
+                                translating = false
+                            }
+                        }
+                    }, enabled = !translating) { Text(if (translating) "Translating…" else "Translate to English") }
                     else -> Button(onClick = {
                         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
                         if (granted) startListening() else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)

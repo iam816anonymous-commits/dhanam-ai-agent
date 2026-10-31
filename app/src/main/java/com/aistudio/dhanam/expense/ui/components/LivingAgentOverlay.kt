@@ -46,7 +46,7 @@ fun LivingAgentOverlay(
     activity: String,
     status: String?,
     onNavigate: (AppDestination) -> Unit,
-    onVoiceRecognized: (String) -> Unit,
+    onVoiceRecognized: (String, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }

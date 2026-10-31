@@ -95,6 +95,7 @@ fun SettingsScreen(
             }
         }
         VoicePreferencesSection()
+        VoiceTranslationModelsSection()
         FinanceDataSection()
         LegacyMigrationSection()
         ModelManagerSection(inferenceViewModel = inferenceViewModel)
