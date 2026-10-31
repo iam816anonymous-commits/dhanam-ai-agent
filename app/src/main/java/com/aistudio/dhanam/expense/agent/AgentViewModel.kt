@@ -11,6 +11,7 @@ import com.aistudio.dhanam.expense.data.IncomeEntity
 import com.aistudio.dhanam.expense.data.BudgetEntity
 import com.aistudio.dhanam.expense.data.FinanceDatabase
 import com.aistudio.dhanam.expense.domain.MoneyParser
+import com.aistudio.dhanam.expense.domain.HistoricalFinanceAnalysis
 import com.aistudio.dhanam.expense.domain.IncomeInputValidator
 import com.aistudio.dhanam.expense.domain.KhataValidator
 import com.aistudio.dhanam.expense.model.LocalInferenceViewModel
@@ -163,7 +164,13 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             )
             viewModelScope.launch {
                 try {
-                    appendAssistant(buildSpendingAnalysis(analysisAction.month, analysisAction.category))
+                    val report = when {
+                        analysisAction.allHistory -> buildHistoricalSpendingAnalysis(null, null, analysisAction.category)
+                        analysisAction.historyMonth != null -> buildHistoricalSpendingAnalysis(null, analysisAction.historyMonth, analysisAction.category)
+                        analysisAction.historyYear != null -> buildHistoricalSpendingAnalysis(analysisAction.historyYear, null, analysisAction.category)
+                        else -> buildSpendingAnalysis(analysisAction.month, analysisAction.category)
+                    }
+                    appendAssistant(report)
                     _state.value = _state.value.copy(activity = "complete", status = "Analysis calculated from local financial records.")
                 } catch (error: kotlinx.coroutines.CancellationException) {
                     throw error
@@ -396,6 +403,71 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 _state.value = _state.value.copy(busy = false)
             }
         }
+    }
+
+    private suspend fun buildHistoricalSpendingAnalysis(
+        year: Int?,
+        month: YearMonth?,
+        category: String?
+    ): String {
+        val allExpenses = dao.expensesSince(LocalDate.of(1900, 1, 1).toEpochDay())
+        val selected = allExpenses.filter { expense ->
+            val date = LocalDate.ofEpochDay(expense.occurredOnEpochDay)
+            (year == null || date.year == year) &&
+                (month == null || YearMonth.from(date) == month) &&
+                (category == null || expense.category.equals(category, ignoreCase = true))
+        }
+        val period = when {
+            month != null -> month.toString()
+            year != null -> year.toString()
+            else -> "all imported years"
+        }
+        val summary = HistoricalFinanceAnalysis.summarize(selected)
+            ?: return "No imported expense records found for " + period +
+                (category?.let { " in " + it } ?: "") +
+                ". Import a CSV with description, amount and date columns, then ask me again."
+        val lines = mutableListOf<String>()
+        lines += "Historical expenditure analysis · " + period
+        if (category != null) lines += "Category filter: " + category + "."
+        lines += "Total recorded expenditure: " + MoneyParser.formatPaise(summary.totalSpentPaise) +
+            " across " + summary.transactionCount + " transaction(s)."
+        lines += "Average per calendar day: " + MoneyParser.formatPaise(summary.averagePerDayPaise) + "."
+        lines += "Average per calendar week: " + MoneyParser.formatPaise(summary.averagePerWeekPaise) + "."
+        lines += "Average per calendar month: " + MoneyParser.formatPaise(summary.averagePerMonthPaise) + "."
+        lines += "Average per calendar year: " + MoneyParser.formatPaise(summary.averagePerYearPaise) + "."
+        lines += "Data span: " + summary.coveredDays + " day(s), " + summary.coveredWeeks +
+            " week(s), " + summary.coveredMonths + " month(s), " + summary.coveredYears +
+            " calendar year(s), from " +
+            LocalDate.ofEpochDay(selected.minOf { it.occurredOnEpochDay }) + " to " +
+            LocalDate.ofEpochDay(selected.maxOf { it.occurredOnEpochDay }) + "."
+        val categoryTotals = selected.groupBy { it.category }.mapValues { (_, rows) ->
+            rows.fold(0L) { total, row -> Math.addExact(total, row.amountPaise) }
+        }.toList().sortedByDescending { it.second }
+        if (categoryTotals.isNotEmpty()) {
+            lines += "Category totals:"
+            categoryTotals.take(8).forEach { (name, amount) ->
+                lines += "• " + name + ": " + MoneyParser.formatPaise(amount) + "."
+            }
+        }
+        if (summary.yearlyTotals.isNotEmpty()) {
+            lines += "Year-wise totals:"
+            summary.yearlyTotals.forEach { yearly ->
+                lines += "• " + yearly.year + ": " + MoneyParser.formatPaise(yearly.amountPaise) + "."
+            }
+        }
+        val monthlyTotals = selected.groupBy {
+            YearMonth.from(LocalDate.ofEpochDay(it.occurredOnEpochDay))
+        }.mapValues { (_, rows) ->
+            rows.fold(0L) { total, row -> Math.addExact(total, row.amountPaise) }
+        }.toList().sortedByDescending { it.first }
+        if (monthlyTotals.isNotEmpty()) {
+            lines += "Month-wise totals (latest 24 shown):"
+            monthlyTotals.take(24).forEach { (periodMonth, amount) ->
+                lines += "• " + periodMonth + ": " + MoneyParser.formatPaise(amount) + "."
+            }
+        }
+        lines += "These figures describe records imported into Dhanam, not necessarily every real-world transaction. Verify the source CSV and category mapping before making financial decisions."
+        return lines.joinToString("\n")
     }
 
     private suspend fun buildSpendingAnalysis(month: YearMonth, category: String?): String {

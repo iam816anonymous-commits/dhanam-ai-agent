@@ -14,8 +14,19 @@ sealed interface PlannedFinanceAction {
     data class AddExpense(val title: String, val amountPaise: Long, val category: String, val date: LocalDate, val note: String = "") : PlannedFinanceAction {
         override val summary = "Record expense: $title · ${MoneyParser.formatPaise(amountPaise)} · $category · $date"
     }
-    data class AnalyzeSpending(val month: YearMonth = YearMonth.now(), val category: String? = null) : PlannedFinanceAction {
-        override val summary = "Analyze recorded spending for $month"
+    data class AnalyzeSpending(
+        val month: YearMonth = YearMonth.now(),
+        val category: String? = null,
+        val allHistory: Boolean = false,
+        val historyYear: Int? = null,
+        val historyMonth: YearMonth? = null
+    ) : PlannedFinanceAction {
+        override val summary = when {
+            allHistory -> "Analyze all imported spending history"
+            historyMonth != null -> "Analyze recorded spending for $historyMonth"
+            historyYear != null -> "Analyze recorded spending for $historyYear"
+            else -> "Analyze recorded spending for $month"
+        }
     }
     data class AddIncome(
         val title: String,
@@ -117,20 +128,61 @@ object AgentActionPlanner {
             "show my expenses", "what are my biggest expenses", "where is my money going",
             "how can i save", "how can i reduce", "reduce my", "cut my expenses", "where can i save",
             "how much have i lent", "who owes me", "how much do i owe",
-            "khata summary", "lending summary", "outstanding loan"
+            "khata summary", "lending summary", "outstanding loan",
+            "average per day", "daily average", "average per week", "weekly average",
+            "average per month", "monthly average", "average per year", "yearly average",
+            "yearly analysis", "annual analysis", "historical spending", "all time", "all-time",
+            "entire history", "total expenditure"
         )
         if (queryPhrases.none { lower.contains(it) }) return null
-        val month = if (lower.contains("last month") || lower.contains("previous month")) {
-            YearMonth.now().minusMonths(1)
-        } else {
-            YearMonth.now()
+
+        val yearMatch = Regex("""\b(19[0-9]{2}|20[0-9]{2})\b""").find(lower)?.groupValues?.get(1)?.toIntOrNull()
+        val historyYear = when {
+            yearMatch != null -> yearMatch
+            lower.contains("last year") || lower.contains("previous year") -> YearMonth.now().year - 1
+            lower.contains("this year") || lower.contains("current year") -> YearMonth.now().year
+            else -> null
+        }
+        val monthNames = mapOf(
+            "january" to 1, "jan" to 1, "february" to 2, "feb" to 2,
+            "march" to 3, "mar" to 3, "april" to 4, "apr" to 4,
+            "may" to 5, "june" to 6, "jun" to 6, "july" to 7, "jul" to 7,
+            "august" to 8, "aug" to 8, "september" to 9, "sep" to 9,
+            "october" to 10, "oct" to 10, "november" to 11, "nov" to 11,
+            "december" to 12, "dec" to 12
+        )
+        val monthNumber = monthNames.entries.sortedByDescending { it.key.length }
+            .firstOrNull { Regex("""\b${Regex.escape(it.key)}\b""").containsMatchIn(lower) }?.value
+        val historyMonth = monthNumber?.let { YearMonth.of(historyYear ?: YearMonth.now().year, it) }
+        val asksForAveragesOrAllHistory = listOf(
+            "average per day", "daily average", "average per week", "weekly average",
+            "average per month", "monthly average", "average per year", "yearly average",
+            "yearly analysis", "annual analysis", "historical spending", "all time", "all-time",
+            "entire history", "total expenditure"
+        ).any { lower.contains(it) }
+        val allHistory = historyMonth == null && historyYear == null &&
+            (asksForAveragesOrAllHistory || lower.contains("analyze all"))
+        val month = when {
+            lower.contains("last month") || lower.contains("previous month") -> YearMonth.now().minusMonths(1)
+            historyMonth != null -> historyMonth
+            else -> YearMonth.now()
         }
         val category = categories.keys.sortedByDescending { it.length }
             .firstOrNull { Regex("""\b${Regex.escape(it)}\b""").containsMatchIn(lower) }
             ?.let { categories[it] }
+        val action = PlannedFinanceAction.AnalyzeSpending(
+            month = month, category = category, allHistory = allHistory,
+            historyYear = historyYear, historyMonth = historyMonth
+        )
+        val target = when {
+            allHistory -> "all imported expense history"
+            historyMonth != null -> historyMonth.toString()
+            historyYear != null -> historyYear.toString()
+            else -> month.toString()
+        }
         return PlannerResult(
-            PlannedFinanceAction.AnalyzeSpending(month, category),
-            "I'll review your recorded ${category?.lowercase()?.plus(" ") ?: ""}expenses, budgets and Khata balances for $month. This is read-only; no financial records will be changed."
+            action,
+            "I'll calculate recorded ${category?.lowercase()?.plus(" ") ?: ""}expenditure for $target from the local ledger. This is read-only; no financial records will be changed."
         )
     }
 

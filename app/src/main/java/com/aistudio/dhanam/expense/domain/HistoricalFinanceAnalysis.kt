@@ -76,8 +76,9 @@ object HistoricalFinanceAnalysis {
             .mapValues { (_, rows) -> rows.fold(0L) { sum, row -> Math.addExact(sum, row.amountPaise) } }
         return totals.mapValues { (_, spent) ->
             val buffered = Math.addExact(spent, Math.multiplyExact(spent, bufferPercent.toLong()) / 100L)
-            val step = 10_000L // ₹100 in paise
-            val rounded = Math.multiplyExact((buffered + step - 1L) / step, step)
+            val step = 10_000L
+            val roundedNumerator = Math.addExact(buffered, step - 1L)
+            val rounded = Math.multiplyExact(roundedNumerator / step, step)
             rounded.coerceAtLeast(step)
         }.toSortedMap()
     }

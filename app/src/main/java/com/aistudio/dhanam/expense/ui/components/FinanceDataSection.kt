@@ -111,7 +111,7 @@ fun FinanceDataSection() {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Backup and reports", style = MaterialTheme.typography.titleMedium)
-            Text("Export expenses as CSV or import a CSV backup. Import is previewed and validated before any records are written.",
+            Text("Import Dhanam backups or external/translated spreadsheet CSV files. Description, amount and date are required; category is optional (missing categories become Other). Common headers such as Expense, Particulars, Amount (INR), Transaction Date and Remarks are recognised. Rows are previewed and validated before any records are written.",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Button(onClick = { exportLauncher.launch("dhanam-expenses.csv") }, modifier = Modifier.fillMaxWidth()) {
                 Text("Export expenses to CSV")
