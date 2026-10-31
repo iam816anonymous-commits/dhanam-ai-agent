@@ -103,8 +103,8 @@ fun AgentVoiceControl(
         transcript = ""
         status = "Preparing the speech service…"
         try {
-            val onDeviceAvailable = dedicatedOnDeviceAvailable
-            val instance = if (onDeviceAvailable) {
+            val onDeviceAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && dedicatedOnDeviceAvailable
+            val instance = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && dedicatedOnDeviceAvailable) {
                 SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
             } else {
                 SpeechRecognizer.createSpeechRecognizer(context)

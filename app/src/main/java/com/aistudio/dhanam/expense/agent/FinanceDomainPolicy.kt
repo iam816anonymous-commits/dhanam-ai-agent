@@ -19,7 +19,8 @@ object FinanceDomainPolicy {
         Regex("""(?:खर्च|आय|बजट|उधार|कर्ज|पैसा|वेतन|ब्याज|किस्त|भुगतान|कमाई|खरीदा)""")
     )
     private val appTerms = listOf(
-        Regex("""(?i)\bdhanam\b"""),
+        Regex("""(?i)\b(?:what|how|tell me|explain)\b.{0,50}\bdhanam\b"""),
+        Regex("""(?i)\bdhanam\b.{0,50}\b(?:agent|model|voice|microphone|speech|backup|restore|csv|pdf|reminder|privacy|security|settings|finance|financial|expense|income|budget|khata)\b"""),
         Regex("""(?i)\b(?:financial|finance)\s+agents?\b"""),
         Regex("""(?i)\b(?:local|on-device|downloaded|verified)\s+(?:ai\s+)?models?\b"""),
         Regex("""(?i)\b(?:what|how|tell me|explain)\b.{0,50}\b(?:model|agent|assistant)\b"""),
@@ -33,7 +34,7 @@ object FinanceDomainPolicy {
     )
 
     fun isSupportedRequest(input: String, hasPendingFinanceAction: Boolean = false): Boolean {
-        val normalized = input.trim()
+        val normalized = input.trim().replace(Regex("""(?i)^(?:hey\\s+)?dhanam[,!:\\s]+"""), "")
         if (normalized.isEmpty()) return false
         val lower = normalized.lowercase()
         if (lower in helpCommands) return true

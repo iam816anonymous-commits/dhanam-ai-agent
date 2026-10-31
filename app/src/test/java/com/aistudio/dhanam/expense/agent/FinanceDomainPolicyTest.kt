@@ -15,6 +15,7 @@ class FinanceDomainPolicyTest {
             "How can I reduce my expenses?",
             "who owes me money?",
             "Tell me about Dhanam AI",
+            "Dhanam, what can you do",
             "What do the financial agents do?",
             "How does the local AI model work?",
             "భోజనానికి 250 ఖర్చు చేశాను"
@@ -30,6 +31,7 @@ class FinanceDomainPolicyTest {
             "open my camera",
             "control WiFi on my phone",
             "what is the weather today",
+            "Dhanam, tell me the weather today",
             "translate this paragraph",
             "agent tell me a joke",
             "make a poem about my budget"
