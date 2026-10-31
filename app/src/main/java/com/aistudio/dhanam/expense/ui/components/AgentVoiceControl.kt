@@ -221,7 +221,12 @@ fun AgentVoiceControl(
     }
 
     FilledTonalButton(
-        onClick = { status = null; transcript = ""; showDialog = true },
+        onClick = {
+            language = preferences.getString("recognition_language", "en-IN") ?: "en-IN"
+            status = null
+            transcript = ""
+            showDialog = true
+        },
         enabled = enabled,
         modifier = modifier
     ) {
