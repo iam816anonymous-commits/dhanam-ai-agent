@@ -3,6 +3,10 @@ package com.aistudio.dhanam.expense
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.fragment.app.FragmentActivity
+import androidx.core.content.ContextCompat
+import android.Manifest
+import android.content.pm.PackageManager
+import android.content.Intent
 import androidx.activity.compose.setContent
 import com.aistudio.dhanam.expense.security.AppLockGate
 import com.aistudio.dhanam.expense.ui.DhanamApp
@@ -18,6 +22,7 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         dispatchWakeCommand(intent)
+        restoreWakeWordServiceIfEnabled()
         applyScreenshotPrivacy()
         val uiPreferences = getSharedPreferences("dhanam_ui", MODE_PRIVATE)
         setContent {
@@ -42,6 +47,23 @@ class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         dispatchWakeCommand(intent)
+    }
+
+    private fun restoreWakeWordServiceIfEnabled() {
+        val preferences = getSharedPreferences(WakeWordService.PREFS, MODE_PRIVATE)
+        if (!preferences.getBoolean(WakeWordService.KEY_ENABLED, false)) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            preferences.edit().putBoolean(WakeWordService.KEY_ENABLED, false).apply()
+            return
+        }
+        runCatching {
+            ContextCompat.startForegroundService(
+                this,
+                Intent(this, WakeWordService::class.java).setAction(WakeWordService.ACTION_START)
+            )
+        }.onFailure {
+            preferences.edit().putBoolean(WakeWordService.KEY_ENABLED, false).apply()
+        }
     }
 
     private fun dispatchWakeCommand(intent: android.content.Intent?) {
