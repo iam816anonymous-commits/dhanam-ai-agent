@@ -233,12 +233,13 @@ class WakeWordService : Service() {
     }
 
     private fun finishUtteranceAndRearm() {
-        speechRecognizer?.let {
+        if (!handlingUtterance.compareAndSet(true, false)) return
+        val activeRecognizer = speechRecognizer
+        speechRecognizer = null
+        activeRecognizer?.let {
             runCatching { it.cancel() }
             runCatching { it.destroy() }
         }
-        speechRecognizer = null
-        handlingUtterance.set(false)
         if (getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(KEY_ENABLED, false)) {
             mainHandler.postDelayed({ startWakeWordDetection() }, REARM_DELAY_MS)
         }
