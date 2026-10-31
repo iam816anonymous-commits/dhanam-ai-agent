@@ -33,9 +33,7 @@ import androidx.core.content.ContextCompat
 import com.aistudio.dhanam.expense.voice.WakeWordModelInstaller
 import com.aistudio.dhanam.expense.voice.WakeWordSecrets
 import com.aistudio.dhanam.expense.voice.WakeWordService
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /** Explicit opt-in setup for the persistent, local Hey Jarvis wake-word service. */
 @Composable
