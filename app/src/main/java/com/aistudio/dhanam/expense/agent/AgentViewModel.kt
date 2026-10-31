@@ -82,6 +82,15 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
+        if (!FinanceDomainPolicy.isSupportedRequest(input, hasPendingFinanceAction = previousPending != null)) {
+            appendAssistant(FinanceDomainPolicy.OUT_OF_SCOPE_REPLY)
+            _state.value = _state.value.copy(
+                activity = if (previousPending != null) "awaiting_confirmation" else "idle",
+                status = "This assistant is restricted to Dhanam's finance features."
+            )
+            return
+        }
+
         if (previousPending != null) {
             val correction = AgentActionPlanner.applyCorrection(previousPending, input)
             if (correction != null) {
