@@ -39,6 +39,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -55,6 +58,7 @@ fun AgentVoiceControl(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val latestOnRecognized by rememberUpdatedState(onRecognized)
     val preferences = remember(context) { context.getSharedPreferences("dhanam_voice", 0) }
     val dedicatedOnDeviceAvailable = remember(context) {
@@ -212,11 +216,19 @@ fun AgentVoiceControl(
         }
     }
 
-    DisposableEffect(context) {
+    DisposableEffect(context, lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP && recognizerRef.get() != null) {
+                releaseRecognizer(cancel = true)
+                isListening = false
+                isProcessing = false
+                status = "Voice capture stopped because Dhanam moved to the background. Tap Start listening to retry."
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
-            val active = recognizerRef.getAndSet(null)
-            try { active?.cancel() } catch (_: Exception) { }
-            try { active?.destroy() } catch (_: Exception) { }
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            releaseRecognizer(cancel = true)
         }
     }
 

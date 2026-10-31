@@ -9,6 +9,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import java.util.Locale
 
 /** Optional local TTS. The engine exists only while enabled and is shut down with the composition. */
@@ -19,6 +22,7 @@ fun AgentSpeechFeedback(
     enabled: Boolean
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var engine by remember(context) { mutableStateOf<TextToSpeech?>(null) }
     var initialized by remember(context) { mutableStateOf(false) }
     var lastSpokenId by remember { mutableStateOf<String?>(null) }
@@ -43,6 +47,16 @@ fun AgentSpeechFeedback(
                 try { instance.shutdown() } catch (_: Exception) { }
             }
         }
+    }
+
+    DisposableEffect(lifecycleOwner, engine) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                try { engine?.stop() } catch (_: Exception) { }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     LaunchedEffect(messageId, message, enabled, initialized, engine) {

@@ -36,6 +36,13 @@ class FinanceDomainPolicyTest {
         ).forEach { assertFalse("Should be out of scope: $it", FinanceDomainPolicy.isSupportedRequest(it)) }
     }
 
+    @Test fun modelResponsesMustRemainInsideDhanamFinanceScope() {
+        assertTrue(FinanceDomainPolicy.isSafeModelResponse("Dhanam Finance Operations can prepare an expense draft for confirmation."))
+        assertTrue(FinanceDomainPolicy.isSafeModelResponse("Your recorded budget and spending totals are available in Insights."))
+        assertFalse(FinanceDomainPolicy.isSafeModelResponse("Here is a general-purpose Python script."))
+        assertFalse(FinanceDomainPolicy.isSafeModelResponse("Here is a joke about your budget."))
+    }
+
     @Test fun refusesModelClarificationTextThatEscapesTheFinanceDomain() {
         assertFalse(FinanceDomainPolicy.isSafeModelClarification("Here is a joke for you."))
         assertFalse(FinanceDomainPolicy.isSafeModelClarification("I can write code for you."))
