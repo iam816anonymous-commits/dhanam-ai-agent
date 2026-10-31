@@ -30,7 +30,9 @@ class FinanceDomainPolicyTest {
             "open my camera",
             "control WiFi on my phone",
             "what is the weather today",
-            "translate this paragraph"
+            "translate this paragraph",
+            "agent tell me a joke",
+            "make a poem about my budget"
         ).forEach { assertFalse("Should be out of scope: $it", FinanceDomainPolicy.isSupportedRequest(it)) }
     }
 

@@ -19,7 +19,14 @@ object FinanceDomainPolicy {
         Regex("""(?:खर्च|आय|बजट|उधार|कर्ज|पैसा|वेतन|ब्याज|किस्त|भुगतान|कमाई|खरीदा)""")
     )
     private val appTerms = listOf(
-        Regex("""(?i)\b(?:dhanam|financial agent|finance agent|agent roles?|agent|assistant|model|local ai|on-device model|offline model|voice input|voice|microphone|microphone permission|speech recognition|speech|voice language|model manager|model download|backup|restore|csv export|pdf report|reminder|privacy settings|security settings)\b""")
+        Regex("""(?i)\bdhanam\b"""),
+        Regex("""(?i)\b(?:financial|finance)\s+agents?\b"""),
+        Regex("""(?i)\b(?:local|on-device|downloaded|verified)\s+(?:ai\s+)?models?\b"""),
+        Regex("""(?i)\b(?:what|how|tell me|explain)\b.{0,50}\b(?:model|agent|assistant)\b"""),
+        Regex("""(?i)\b(?:model|agent|assistant)\b.{0,50}\b(?:work|role|feature|purpose|finance|financial|not working|error|crash)\b"""),
+        Regex("""(?i)\b(?:voice|microphone|speech recognition)\b.{0,40}\b(?:not working|issue|error|permission|crash|language|offline|available)\b"""),
+        Regex("""(?i)\b(?:microphone permission|model manager|model download|csv export|pdf report|privacy settings|security settings)\b"""),
+        Regex("""(?i)\b(?:backup|restore|reminder)\b.{0,35}\b(?:dhanam|finance|financial|ledger|expense|income)\b""")
     )
     private val correctionPattern = Regex(
         """(?i)^(?:actually|change that|correct that|instead|make it|set it|change the amount|change the category|change the description|change description|change title|change item|to\s+₹?\s*[0-9])"""
@@ -41,6 +48,7 @@ object FinanceDomainPolicy {
         val normalized = message.trim()
         if (normalized.isEmpty() || normalized.length > 180) return false
         if (unsupportedTaskPatterns.any { it.containsMatchIn(normalized) }) return false
+        if (Regex("""(?i)\b(?:joke|poem|story|song|recipe|weather|code|program|website)\b""").containsMatchIn(normalized)) return false
         return Regex("""(?i)\b(?:finance|financial|expense|income|budget|khata|repayment|amount|category|money|loan|borrow|lend|transaction|record|payment|spending)\b""")
             .containsMatchIn(normalized) ||
             Regex("""(?:ఖర్చు|ఆదాయం|బడ్జెట్|అప్పు|ఖాతా|డబ్బు|మొత్తం)""").containsMatchIn(normalized)
