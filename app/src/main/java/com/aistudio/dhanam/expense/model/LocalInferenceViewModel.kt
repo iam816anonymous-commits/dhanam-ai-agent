@@ -136,12 +136,12 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                 engine = candidate
                 try {
                     currentCoroutineContext().ensureActive()
-                    val peakBytes = ProcessMemoryBudget.readPeakResidentBytes()
-                    check(peakBytes != null) {
+                    val residentBytes = ProcessMemoryBudget.readCurrentResidentBytes()
+                    check(residentBytes != null) {
                         "Cannot verify this process's peak memory. Model loading is blocked for safety."
                     }
-                    check(peakBytes < model.maxProcessPeakBytes) {
-                        "The app process has reached this model's peak-memory budget. Unload other apps and try again."
+                    check(residentBytes < model.maxProcessPeakBytes) {
+                        "The app's current resident memory is above this model's safety limit. Close other apps and try again."
                     }
                     conversation = candidate.createConversation(createConversationConfig())
                 } catch (error: OutOfMemoryError) {
@@ -214,10 +214,10 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
         var output = ""
         var outputTooLong = false
         try {
-            val peakBefore = ProcessMemoryBudget.readPeakResidentBytes()
-            check(peakBefore != null && peakBefore < model.maxProcessPeakBytes) {
+            val residentBefore = ProcessMemoryBudget.readCurrentResidentBytes()
+            check(residentBefore != null && residentBefore < model.maxProcessPeakBytes) {
                 shouldUnload = true
-                "The process is already at this model's peak-memory limit; the model will be unloaded."
+                "Current process memory is already above this model's safety limit; the model will be unloaded."
             }
             val agentConversation = activeEngine.createConversation(
                 ConversationConfig(
@@ -233,11 +233,11 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                 maxOutputToken = 512,
                 thinkingConfig = ThinkingConfig(enableThinking = false, thinkingTokenBudget = 0)
             ).collect { chunk ->
-                val peakBytes = ProcessMemoryBudget.readPeakResidentBytes()
+                val residentBytes = ProcessMemoryBudget.readCurrentResidentBytes()
                 if (peakBytes == null || peakBytes >= model.maxProcessPeakBytes) {
                     shouldUnload = true
                     try { agentConversation.cancelProcess() } catch (_: Exception) { }
-                    throw IllegalStateException("The selected model's ${model.maxProcessPeakBytes / (1024L * 1024L)} MiB process peak-memory budget was reached or could not be measured.")
+                    throw IllegalStateException("The selected model's ${model.maxProcessPeakBytes / (1024L * 1024L)} MiB current resident-memory safety limit was reached or could not be measured.")
                 }
                 val text = chunk.toString()
                 if (!outputTooLong && builder.length + text.length > MAX_AGENT_OUTPUT_CHARS) {
@@ -323,13 +323,13 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                 thinkingConfig = ThinkingConfig(enableThinking = false, thinkingTokenBudget = 0)
             )
                     .collect { chunk ->
-                        val peakBytes = ProcessMemoryBudget.readPeakResidentBytes()
+                        val residentBytes = ProcessMemoryBudget.readCurrentResidentBytes()
                         if (peakBytes == null || peakBytes >= model.maxProcessPeakBytes) {
                             memoryBudgetExceeded = true
                             stopRequested = true
                             _state.update {
                                 it.copy(
-                                    status = "This model's process peak-memory budget was reached or could not be measured. Stopping and unloading the model.",
+                                    status = "This model's current resident-memory safety limit was reached or could not be measured. Stopping and unloading the model.",
                                     error = null
                                 )
                             }

@@ -6,21 +6,26 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ProcessMemoryBudgetTest {
-    @Test fun parsesPeakResidentMemoryFromProcStatus() {
+    @Test fun readsCurrentResidentMemoryInsteadOfLifetimePeak() {
         val status = File.createTempFile("proc-status", ".txt")
         try {
-            status.writeText("Name:\ttest\nVmPeak:\t  123456 kB\nVmHWM:\t  1048576 kB\nVmRSS:\t  100000 kB\n")
-            assertEquals(1_073_741_824L, ProcessMemoryBudget.readPeakResidentBytes(status))
+            status.writeText(
+                "Name:\ttest\n" +
+                    "VmHWM:\t  2097152 kB\n" +
+                    "VmRSS:\t  512000 kB\n"
+            )
+            // A historical 2 GiB peak must not mask the current 500 MiB resident set.
+            assertEquals(512_000L * 1024L, ProcessMemoryBudget.readCurrentResidentBytes(status))
         } finally {
             status.delete()
         }
     }
 
-    @Test fun failsClosedWhenPeakMemoryCannotBeRead() {
+    @Test fun failsClosedWhenCurrentResidentMemoryCannotBeRead() {
         val status = File.createTempFile("proc-status", ".txt")
         try {
-            status.writeText("Name:\ttest\nVmRSS:\t  100000 kB\n")
-            assertNull(ProcessMemoryBudget.readPeakResidentBytes(status))
+            status.writeText("Name:\ttest\nVmHWM:\t  1048576 kB\n")
+            assertNull(ProcessMemoryBudget.readCurrentResidentBytes(status))
         } finally {
             status.delete()
         }
