@@ -5,6 +5,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FinanceDomainPolicyTest {
+    @Test fun removesOptionalDhanamWakePhraseBeforeIntentRouting() {
+        assertTrue(FinanceDomainPolicy.normalizeRequest("Dhanam, record repayment 500 from Ravi") == "record repayment 500 from Ravi")
+        assertTrue(FinanceDomainPolicy.normalizeRequest("Hey Dhanam, what can you do") == "what can you do")
+        assertTrue(FinanceDomainPolicy.isSupportedRequest("Hey Dhanam, what can you do"))
+    }
+
     @Test fun permitsSupportedDhanamFinanceWorkflows() {
         listOf(
             "I spent 250 on lunch",

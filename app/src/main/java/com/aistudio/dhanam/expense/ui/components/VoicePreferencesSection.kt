@@ -2,6 +2,7 @@ package com.aistudio.dhanam.expense.ui.components
 
 import android.Manifest
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -57,6 +58,21 @@ fun VoicePreferencesSection() {
         mutableStateOf(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && SpeechRecognizer.isOnDeviceRecognitionAvailable(context))
     }
     var permissionMessage by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(preferences) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            when (key) {
+                "recognition_language" -> {
+                    language = preferences.getString("recognition_language", "en-IN") ?: "en-IN"
+                }
+                "voice_feedback_enabled" -> {
+                    voiceReplies = preferences.getBoolean("voice_feedback_enabled", false)
+                }
+            }
+        }
+        preferences.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
 
     fun refreshDiagnostics() {
         permissionGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED

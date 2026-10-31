@@ -33,8 +33,11 @@ object FinanceDomainPolicy {
         """(?i)^(?:actually|change that|correct that|instead|make it|set it|change the amount|change the category|change the description|change description|change title|change item|to\s+₹?\s*[0-9])"""
     )
 
+    fun normalizeRequest(input: String): String =
+        input.trim().replace(Regex("""(?i)^(?:hey\s+)?dhanam[,!:\s]+"""), "").trim()
+
     fun isSupportedRequest(input: String, hasPendingFinanceAction: Boolean = false): Boolean {
-        val normalized = input.trim().replace(Regex("""(?i)^(?:hey\s+)?dhanam[,!:\s]+"""), "")
+        val normalized = normalizeRequest(input)
         if (normalized.isEmpty()) return false
         val lower = normalized.lowercase()
         if (lower in helpCommands) return true

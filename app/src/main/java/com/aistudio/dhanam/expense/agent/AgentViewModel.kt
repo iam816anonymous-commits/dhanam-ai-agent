@@ -69,6 +69,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
     fun submit(text: String) {
         val input = text.trim().take(1000)
+        val commandInput = FinanceDomainPolicy.normalizeRequest(input)
         if (input.isEmpty() || _state.value.busy) return
         val previousPending = _state.value.pendingAction
         _state.value = _state.value.copy(
@@ -76,13 +77,13 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             status = null, activity = "thinking"
         )
 
-        if (input.lowercase() in setOf("cancel", "cancel that", "never mind", "nevermind", "stop", "discard")) {
+        if (commandInput.lowercase() in setOf("cancel", "cancel that", "never mind", "nevermind", "stop", "discard")) {
             _state.value = _state.value.copy(pendingAction = null, activity = "idle", status = "No changes were saved.")
             appendAssistant("Cancelled. Nothing was changed.")
             return
         }
 
-        if (!FinanceDomainPolicy.isSupportedRequest(input, hasPendingFinanceAction = previousPending != null)) {
+        if (!FinanceDomainPolicy.isSupportedRequest(commandInput, hasPendingFinanceAction = previousPending != null)) {
             appendAssistant(FinanceDomainPolicy.OUT_OF_SCOPE_REPLY)
             _state.value = _state.value.copy(
                 activity = if (previousPending != null) "awaiting_confirmation" else "idle",
@@ -92,7 +93,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         if (previousPending != null) {
-            val correction = AgentActionPlanner.applyCorrection(previousPending, input)
+            val correction = AgentActionPlanner.applyCorrection(previousPending, commandInput)
             if (correction != null) {
                 _state.value = _state.value.copy(
                     messages = _state.value.messages + AgentChatMessage(role = "assistant", text = correction.message),
@@ -101,7 +102,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 return
             }
-            if (Regex("""(?i)^(actually|change that|correct that|instead|make it|set it|change the amount|change the category|change the description|change description|change title|change item)\b""").containsMatchIn(input)) {
+            if (Regex("""(?i)^(actually|change that|correct that|instead|make it|set it|change the amount|change the category|change the description|change description|change title|change item)\b""").containsMatchIn(commandInput)) {
                 appendAssistant("I couldn't apply that correction safely. Please say, for example, “actually change that to 300”, “change category to transport”, or “change description to taxi”. The current draft has not been saved.")
                 _state.value = _state.value.copy(pendingAction = previousPending, activity = "awaiting_confirmation")
                 return
@@ -112,7 +113,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         // so the old confirmation cannot be tapped while the new request is being resolved.
         _state.value = _state.value.copy(pendingAction = null)
 
-        val repayment = Regex("""(?i)^record repayment\s+([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s+(from|to)\s+(.+)$""").matchEntire(input)
+        val repayment = Regex("""(?i)^record repayment\s+([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s+(from|to)\s+(.+)$""").matchEntire(commandInput)
         if (repayment != null) {
             _state.value = _state.value.copy(busy = true)
             viewModelScope.launch {
@@ -141,6 +142,8 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                             pendingAction = action, activity = "awaiting_confirmation", busy = false
                         )
                     }
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
                 } catch (e: Exception) {
                     appendAssistant(e.message ?: "I couldn't prepare that repayment.")
                     _state.value = _state.value.copy(activity = "idle", busy = false)
@@ -149,7 +152,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        val result = AgentActionPlanner.parseWithLearnedSkills(input, activeSkills)
+        val result = AgentActionPlanner.parseWithLearnedSkills(commandInput, activeSkills)
         val analysisAction = result.action as? PlannedFinanceAction.AnalyzeSpending
         if (analysisAction != null) {
             _state.value = _state.value.copy(
@@ -194,7 +197,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                     val proposalText = coordinator.run(
                         AgentTaskRequest(
                             role = DhanamAgentRole.FINANCE_OPERATIONS,
-                            prompt = AgentActionPlanner.modelPrompt(input),
+                            prompt = AgentActionPlanner.modelPrompt(commandInput),
                             priority = AgentTaskPriority.USER_REQUEST,
                             requiresNightWindow = false
                         )
