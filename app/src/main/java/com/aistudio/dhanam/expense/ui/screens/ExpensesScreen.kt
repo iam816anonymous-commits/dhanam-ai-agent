@@ -29,6 +29,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import com.aistudio.dhanam.expense.data.FinanceDatabase
+import com.aistudio.dhanam.expense.domain.FinanceCalculations
+import com.aistudio.dhanam.expense.ui.components.OverspendingBanner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -42,6 +46,23 @@ import java.time.YearMonth
 @Composable
 fun ExpensesScreen(viewModel: ExpensesViewModel = viewModel()) {
     val expenses by viewModel.expenses.collectAsState()
+    val context = LocalContext.current
+    val financeDao = remember(context) { FinanceDatabase.getInstance(context).financeDao() }
+    val monthlyBudgets by financeDao.observeBudgetsForMonth(YearMonth.now().atDay(1).toEpochDay()).collectAsState(initial = emptyList())
+    val monthStart = YearMonth.now().atDay(1).toEpochDay()
+    val monthEnd = LocalDate.now().toEpochDay()
+    val monthSpentPaise = remember(expenses, monthStart, monthEnd) {
+        expenses.asSequence().filter { it.occurredOnEpochDay in monthStart..monthEnd }
+            .fold(0L) { total, expense -> Math.addExact(total, expense.amountPaise) }
+    }
+    val overallBudget = monthlyBudgets.firstOrNull { it.category == FinanceCalculations.OVERALL_BUDGET_CATEGORY }
+    val categoryOverrun = monthlyBudgets.asSequence()
+        .filter { it.category != FinanceCalculations.OVERALL_BUDGET_CATEGORY }
+        .mapNotNull { budget ->
+            val spent = expenses.asSequence().filter { it.category == budget.category && it.occurredOnEpochDay in monthStart..monthEnd }
+                .fold(0L) { total, expense -> Math.addExact(total, expense.amountPaise) }
+            (spent - budget.amountPaise).takeIf { it > 0L }?.let { budget.category to it }
+        }.maxByOrNull { it.second }
     val message by viewModel.message.collectAsState()
     var title by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
@@ -82,6 +103,18 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = viewModel()) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        when {
+            overallBudget != null && monthSpentPaise > overallBudget.amountPaise ->
+                OverspendingBanner(
+                    title = "Monthly budget exceeded",
+                    message = "Recorded spending is ${MoneyParser.formatPaise(monthSpentPaise - overallBudget.amountPaise)} above your ${MoneyParser.formatPaise(overallBudget.amountPaise)} overall budget."
+                )
+            categoryOverrun != null ->
+                OverspendingBanner(
+                    title = "${categoryOverrun.first} budget exceeded",
+                    message = "Recorded spending is ${MoneyParser.formatPaise(categoryOverrun.second)} above this month's category limit."
+                )
+        }
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(if (editingId == null) "Add an expense" else "Edit expense",

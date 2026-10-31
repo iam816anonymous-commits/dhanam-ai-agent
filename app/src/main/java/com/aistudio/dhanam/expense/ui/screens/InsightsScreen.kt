@@ -17,7 +17,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,9 +32,14 @@ import androidx.compose.ui.unit.dp
 import com.aistudio.dhanam.expense.data.FinanceDatabase
 import com.aistudio.dhanam.expense.data.RecommendationFeedbackEntity
 import com.aistudio.dhanam.expense.data.FinancePdfReportExporter
+import com.aistudio.dhanam.expense.data.FinanceCsvTransfer
+import com.aistudio.dhanam.expense.ui.components.LegacyCategoryDonutChart
+import com.aistudio.dhanam.expense.ui.components.LegacyWeeklySpendChart
+import com.aistudio.dhanam.expense.ui.components.LegacyPaymentModeBreakdown
 import com.aistudio.dhanam.expense.domain.ExpenseInputValidator
 import com.aistudio.dhanam.expense.domain.FinanceCalculations
 import com.aistudio.dhanam.expense.domain.MoneyParser
+import com.aistudio.dhanam.expense.domain.HistoricalFinanceAnalysis
 import com.aistudio.dhanam.expense.agent.FinancialAnalysisEngine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -53,6 +60,25 @@ fun InsightsScreen() {
     val recommendationFeedback by db.financeDao().observeRecommendationFeedback().collectAsState(initial = emptyList())
     val budgets by db.financeDao().observeBudgetsForMonth(month.atDay(1).toEpochDay()).collectAsState(initial = emptyList())
     val loans by db.financeDao().observeLoans().collectAsState(initial = emptyList())
+    val budgetPreferences = remember(context) { context.getSharedPreferences("dhanam_budget_preferences", 0) }
+    var adaptiveBudgetsEnabled by remember {
+        mutableStateOf(budgetPreferences.getBoolean("adaptive_category_budgets", false))
+    }
+    val historicalSummary = remember(expenses) { HistoricalFinanceAnalysis.summarize(expenses) }
+    val adaptiveAllocations = remember(expenses, month) {
+        HistoricalFinanceAnalysis.adaptiveCategoryBudgets(expenses, month)
+    }
+    LaunchedEffect(adaptiveBudgetsEnabled, expenses, month) {
+        if (adaptiveBudgetsEnabled && month == YearMonth.now() && adaptiveAllocations.isNotEmpty()) {
+            val now = System.currentTimeMillis()
+            adaptiveAllocations.forEach { (category, amountPaise) ->
+                db.financeDao().saveBudget(category, month.atDay(1).toEpochDay(), amountPaise, now)
+            }
+            val overall = adaptiveAllocations.values.fold(0L) { total, amount -> Math.addExact(total, amount) }
+            db.financeDao().saveBudget(FinanceCalculations.OVERALL_BUDGET_CATEGORY,
+                month.atDay(1).toEpochDay(), overall, now)
+        }
+    }
     val analysisDate = if (month == YearMonth.now()) LocalDate.now() else month.atEndOfMonth()
     val financialSnapshot = remember(expenses, budgets, loans, month) {
         FinancialAnalysisEngine.analyze(expenses, budgets, loans, analysisDate)
@@ -82,6 +108,23 @@ fun InsightsScreen() {
             ?.let { "%d.%02d".format(it.amountPaise / 100, it.amountPaise % 100) } ?: "")
     }
     var message by remember { mutableStateOf<String?>(null) }
+    val monthExpenses = remember(expenses, month) {
+        expenses.filter { it.occurredOnEpochDay in month.atDay(1).toEpochDay()..incomeEndEpochDay }
+    }
+    val csvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) {
+            val records = monthExpenses
+            scope.launch {
+                try {
+                    withContext(Dispatchers.IO) {
+                        FinanceCsvTransfer.writeText(context.contentResolver, uri, FinanceCsvTransfer.exportCsv(records))
+                    }
+                    message = "Monthly expense CSV saved."
+                } catch (e: CancellationException) { throw e }
+                catch (e: Exception) { message = e.message ?: "CSV export failed." }
+            }
+        }
+    }
     val pdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
         if (uri != null) {
             val snapshot = summary
@@ -188,6 +231,10 @@ fun InsightsScreen() {
                 }
             }
         }
+        LegacyCategoryDonutChart(summary.categoryTotalsPaise)
+        LegacyWeeklySpendChart(monthExpenses, month)
+        LegacyPaymentModeBreakdown(expenses, month)
+
         Text("Category spending movement", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         Text(
             if (month == YearMonth.now()) {
@@ -225,11 +272,72 @@ fun InsightsScreen() {
             }
         }
 
+        Text("Historical spending averages", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        Text("Calculated from all imported expense records. Averages use the full calendar span between the earliest and latest transaction, including days with no transactions.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (historicalSummary == null) {
+            Text("Import historical CSV records to unlock daily, weekly, monthly and yearly averages.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            SummaryCard("All-time recorded expenditure", MoneyParser.formatPaise(historicalSummary.totalSpentPaise),
+                "${historicalSummary.transactionCount} transactions · ${historicalSummary.coveredDays} calendar days covered")
+            SummaryCard("Average per day", MoneyParser.formatPaise(historicalSummary.averagePerDayPaise),
+                "Across ${historicalSummary.coveredDays} calendar day(s)")
+            SummaryCard("Average per week", MoneyParser.formatPaise(historicalSummary.averagePerWeekPaise),
+                "Across ${historicalSummary.coveredWeeks} calendar week(s)")
+            SummaryCard("Average per month", MoneyParser.formatPaise(historicalSummary.averagePerMonthPaise),
+                "Across ${historicalSummary.coveredMonths} calendar month(s)")
+            SummaryCard("Average per year", MoneyParser.formatPaise(historicalSummary.averagePerYearPaise),
+                "Across ${historicalSummary.coveredYears} calendar year(s)")
+            Text("Year-wise expenditure", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            historicalSummary.yearlyTotals.takeLast(8).asReversed().forEach { yearly ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween) {
+                    Text(yearly.year.toString())
+                    Text(MoneyParser.formatPaise(yearly.amountPaise), fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+
         Text("Data coverage: ${financialSnapshot.dataCoverageDays} day(s) since the earliest recorded expense. Sparse history can make comparisons unreliable.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Adaptive category budgets", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text("Automatically allocate this month from the previous complete month's actual category spending.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(
+                        checked = adaptiveBudgetsEnabled,
+                        onCheckedChange = {
+                            adaptiveBudgetsEnabled = it
+                            budgetPreferences.edit().putBoolean("adaptive_category_budgets", it).apply()
+                        }
+                    )
+                }
+                Text(
+                    if (adaptiveBudgetsEnabled) "Enabled: limits recalculate when historical records change. Each category receives a 10% buffer, rounded up to ₹100. Manual budget editing is best done with this mode switched off."
+                    else "Disabled: budgets stay under your manual control. Turn this on to use previous-month spending as the allocation baseline.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (adaptiveBudgetsEnabled && adaptiveAllocations.isEmpty()) {
+                    Text("No expenses were found in the previous month. Import or record that month's transactions first.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                } else if (adaptiveBudgetsEnabled) {
+                    Text("Based on ${month.minusMonths(1)} · ${adaptiveAllocations.size} category allocation(s)",
+                        style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    adaptiveAllocations.forEach { (category, amount) ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween) {
+                            Text(category)
+                            Text(MoneyParser.formatPaise(amount), fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                    Text("Total monthly limit: " +
+                        MoneyParser.formatPaise(adaptiveAllocations.values.fold(0L) { total, amount -> Math.addExact(total, amount) }),
+                        fontWeight = FontWeight.SemiBold)
+                }
                 Text("Overall monthly budget", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 OutlinedTextField(
                     value = budgetAmount, onValueChange = { budgetAmount = it },
@@ -291,6 +399,9 @@ fun InsightsScreen() {
                 }
                 Button(onClick = { pdfLauncher.launch("dhanam-report-$month.pdf") }, modifier = Modifier.fillMaxWidth()) {
                     Text("Export monthly report as PDF")
+                }
+                Button(onClick = { csvLauncher.launch("dhanam-expenses-$month.csv") }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Export this month's expenses as CSV")
                 }
             }
         }

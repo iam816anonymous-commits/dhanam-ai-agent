@@ -57,6 +57,21 @@ class AgentActionPlannerTest {
         })
     }
 
+    @Test fun historicalSpendingQueriesSelectAllHistoryYearAndSpecificMonth() {
+        val all = AgentActionPlanner.parse("give me average per day week month and year for all history")
+            .action as PlannedFinanceAction.AnalyzeSpending
+        assertTrue(all.allHistory)
+
+        val year = AgentActionPlanner.parse("analyze my expenses for 2025")
+            .action as PlannedFinanceAction.AnalyzeSpending
+        assertEquals(2025, year.historyYear)
+        assertEquals(false, year.allHistory)
+
+        val month = AgentActionPlanner.parse("analyze October 2025 expenses")
+            .action as PlannedFinanceAction.AnalyzeSpending
+        assertEquals(YearMonth.of(2025, 10), month.historyMonth)
+    }
+
     @Test fun incomeCommandsCreateValidatedFinancePreviews() {
         val salary = AgentActionPlanner.parse("salary 50000").action as PlannedFinanceAction.AddIncome
         assertEquals(5_000_000L, salary.amountPaise)

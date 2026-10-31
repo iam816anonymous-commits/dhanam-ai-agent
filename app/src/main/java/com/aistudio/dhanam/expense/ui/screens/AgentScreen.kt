@@ -35,6 +35,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -47,6 +48,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aistudio.dhanam.expense.agent.AgentViewModel
 import com.aistudio.dhanam.expense.agent.PlannedFinanceAction
@@ -63,10 +67,21 @@ fun AgentScreen(
     onOpenSettings: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val voicePreferences = remember(context) { context.getSharedPreferences("dhanam_voice", 0) }
     val state by viewModel.state.collectAsState()
     var voiceFeedbackEnabled by remember(context) {
         mutableStateOf(voicePreferences.getBoolean("voice_feedback_enabled", false))
+    }
+
+    DisposableEffect(lifecycleOwner, context) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                voiceFeedbackEnabled = voicePreferences.getBoolean("voice_feedback_enabled", false)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     val latestAssistantMessage = state.messages.lastOrNull()?.takeIf { it.role == "assistant" }
     AgentSpeechFeedback(
@@ -182,6 +197,19 @@ fun AgentScreen(
                         label = { Text(command.label) },
                         enabled = !state.busy
                     )
+                }
+            }
+        }
+
+        if (state.undoDescription != null) {
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Undo available", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        Text(state.undoDescription.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    OutlinedButton(onClick = viewModel::undoLastAction, enabled = !state.busy) { Text("Undo") }
                 }
             }
         }

@@ -32,6 +32,8 @@ import com.aistudio.dhanam.expense.reminders.FinanceReminderSection
 import com.aistudio.dhanam.expense.ui.components.FinanceDataSection
 import com.aistudio.dhanam.expense.ui.components.LegacyMigrationSection
 import com.aistudio.dhanam.expense.ui.components.ModelManagerSection
+import com.aistudio.dhanam.expense.ui.components.VoicePreferencesSection
+import com.aistudio.dhanam.expense.ui.components.VoiceTranslationModelsSection
 import com.aistudio.dhanam.expense.model.LocalInferenceViewModel
 
 @Composable
@@ -93,6 +95,8 @@ fun SettingsScreen(
                 )
             }
         }
+        VoicePreferencesSection()
+        VoiceTranslationModelsSection()
         FinanceDataSection()
         LegacyMigrationSection()
         ModelManagerSection(inferenceViewModel = inferenceViewModel)

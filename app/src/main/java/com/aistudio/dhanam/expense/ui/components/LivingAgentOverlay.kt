@@ -46,6 +46,7 @@ fun LivingAgentOverlay(
     activity: String,
     status: String?,
     onNavigate: (AppDestination) -> Unit,
+    onVoiceRecognized: (String, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -127,6 +128,12 @@ fun LivingAgentOverlay(
                 }
             }
         }
+
+        AgentVoiceControl(
+            enabled = activity !in setOf("thinking", "acting"),
+            onRecognized = onVoiceRecognized,
+            modifier = Modifier.padding(end = 4.dp)
+        )
 
         androidx.compose.foundation.layout.Box(
             modifier = Modifier

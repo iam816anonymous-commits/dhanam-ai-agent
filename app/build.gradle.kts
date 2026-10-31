@@ -23,6 +23,12 @@ android {
 }
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 
+// Debug and release KSP both write Room schema output. Serialize these tasks to avoid
+// a variant reading the shared JSON file while the other variant is still writing.
+tasks.matching { it.name == "kspReleaseKotlin" }.configureEach {
+    dependsOn("kspDebugKotlin")
+}
+
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
@@ -48,6 +54,8 @@ dependencies {
     implementation("androidx.room:room-ktx:2.8.5")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.18.0")
+    implementation("com.google.mlkit:language-id:17.0.6")
+    implementation("com.google.mlkit:translate:17.0.3")
     ksp("androidx.room:room-compiler:2.8.5")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

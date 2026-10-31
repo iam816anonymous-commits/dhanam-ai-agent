@@ -10,6 +10,7 @@ import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.ThinkingConfig
 import com.aistudio.dhanam.expense.agent.SharedAgentCoordinator
+import com.aistudio.dhanam.expense.agent.FinanceDomainPolicy
 import java.util.concurrent.Executors
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -294,6 +295,16 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
             _state.update { it.copy(error = error.message) }
             return
         }
+        if (!FinanceDomainPolicy.isSupportedRequest(prompt)) {
+            _state.update {
+                it.copy(
+                    reply = FinanceDomainPolicy.OUT_OF_SCOPE_REPLY,
+                    error = null,
+                    status = "Local model requests are restricted to Dhanam finance workflows."
+                )
+            }
+            return
+        }
         if (!_state.value.isReady || _state.value.isLoading) return
         // This is an interactive user session. Only autonomous/background learning is night-windowed.
         scope.launch {
@@ -303,7 +314,6 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
             memoryBudgetExceeded = false
             _state.update { it.copy(isGenerating = true, reply = "", error = null, status = "Generating on-device…") }
             val builder = StringBuilder()
-            var chunksSinceUiUpdate = 0
             var outputLimitReached = false
             try {
                 checkNotNull(conversation) { "The local conversation is not available. Reload the model." }
@@ -332,16 +342,19 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                                 _state.update { it.copy(status = "Response reached the 1,800-character safety limit. Stopping generation…") }
                                 try { conversation?.cancelProcess() } catch (_: Exception) { }
                             } else {
+                                // Keep free-form output off-screen until the complete response passes
+                                // the finance-domain output guard below.
                                 builder.append(piece)
-                                chunksSinceUiUpdate++
-                                if (chunksSinceUiUpdate >= UI_UPDATE_CHUNK_INTERVAL) {
-                                    _state.update { it.copy(reply = builder.toString()) }
-                                    chunksSinceUiUpdate = 0
-                                }
                             }
                         }
                     }
-                _state.update { it.copy(reply = builder.toString()) }
+                val rawResponse = builder.toString()
+                val safeResponse = when {
+                    rawResponse.isBlank() -> ""
+                    FinanceDomainPolicy.isSafeModelResponse(rawResponse) -> rawResponse
+                    else -> FinanceDomainPolicy.OUT_OF_SCOPE_REPLY
+                }
+                _state.update { it.copy(reply = safeResponse) }
                 if (!stopRequested) {
                     _state.update { it.copy(status = "Response complete. Generated locally; no cloud API was used.") }
                 }

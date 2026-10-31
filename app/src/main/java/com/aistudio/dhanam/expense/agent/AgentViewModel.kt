@@ -8,8 +8,10 @@ import com.aistudio.dhanam.expense.data.KhataLoanEntity
 import com.aistudio.dhanam.expense.data.AgentSkillEntity
 import com.aistudio.dhanam.expense.data.RepaymentEntity
 import com.aistudio.dhanam.expense.data.IncomeEntity
+import com.aistudio.dhanam.expense.data.BudgetEntity
 import com.aistudio.dhanam.expense.data.FinanceDatabase
 import com.aistudio.dhanam.expense.domain.MoneyParser
+import com.aistudio.dhanam.expense.domain.HistoricalFinanceAnalysis
 import com.aistudio.dhanam.expense.domain.IncomeInputValidator
 import com.aistudio.dhanam.expense.domain.KhataValidator
 import com.aistudio.dhanam.expense.model.LocalInferenceViewModel
@@ -30,14 +32,24 @@ data class AgentState(
     val pendingAction: PlannedFinanceAction? = null,
     val busy: Boolean = false,
     val activity: String = "idle",
-    val status: String? = null
+    val status: String? = null,
+    val undoDescription: String? = null
 )
+
+private sealed class AgentUndoAction(val description: String) {
+    data class Expense(val id: Long, val updatedAt: Long, val title: String) : AgentUndoAction("Expense: $title")
+    data class Income(val id: Long, val updatedAt: Long, val title: String) : AgentUndoAction("Income: $title")
+    data class Loan(val id: Long, val updatedAt: Long, val person: String) : AgentUndoAction("Khata record: $person")
+    data class Budget(val category: String, val monthEpochDay: Long, val appliedUpdatedAt: Long, val previous: BudgetEntity?) : AgentUndoAction("Budget: $category")
+    data class Repayment(val requestId: String, val person: String) : AgentUndoAction("Repayment: $person")
+}
 
 class AgentViewModel(application: Application) : AndroidViewModel(application) {
     private val db = FinanceDatabase.getInstance(application)
     private val dao = db.financeDao()
     private var localInference: LocalInferenceViewModel? = null
     private var sharedCoordinator: SharedAgentCoordinator? = null
+    private var lastUndoAction: AgentUndoAction? = null
     @Volatile private var activeSkills: List<AgentSkillEntity> = emptyList()
     private val _state = MutableStateFlow(AgentState())
     val state: StateFlow<AgentState> = _state.asStateFlow()
@@ -56,23 +68,33 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     }
 
 
-    fun submit(text: String) {
+    fun submit(text: String, displayText: String = text) {
         val input = text.trim().take(1000)
+        val commandInput = FinanceDomainPolicy.normalizeRequest(input)
         if (input.isEmpty() || _state.value.busy) return
         val previousPending = _state.value.pendingAction
         _state.value = _state.value.copy(
-            messages = (_state.value.messages + AgentChatMessage(role = "user", text = input)).takeLast(MAX_CHAT_MESSAGES - 1),
+            messages = (_state.value.messages + AgentChatMessage(role = "user", text = displayText.take(2000))).takeLast(MAX_CHAT_MESSAGES - 1),
             status = null, activity = "thinking"
         )
 
-        if (input.lowercase() in setOf("cancel", "cancel that", "never mind", "nevermind", "stop", "discard")) {
+        if (commandInput.lowercase() in setOf("cancel", "cancel that", "never mind", "nevermind", "stop", "discard")) {
             _state.value = _state.value.copy(pendingAction = null, activity = "idle", status = "No changes were saved.")
             appendAssistant("Cancelled. Nothing was changed.")
             return
         }
 
+        if (!FinanceDomainPolicy.isSupportedRequest(commandInput, hasPendingFinanceAction = previousPending != null)) {
+            appendAssistant(FinanceDomainPolicy.OUT_OF_SCOPE_REPLY)
+            _state.value = _state.value.copy(
+                activity = if (previousPending != null) "awaiting_confirmation" else "idle",
+                status = "This assistant is restricted to Dhanam's finance features."
+            )
+            return
+        }
+
         if (previousPending != null) {
-            val correction = AgentActionPlanner.applyCorrection(previousPending, input)
+            val correction = AgentActionPlanner.applyCorrection(previousPending, commandInput)
             if (correction != null) {
                 _state.value = _state.value.copy(
                     messages = _state.value.messages + AgentChatMessage(role = "assistant", text = correction.message),
@@ -81,7 +103,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 return
             }
-            if (Regex("""(?i)^(actually|change that|correct that|instead|make it|set it|change the amount|change the category|change the description|change description|change title|change item)\b""").containsMatchIn(input)) {
+            if (Regex("""(?i)^(actually|change that|correct that|instead|make it|set it|change the amount|change the category|change the description|change description|change title|change item)\b""").containsMatchIn(commandInput)) {
                 appendAssistant("I couldn't apply that correction safely. Please say, for example, “actually change that to 300”, “change category to transport”, or “change description to taxi”. The current draft has not been saved.")
                 _state.value = _state.value.copy(pendingAction = previousPending, activity = "awaiting_confirmation")
                 return
@@ -92,7 +114,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         // so the old confirmation cannot be tapped while the new request is being resolved.
         _state.value = _state.value.copy(pendingAction = null)
 
-        val repayment = Regex("""(?i)^record repayment\s+([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s+(from|to)\s+(.+)$""").matchEntire(input)
+        val repayment = Regex("""(?i)^record repayment\s+([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s+(from|to)\s+(.+)$""").matchEntire(commandInput)
         if (repayment != null) {
             _state.value = _state.value.copy(busy = true)
             viewModelScope.launch {
@@ -121,6 +143,8 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                             pendingAction = action, activity = "awaiting_confirmation", busy = false
                         )
                     }
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
                 } catch (e: Exception) {
                     appendAssistant(e.message ?: "I couldn't prepare that repayment.")
                     _state.value = _state.value.copy(activity = "idle", busy = false)
@@ -129,7 +153,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        val result = AgentActionPlanner.parseWithLearnedSkills(input, activeSkills)
+        val result = AgentActionPlanner.parseWithLearnedSkills(commandInput, activeSkills)
         val analysisAction = result.action as? PlannedFinanceAction.AnalyzeSpending
         if (analysisAction != null) {
             _state.value = _state.value.copy(
@@ -140,7 +164,13 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             )
             viewModelScope.launch {
                 try {
-                    appendAssistant(buildSpendingAnalysis(analysisAction.month, analysisAction.category))
+                    val report = when {
+                        analysisAction.allHistory -> buildHistoricalSpendingAnalysis(null, null, analysisAction.category)
+                        analysisAction.historyMonth != null -> buildHistoricalSpendingAnalysis(null, analysisAction.historyMonth, analysisAction.category)
+                        analysisAction.historyYear != null -> buildHistoricalSpendingAnalysis(analysisAction.historyYear, null, analysisAction.category)
+                        else -> buildSpendingAnalysis(analysisAction.month, analysisAction.category)
+                    }
+                    appendAssistant(report)
                     _state.value = _state.value.copy(activity = "complete", status = "Analysis calculated from local financial records.")
                 } catch (error: kotlinx.coroutines.CancellationException) {
                     throw error
@@ -174,7 +204,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                     val proposalText = coordinator.run(
                         AgentTaskRequest(
                             role = DhanamAgentRole.FINANCE_OPERATIONS,
-                            prompt = AgentActionPlanner.modelPrompt(input),
+                            prompt = AgentActionPlanner.modelPrompt(commandInput),
                             priority = AgentTaskPriority.USER_REQUEST,
                             requiresNightWindow = false
                         )
@@ -186,6 +216,8 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                         activity = if (proposal.action != null) "awaiting_confirmation" else "idle",
                         busy = false
                     )
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
                 } catch (error: Exception) {
                     appendAssistant("I couldn't safely interpret that with the local model. No changes were made. Try a specific command or clarify the amount/category. ${error.message ?: ""}".trim())
                     _state.value = _state.value.copy(pendingAction = null, activity = "idle", busy = false)
@@ -207,6 +239,40 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         appendAssistant("Cancelled. Nothing was changed.")
     }
 
+    /** Reverses only the latest assistant-created record and only if it is unchanged. */
+    fun undoLastAction() {
+        val action = lastUndoAction ?: return
+        if (_state.value.busy) return
+        _state.value = _state.value.copy(busy = true, activity = "acting", status = "Checking whether the last action can be safely reversed…")
+        viewModelScope.launch {
+            try {
+                val undone = when (action) {
+                    is AgentUndoAction.Expense -> dao.deleteExpenseIfUnchanged(action.id, action.updatedAt) == 1
+                    is AgentUndoAction.Income -> dao.deleteIncomeIfUnchanged(action.id, action.updatedAt) == 1
+                    is AgentUndoAction.Loan -> dao.deleteLoanIfUnchanged(action.id, action.updatedAt) == 1
+                    is AgentUndoAction.Budget -> {
+                        val current = dao.findBudget(action.category, action.monthEpochDay)
+                        if (current == null || current.updatedAtEpochMillis != action.appliedUpdatedAt) false
+                        else if (action.previous == null) dao.deleteBudgetById(current.id) == 1
+                        else dao.updateBudget(action.previous.copy(updatedAtEpochMillis = System.currentTimeMillis())) == 1
+                    }
+                    is AgentUndoAction.Repayment -> dao.undoRepayment(action.requestId)
+                }
+                check(undone) { "Undo was not applied because the record changed or no longer exists. No unrelated record was modified." }
+                lastUndoAction = null
+                _state.value = _state.value.copy(activity = "complete", status = "The last assistant action was reversed and checked against the local database.", undoDescription = null)
+                appendAssistant("Undid ${action.description}. The local record was checked after the reversal.")
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(activity = "error", status = error.message ?: "The last action could not be safely reversed.")
+                appendAssistant(error.message ?: "Undo failed. Check the financial record before trying again.")
+            } finally {
+                _state.value = _state.value.copy(busy = false)
+            }
+        }
+    }
+
     fun confirmPending() {
         val action = _state.value.pendingAction ?: return
         if (_state.value.busy) return
@@ -226,6 +292,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                         check(saved != null && saved.amountPaise == action.amountPaise && saved.title == action.title) {
                             "Expense save could not be verified. Check the Expenses list before retrying."
                         }
+                        lastUndoAction = AgentUndoAction.Expense(saved.id, saved.updatedAtEpochMillis, saved.title)
                         appendAssistant("Verified: expense “${saved.title}” saved as record #${saved.id} for ${MoneyParser.formatPaise(saved.amountPaise)}.")
                     }
                     is PlannedFinanceAction.AddIncome -> {
@@ -254,6 +321,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                             saved.category == validated.category) {
                             "Income save could not be verified. Check Expenses → Income before retrying."
                         }
+                        lastUndoAction = AgentUndoAction.Income(saved.id, saved.updatedAtEpochMillis, saved.title)
                         appendAssistant("Verified: income “${saved.title}” saved as record #${saved.id} for ${MoneyParser.formatPaise(saved.amountPaise)}.")
                     }
                     is PlannedFinanceAction.AddLoan -> {
@@ -287,16 +355,20 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                             saved.outstandingPaise == validated.principalPaise) {
                             "Khata save could not be verified. Check Khata before retrying."
                         }
+                        lastUndoAction = AgentUndoAction.Loan(saved.id, saved.updatedAtEpochMillis, saved.personName)
                         val relation = if (saved.direction == KhataValidator.LENT) "lent to" else "borrowed from"
                         appendAssistant("Verified: recorded ${MoneyParser.formatPaise(saved.principalPaise)} $relation ${saved.personName} in Khata.")
                     }
                     is PlannedFinanceAction.SetBudget -> {
                         val monthEpochDay = action.month.atDay(1).toEpochDay()
-                        dao.saveBudget(action.category, monthEpochDay, action.amountPaise, System.currentTimeMillis())
+                        val previous = dao.findBudget(action.category, monthEpochDay)
+                        val now = System.currentTimeMillis()
+                        dao.saveBudget(action.category, monthEpochDay, action.amountPaise, now)
                         val saved = dao.findBudget(action.category, monthEpochDay)
                         check(saved != null && saved.amountPaise == action.amountPaise) {
                             "Budget save could not be verified. Check Insights before retrying."
                         }
+                        lastUndoAction = AgentUndoAction.Budget(action.category, monthEpochDay, saved.updatedAtEpochMillis, previous)
                         appendAssistant("Verified: ${saved.category} budget set to ${MoneyParser.formatPaise(saved.amountPaise)} for ${action.month}.")
                     }
                     is PlannedFinanceAction.RecordRepayment -> {
@@ -305,10 +377,11 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                             loan.direction == action.direction && loan.outstandingPaise >= action.amountPaise && !loan.isSettled) {
                             "The Khata record changed or no longer has enough outstanding balance. Review it before retrying."
                         }
+                        val repaymentNow = System.currentTimeMillis()
                         val inserted = dao.recordRepayment(RepaymentEntity(
                             loanId = action.loanId, amountPaise = action.amountPaise,
                             paidOnEpochDay = action.date.toEpochDay(), note = "Recorded by Dhanam assistant",
-                            requestId = action.requestId, createdAtEpochMillis = System.currentTimeMillis()
+                            requestId = action.requestId, createdAtEpochMillis = repaymentNow
                         ))
                         check(inserted) { "This repayment request was already recorded; check Khata before retrying." }
                         val savedLoan = dao.findLoan(action.loanId)
@@ -316,10 +389,13 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                         check(savedLoan != null && savedRepayment != null && savedLoan.paidPaise >= loan.paidPaise + action.amountPaise) {
                             "Repayment save could not be verified. Check Khata before retrying."
                         }
+                        lastUndoAction = AgentUndoAction.Repayment(action.requestId, action.personName)
                         appendAssistant("Verified: repayment of ${MoneyParser.formatPaise(action.amountPaise)} recorded for ${action.personName}.")
                     }
                 }
-                _state.value = _state.value.copy(pendingAction = null, activity = "complete", status = "Action verified against the local database.")
+                _state.value = _state.value.copy(pendingAction = null, activity = "complete", status = "Action verified against the local database.", undoDescription = lastUndoAction?.description)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 _state.value = _state.value.copy(activity = "error", status = e.message ?: "Action failed. No success is claimed.")
                 appendAssistant(e.message ?: "The action failed. Check the record before retrying.")
@@ -327,6 +403,71 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 _state.value = _state.value.copy(busy = false)
             }
         }
+    }
+
+    private suspend fun buildHistoricalSpendingAnalysis(
+        year: Int?,
+        month: YearMonth?,
+        category: String?
+    ): String {
+        val allExpenses = dao.expensesSince(LocalDate.of(1, 1, 1).toEpochDay())
+        val selected = allExpenses.filter { expense ->
+            val date = LocalDate.ofEpochDay(expense.occurredOnEpochDay)
+            (year == null || date.year == year) &&
+                (month == null || YearMonth.from(date) == month) &&
+                (category == null || expense.category.equals(category, ignoreCase = true))
+        }
+        val period = when {
+            month != null -> month.toString()
+            year != null -> year.toString()
+            else -> "all imported years"
+        }
+        val summary = HistoricalFinanceAnalysis.summarize(selected)
+            ?: return "No imported expense records found for " + period +
+                (category?.let { " in " + it } ?: "") +
+                ". Import a CSV with description, amount and date columns, then ask me again."
+        val lines = mutableListOf<String>()
+        lines += "Historical expenditure analysis · " + period
+        if (category != null) lines += "Category filter: " + category + "."
+        lines += "Total recorded expenditure: " + MoneyParser.formatPaise(summary.totalSpentPaise) +
+            " across " + summary.transactionCount + " transaction(s)."
+        lines += "Average per calendar day: " + MoneyParser.formatPaise(summary.averagePerDayPaise) + "."
+        lines += "Average per calendar week: " + MoneyParser.formatPaise(summary.averagePerWeekPaise) + "."
+        lines += "Average per calendar month: " + MoneyParser.formatPaise(summary.averagePerMonthPaise) + "."
+        lines += "Average per calendar year: " + MoneyParser.formatPaise(summary.averagePerYearPaise) + "."
+        lines += "Data span: " + summary.coveredDays + " day(s), " + summary.coveredWeeks +
+            " week(s), " + summary.coveredMonths + " month(s), " + summary.coveredYears +
+            " calendar year(s), from " +
+            LocalDate.ofEpochDay(selected.minOf { it.occurredOnEpochDay }) + " to " +
+            LocalDate.ofEpochDay(selected.maxOf { it.occurredOnEpochDay }) + "."
+        val categoryTotals = selected.groupBy { it.category }.mapValues { (_, rows) ->
+            rows.fold(0L) { total, row -> Math.addExact(total, row.amountPaise) }
+        }.toList().sortedByDescending { it.second }
+        if (categoryTotals.isNotEmpty()) {
+            lines += "Category totals:"
+            categoryTotals.take(8).forEach { (name, amount) ->
+                lines += "• " + name + ": " + MoneyParser.formatPaise(amount) + "."
+            }
+        }
+        if (summary.yearlyTotals.isNotEmpty()) {
+            lines += "Year-wise totals:"
+            summary.yearlyTotals.forEach { yearly ->
+                lines += "• " + yearly.year + ": " + MoneyParser.formatPaise(yearly.amountPaise) + "."
+            }
+        }
+        val monthlyTotals = selected.groupBy {
+            YearMonth.from(LocalDate.ofEpochDay(it.occurredOnEpochDay))
+        }.mapValues { (_, rows) ->
+            rows.fold(0L) { total, row -> Math.addExact(total, row.amountPaise) }
+        }.toList().sortedByDescending { it.first }
+        if (monthlyTotals.isNotEmpty()) {
+            lines += "Month-wise totals (latest 24 shown):"
+            monthlyTotals.take(24).forEach { (periodMonth, amount) ->
+                lines += "• " + periodMonth + ": " + MoneyParser.formatPaise(amount) + "."
+            }
+        }
+        lines += "These figures describe records imported into Dhanam, not necessarily every real-world transaction. Verify the source CSV and category mapping before making financial decisions."
+        return lines.joinToString("\n")
     }
 
     private suspend fun buildSpendingAnalysis(month: YearMonth, category: String?): String {

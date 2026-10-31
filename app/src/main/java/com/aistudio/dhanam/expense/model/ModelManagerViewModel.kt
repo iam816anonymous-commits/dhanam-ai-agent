@@ -64,6 +64,7 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
     /** Refresh every catalogue entry so users can see why each model is or is not runnable. */
     fun refresh() {
         val selectedId = _state.value.selectedModelId
+        val selectedModel = ModelCatalog.models.first { it.id == selectedId }
         viewModelScope.launch {
             val snapshot = withContext(Dispatchers.IO) {
                 val downloadChecks = ModelCatalog.models.associate { candidate ->
@@ -81,7 +82,9 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
                 val selectedVerified = ModelFileVerifier.isValid(
                     selectedFile, selected.expectedBytes, selected.sha256
                 )
-                CatalogSnapshot(downloadChecks, runtimeChecks, installed, selectedVerified)
+                val partialBytes = ModelCatalog.partialFile(getApplication(), selected)
+                    .takeIf { it.isFile }?.length()?.coerceAtMost(selected.expectedBytes) ?: 0L
+                CatalogSnapshot(downloadChecks, runtimeChecks, installed, selectedVerified, partialBytes)
             }
             if (_state.value.selectedModelId != selectedId) return@launch
             val preferred = preferences.getString(KEY_PREFERRED, null)
@@ -95,7 +98,15 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
                 installedModelIds = snapshot.installedModelIds,
                 isVerified = snapshot.selectedVerified,
                 preferredModelId = if (snapshot.selectedVerified) preferred else null,
-                message = if (snapshot.selectedVerified) "Selected model is installed and SHA-256 verified." else _state.value.message
+                downloadedBytes = if (snapshot.selectedVerified) selectedModel.expectedBytes else snapshot.partialBytes,
+                totalBytes = selectedModel.expectedBytes,
+                progress = if (snapshot.selectedVerified) 1f else
+                    (snapshot.partialBytes.toDouble() / selectedModel.expectedBytes.coerceAtLeast(1L)).toFloat().coerceIn(0f, 1f),
+                message = when {
+                    snapshot.selectedVerified -> "Selected model is installed and SHA-256 verified."
+                    snapshot.partialBytes > 0L -> "Paused download found. ${snapshot.partialBytes} bytes are saved; tap Resume download to continue."
+                    else -> _state.value.message
+                }
             )
         }
     }
@@ -117,9 +128,16 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
                         "Download blocked because this device does not meet the resource checks."
                     }
                 }
+                val partialBytes = withContext(Dispatchers.IO) {
+                    ModelCatalog.partialFile(getApplication(), selected)
+                        .takeIf { it.isFile }?.length()?.coerceAtMost(selected.expectedBytes) ?: 0L
+                }
                 _state.value = _state.value.copy(
-                    isDownloading = true, progress = 0f, downloadedBytes = 0L,
-                    totalBytes = selected.expectedBytes, message = "Downloading from the pinned HTTPS source…"
+                    isDownloading = true,
+                    progress = (partialBytes.toDouble() / selected.expectedBytes.coerceAtLeast(1L)).toFloat().coerceIn(0f, 1f),
+                    downloadedBytes = partialBytes,
+                    totalBytes = selected.expectedBytes,
+                    message = if (partialBytes > 0L) "Resuming the saved download…" else "Downloading from the pinned HTTPS source…"
                 )
                 val file = downloader.download(selected) { received, total ->
                     _state.value = _state.value.copy(
@@ -139,7 +157,13 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
                 )
                 refresh()
             } catch (cancelled: CancellationException) {
-                _state.value = _state.value.copy(isDownloading = false, message = "Download cancelled. Partial data was discarded.")
+                val savedBytes = _state.value.downloadedBytes
+                _state.value = _state.value.copy(
+                    isDownloading = false,
+                    totalBytes = selected.expectedBytes,
+                    progress = (savedBytes.toDouble() / selected.expectedBytes.coerceAtLeast(1L)).toFloat().coerceIn(0f, 1f),
+                    message = if (savedBytes > 0L) "Download paused. Your progress is saved and will resume next time." else "Download paused."
+                )
                 throw cancelled
             } catch (error: Exception) {
                 _state.value = _state.value.copy(
@@ -200,7 +224,8 @@ class ModelManagerViewModel(application: Application) : AndroidViewModel(applica
         val downloadEligibility: Map<String, DeviceEligibility>,
         val runtimeEligibility: Map<String, DeviceEligibility>,
         val installedModelIds: Set<String>,
-        val selectedVerified: Boolean
+        val selectedVerified: Boolean,
+        val partialBytes: Long
     )
 
     private companion object { const val KEY_PREFERRED = "preferred_model_id" }
