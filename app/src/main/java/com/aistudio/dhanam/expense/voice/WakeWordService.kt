@@ -309,6 +309,7 @@ class WakeWordService : Service() {
         speechRecognizer = null
         wakeTone?.release()
         wakeTone = null
+        getSystemService(NotificationManager::class.java).cancel(COMMAND_NOTIFICATION_ID)
         super.onDestroy()
     }
 
