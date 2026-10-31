@@ -410,7 +410,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         month: YearMonth?,
         category: String?
     ): String {
-        val allExpenses = dao.expensesSince(LocalDate.of(1900, 1, 1).toEpochDay())
+        val allExpenses = dao.expensesSince(LocalDate.of(1, 1, 1).toEpochDay())
         val selected = allExpenses.filter { expense ->
             val date = LocalDate.ofEpochDay(expense.occurredOnEpochDay)
             (year == null || date.year == year) &&
