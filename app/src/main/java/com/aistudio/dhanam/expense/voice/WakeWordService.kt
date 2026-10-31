@@ -122,7 +122,7 @@ class WakeWordService : Service() {
         stopWakeWordEngine()
         playWakeTone()
         updateNotification("Jarvis heard you · listening for your command")
-        startSpeechToText()
+        mainHandler.postDelayed({ startSpeechToText() }, 250L)
     }
 
     private fun playWakeTone() {
