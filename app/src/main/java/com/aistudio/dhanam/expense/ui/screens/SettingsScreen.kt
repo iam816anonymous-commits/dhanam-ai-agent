@@ -34,6 +34,7 @@ import com.aistudio.dhanam.expense.ui.components.LegacyMigrationSection
 import com.aistudio.dhanam.expense.ui.components.ModelManagerSection
 import com.aistudio.dhanam.expense.ui.components.VoicePreferencesSection
 import com.aistudio.dhanam.expense.ui.components.VoiceTranslationModelsSection
+import com.aistudio.dhanam.expense.ui.components.WakeWordSettingsSection
 import com.aistudio.dhanam.expense.model.LocalInferenceViewModel
 
 @Composable
@@ -97,6 +98,7 @@ fun SettingsScreen(
         }
         VoicePreferencesSection()
         VoiceTranslationModelsSection()
+        WakeWordSettingsSection()
         FinanceDataSection()
         LegacyMigrationSection()
         ModelManagerSection(inferenceViewModel = inferenceViewModel)
