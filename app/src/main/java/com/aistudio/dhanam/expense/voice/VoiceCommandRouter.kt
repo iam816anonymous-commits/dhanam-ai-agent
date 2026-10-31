@@ -9,6 +9,7 @@ import com.aistudio.dhanam.expense.ui.AppDestination
 object VoiceCommandRouter {
     fun destinationFor(transcript: String): AppDestination? {
         val text = transcript.trim().lowercase()
+            .replace(Regex("""^(?:hey\s+)?(?:jarvis|dhanam)[,!:\s]+"""), "")
             .replace(Regex("""[.!?,]+$"""), "")
             .replace(Regex("""\s+"""), " ")
         if (text.isBlank()) return null
