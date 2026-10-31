@@ -82,37 +82,107 @@ object FinanceCsvTransfer {
         val normalizedText = text.removePrefix("\uFEFF")
         val rows = parseRows(normalizedText)
         require(rows.isNotEmpty()) { "CSV file is empty." }
-        val normalizedHeader = rows.first().map { it.trim().lowercase() }
-        require(normalizedHeader == header || normalizedHeader == legacyHeader) {
-            "CSV headers must be: ${header.joinToString(", ")} (older five-column Dhanam expense CSVs are also supported)."
+        val headers = rows.first().map(::normalizeHeader)
+        val exactHeader = rows.first().map { it.trim().lowercase() }
+        val columnMap = if (exactHeader == header || exactHeader == legacyHeader) {
+            mapOf("description" to 0, "amount" to 1, "category" to 2, "date" to 3, "note" to 4)
+                .plus(if (exactHeader == header) mapOf("payment_mode" to 5, "detected_language" to 6) else emptyMap())
+        } else {
+            headers.mapIndexedNotNull { index, value -> headerAliases[value]?.let { it to index } }.toMap()
         }
-        val hasMetadata = normalizedHeader == header
-        val expectedColumns = normalizedHeader.size
-        require(rows.size - 1 <= MAX_ROWS) { "CSV contains too many rows. Limit: ${MAX_ROWS}." }
+        require(columnMap.containsKey("description") && columnMap.containsKey("amount") && columnMap.containsKey("date")) {
+            "CSV needs description, amount and date columns. Supported names include Description/Expense/Particulars, Amount/Cost, Date/Transaction Date, Category, Notes/Remarks and Payment Method."
+        }
+        require(rows.size - 1 <= MAX_ROWS) { "CSV contains too many rows. Limit: $MAX_ROWS." }
         val parsed = mutableListOf<ExpenseEntity>()
         val errors = mutableListOf<String>()
         val sourceHash = MessageDigest.getInstance("SHA-256")
             .digest(normalizedText.toByteArray(StandardCharsets.UTF_8)).joinToString("") { "%02x".format(it) }
         rows.drop(1).forEachIndexed { index, row ->
-            if (row.size != expectedColumns) {
-                errors += "Row ${index + 2}: expected $expectedColumns columns."
-            } else {
-                try {
-                    val valid = ExpenseInputValidator.validate(row[0], row[1], row[2], row[3], row[4])
-                    parsed += ExpenseEntity(
-                        title = valid.title, amountPaise = valid.amountPaise, category = valid.category,
-                        occurredOnEpochDay = valid.occurredOn.toEpochDay(), note = valid.note,
-                        createdAtEpochMillis = nowMillis, updatedAtEpochMillis = nowMillis,
-                        paymentMode = if (hasMetadata) row[5].trim().ifBlank { "Unknown" } else "Unknown",
-                        detectedLanguage = if (hasMetadata) row[6].trim().ifBlank { "en" } else "en",
-                        sourceRecordKey = "csv:$sourceHash:${index + 2}"
-                    )
-                } catch (e: Exception) {
-                    errors += "Row ${index + 2}: ${e.message ?: "invalid record"}"
-                }
+            val rowNumber = index + 2
+            try {
+                fun value(key: String): String = columnMap[key]?.let { row.getOrNull(it).orEmpty().trim() }.orEmpty()
+                val title = value("description")
+                val amount = normalizeExternalAmount(value("amount"))
+                val category = value("category").ifBlank { "Other" }.let(::normalizeExternalCategory)
+                val date = normalizeExternalDate(value("date"))
+                val valid = ExpenseInputValidator.validate(title, amount, category, date, value("note"))
+                parsed += ExpenseEntity(
+                    title = valid.title, amountPaise = valid.amountPaise, category = valid.category,
+                    occurredOnEpochDay = valid.occurredOn.toEpochDay(), note = valid.note,
+                    createdAtEpochMillis = nowMillis, updatedAtEpochMillis = nowMillis,
+                    paymentMode = value("payment_mode").ifBlank { "Unknown" }.take(60),
+                    detectedLanguage = value("detected_language").ifBlank { "en" }.take(12),
+                    sourceRecordKey = "csv:$sourceHash:$rowNumber"
+                )
+            } catch (error: Exception) {
+                errors += "Row $rowNumber: ${error.message ?: "invalid expense record"}"
             }
         }
         return CsvImportPreview(parsed, errors)
+    }
+
+    private val headerAliases = mapOf(
+        "description" to "description", "expense" to "description", "item" to "description",
+        "particulars" to "description", "details" to "description", "merchant" to "description",
+        "transactiondescription" to "description", "transactiondetails" to "description",
+        "amount" to "amount", "amountrupees" to "amount", "amountinr" to "amount",
+        "cost" to "amount", "price" to "amount", "value" to "amount", "total" to "amount",
+        "expenseamount" to "amount", "debit" to "amount", "spent" to "amount",
+        "category" to "category", "expensecategory" to "category", "type" to "category",
+        "date" to "date", "transactiondate" to "date", "paymentdate" to "date",
+        "occurredon" to "date", "datetime" to "date",
+        "note" to "note", "notes" to "note", "remark" to "note", "remarks" to "note",
+        "memo" to "note", "comment" to "note",
+        "paymentmode" to "payment_mode", "paymentmethod" to "payment_mode", "mode" to "payment_mode",
+        "detectedlanguage" to "detected_language", "language" to "detected_language"
+    )
+
+    private fun normalizeHeader(value: String): String =
+        value.trim().lowercase().replace(Regex("[^a-z0-9]"), "")
+
+    private fun normalizeExternalAmount(value: String): String {
+        val cleaned = value.trim()
+            .replace(Regex("(?i)^(?:INR|Rs\\.?|₹)\\s*"), "")
+            .replace(",", "")
+            .replace(Regex("\\s+"), "")
+        require(cleaned.isNotBlank()) { "Amount is missing." }
+        return cleaned
+    }
+
+    private fun normalizeExternalCategory(value: String): String {
+        val normalized = value.trim().lowercase()
+        val aliases = mapOf(
+            "food" to "Food", "groceries" to "Food", "grocery" to "Food", "restaurant" to "Food",
+            "transport" to "Transport", "travel" to "Transport", "fuel" to "Transport", "commute" to "Transport",
+            "shopping" to "Shopping", "retail" to "Shopping",
+            "bills" to "Bills", "bill" to "Bills", "utilities" to "Bills", "rent" to "Bills",
+            "health" to "Health", "medical" to "Health", "medicine" to "Health",
+            "education" to "Education", "school" to "Education", "fees" to "Education",
+            "other" to "Other", "miscellaneous" to "Other", "misc" to "Other"
+        )
+        return aliases[normalized] ?: ExpenseInputValidator.categories.firstOrNull { it.equals(value.trim(), true) }
+            ?: throw IllegalArgumentException("Unknown category '$value'. Use Food, Transport, Shopping, Bills, Health, Education or Other.")
+    }
+
+    private fun normalizeExternalDate(value: String): String {
+        val raw = value.trim()
+        require(raw.isNotBlank()) { "Date is missing." }
+        val iso = runCatching { LocalDate.parse(raw) }.getOrNull()
+        if (iso != null) return iso.toString()
+        val patterns = listOf(
+            java.time.format.DateTimeFormatter.ofPattern("d/M/uuuu", java.util.Locale.ROOT),
+            java.time.format.DateTimeFormatter.ofPattern("d-M-uuuu", java.util.Locale.ROOT),
+            java.time.format.DateTimeFormatter.ofPattern("d.M.uuuu", java.util.Locale.ROOT),
+            java.time.format.DateTimeFormatter.ofPattern("M/d/uuuu", java.util.Locale.ROOT),
+            java.time.format.DateTimeFormatter.ofPattern("d MMM uuuu", java.util.Locale.ENGLISH),
+            java.time.format.DateTimeFormatter.ofPattern("d MMMM uuuu", java.util.Locale.ENGLISH)
+        )
+        for (formatter in patterns) {
+            val parsed = runCatching { LocalDate.parse(raw, formatter) }.getOrNull()
+            if (parsed != null) return parsed.toString()
+        }
+        throw IllegalArgumentException("Unrecognised date '$raw'. Use YYYY-MM-DD or DD/MM/YYYY.")
     }
 
     fun readText(resolver: ContentResolver, uri: Uri): String {
