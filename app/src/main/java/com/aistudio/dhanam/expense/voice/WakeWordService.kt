@@ -54,6 +54,7 @@ class WakeWordService : Service() {
             }
             ACTION_START, null -> {
                 if (!hasMicrophonePermission()) {
+                    getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
                     stopSelf()
                     return START_NOT_STICKY
                 }
