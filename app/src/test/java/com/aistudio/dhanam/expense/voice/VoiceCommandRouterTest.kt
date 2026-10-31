@@ -8,6 +8,7 @@ import org.junit.Test
 class VoiceCommandRouterTest {
     @Test fun routesExplicitScreenNavigationCommands() {
         assertEquals(AppDestination.EXPENSES, VoiceCommandRouter.destinationFor("show expenses"))
+        assertEquals(AppDestination.EXPENSES, VoiceCommandRouter.destinationFor("open budget"))
         assertEquals(AppDestination.KHATA, VoiceCommandRouter.destinationFor("open khata"))
         assertEquals(AppDestination.INSIGHTS, VoiceCommandRouter.destinationFor("go to insights"))
         assertEquals(AppDestination.SETTINGS, VoiceCommandRouter.destinationFor("open settings"))
