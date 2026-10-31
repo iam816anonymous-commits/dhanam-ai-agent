@@ -49,7 +49,7 @@ object FinanceDomainPolicy {
         val normalized = message.trim()
         if (normalized.isEmpty() || normalized.length > 1800) return false
         if (unsupportedTaskPatterns.any { it.containsMatchIn(normalized) }) return false
-        if (Regex("""(?i)\\b(?:joke|poem|story|song|recipe|weather|code|program|website|device control)\\b""").containsMatchIn(normalized)) return false
+        if (Regex("""(?i)\b(?:joke|poem|story|song|recipe|weather|code|program|website|device control)\b""").containsMatchIn(normalized)) return false
         return financeTerms.any { it.containsMatchIn(normalized) } ||
             appTerms.any { it.containsMatchIn(normalized) }
     }
