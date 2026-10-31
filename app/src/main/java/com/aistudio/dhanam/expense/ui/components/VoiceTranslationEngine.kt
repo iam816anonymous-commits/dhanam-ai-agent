@@ -3,7 +3,6 @@ package com.aistudio.dhanam.expense.ui.components
 import android.content.Context
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.nl.languageid.LanguageIdentification
-import com.google.mlkit.nl.translate.DownloadConditions
 import com.google.mlkit.nl.translate.RemoteModelManager
 import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.TranslateRemoteModel
@@ -57,7 +56,6 @@ object VoiceTranslationEngine {
         val sourceLanguage = TranslateLanguage.fromLanguageTag(language)
             ?: throw IllegalStateException("The on-device translator does not support language '$language'.")
         val targetLanguage = TranslateLanguage.ENGLISH
-        val remoteModel = TranslateRemoteModel.Builder(sourceLanguage).build()
         val manager = RemoteModelManager.getInstance()
         val downloaded = Tasks.await(manager.getDownloadedModels(TranslateRemoteModel::class.java))
         if (downloaded.none { it.language == sourceLanguage }) {

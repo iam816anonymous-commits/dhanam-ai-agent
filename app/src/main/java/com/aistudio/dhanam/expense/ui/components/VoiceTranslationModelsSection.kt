@@ -1,6 +1,5 @@
 package com.aistudio.dhanam.expense.ui.components
 
-import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.nl.translate.DownloadConditions
 import com.google.mlkit.nl.translate.RemoteModelManager
-import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.TranslateRemoteModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

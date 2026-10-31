@@ -33,6 +33,7 @@ import com.aistudio.dhanam.expense.ui.components.FinanceDataSection
 import com.aistudio.dhanam.expense.ui.components.LegacyMigrationSection
 import com.aistudio.dhanam.expense.ui.components.ModelManagerSection
 import com.aistudio.dhanam.expense.ui.components.VoicePreferencesSection
+import com.aistudio.dhanam.expense.ui.components.VoiceTranslationModelsSection
 import com.aistudio.dhanam.expense.model.LocalInferenceViewModel
 
 @Composable

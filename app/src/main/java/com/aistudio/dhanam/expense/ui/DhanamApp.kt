@@ -177,7 +177,7 @@ fun DhanamApp(
                     navigateTo(AppDestination.AGENT)
                     agentViewModel.submit(
                         translated,
-                        displayText = "🎙️ $original\\nEnglish interpretation: $translated"
+                        displayText = "🎙️ $original\nEnglish interpretation: $translated"
                     )
                 },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
