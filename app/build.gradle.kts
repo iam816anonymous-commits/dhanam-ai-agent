@@ -6,7 +6,7 @@ plugins {
 }
 android {
     namespace = "com.aistudio.dhanam.expense"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.aistudio.dhanam.expense"
         minSdk = 27
@@ -41,7 +41,6 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.activity:activity-compose:1.9.2")
     implementation("androidx.biometric:biometric:1.1.0")
-    implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
@@ -52,6 +51,8 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.room:room-runtime:2.8.5")
     implementation("androidx.room:room-ktx:2.8.5")
+    implementation("androidx.sqlite:sqlite:2.7.0")
+    implementation("net.zetetic:sqlcipher-android:4.19.1@aar")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.18.0")
     implementation("com.google.mlkit:language-id:17.0.6")
