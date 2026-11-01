@@ -202,6 +202,20 @@ class WakeWordService : Service() {
                 override fun onBufferReceived(buffer: ByteArray?) = Unit
                 override fun onEndOfSpeech() = Unit
                 override fun onError(error: Int) {
+                    if (
+                        recognitionRoute == SpeechRecognitionRoute.ON_DEVICE &&
+                        SpeechRecognitionPolicy.allowNetworkFallback(this@WakeWordService) &&
+                        (error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE ||
+                            error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED)
+                    ) {
+                        updateNotification("The on-device recognizer does not support this language. Using the online provider you explicitly allowed.")
+                        speechRecognizer?.destroy()
+                        speechRecognizer = null
+                        mainHandler.postDelayed({
+                            if (handlingUtterance.get()) startSpeechToText(forceSystemProvider = true)
+                        }, 500L)
+                        return
+                    }
                     updateNotification("Speech recognition failed (code $error). Say Hey Jarvis to retry.")
                     finishUtteranceAndRearm()
                 }
@@ -247,7 +261,7 @@ class WakeWordService : Service() {
                 offlineSpeechSession = session
                 session.start(object : OfflineVoskSpeechSession.Listener {
                     override fun onPartial(text: String) {
-                        updateNotification("Offline recognition · hearing: ${text.take(75)}")
+                        updateNotification("Offline speech is processing your command on this device.")
                     }
 
                     override fun onFinal(text: String) {
@@ -309,8 +323,8 @@ class WakeWordService : Service() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentTitle("Jarvis understood your command")
-            .setContentText(transcript.take(100))
-            .setStyle(NotificationCompat.BigTextStyle().bigText("Recognized: $transcript\nTap to review it in Dhanam. No financial changes are saved automatically."))
+            .setContentText("Tap to review your command in Dhanam.")
+            .setStyle(NotificationCompat.BigTextStyle().bigText("Your command was transcribed. Tap to review it in Dhanam. No financial changes are saved automatically."))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()
