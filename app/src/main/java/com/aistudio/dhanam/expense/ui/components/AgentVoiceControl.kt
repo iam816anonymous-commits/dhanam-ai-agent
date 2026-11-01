@@ -36,6 +36,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -44,14 +46,16 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.aistudio.dhanam.expense.voice.SpeechRecognitionPolicy
+import com.aistudio.dhanam.expense.voice.OfflineSpeechModelCatalog
+import com.aistudio.dhanam.expense.voice.OfflineVoskSpeechSession
 import java.util.concurrent.atomic.AtomicReference
 
 /**
  * One in-app voice path for the floating assistant.
- * API 31+ uses Android's dedicated on-device recognizer when installed. Older Android
- * versions use the platform recognizer with EXTRA_PREFER_OFFLINE; Android 8.1 cannot
- * guarantee offline recognition through the public platform API.
- * Speech is editable before submission; financial writes still require explicit confirmation.
+ * An installed Vosk model is preferred and runs fully offline. Without one, API 31+ uses
+ * Android's dedicated on-device recognizer when available. The remote-capable system provider
+ * is used only after explicit user consent. Speech remains editable before submission.
  */
 @Composable
 fun AgentVoiceControl(
@@ -79,11 +83,16 @@ fun AgentVoiceControl(
     val translationScope = rememberCoroutineScope()
     var status by remember { mutableStateOf<String?>(null) }
     val recognizerRef = remember { AtomicReference<SpeechRecognizer?>(null) }
+    val offlineSessionRef = remember { AtomicReference<OfflineVoskSpeechSession?>(null) }
 
     fun releaseRecognizer(cancel: Boolean) {
-        val active = recognizerRef.getAndSet(null) ?: return
-        try { if (cancel) active.cancel() } catch (_: Exception) { }
-        try { active.destroy() } catch (_: Exception) { }
+        val offline = offlineSessionRef.getAndSet(null)
+        if (cancel) offline?.cancel()
+        val active = recognizerRef.getAndSet(null)
+        if (active != null) {
+            try { if (cancel) active.cancel() } catch (_: Exception) { }
+            try { active.destroy() } catch (_: Exception) { }
+        }
     }
 
     fun closeDialog() {
@@ -93,13 +102,14 @@ fun AgentVoiceControl(
         showDialog = false
     }
 
-    fun startListening() {
+    fun startListening(forceSystemProvider: Boolean = false, skipOfflineModel: Boolean = false) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             status = "Microphone permission is required. Grant it in Android app permissions and try again."
             return
         }
-        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-            status = "No Android speech-recognition service is installed or enabled. Install or enable one, then retry."
+        val offlineModel = if (forceSystemProvider || skipOfflineModel) null else OfflineSpeechModelCatalog.installedDirectory(context, language)
+        if (offlineModel == null && !SpeechRecognizer.isRecognitionAvailable(context)) {
+            status = "No offline model for $language is installed and no Android speech provider is available."
             isListening = false
             isProcessing = false
             return
@@ -108,25 +118,126 @@ fun AgentVoiceControl(
         transcript = ""
         translatedTranscript = ""
         status = "Preparing the speech service…"
-        try {
-            val onDeviceAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && dedicatedOnDeviceAvailable
-            val instance = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && dedicatedOnDeviceAvailable) {
-                SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-            } else {
-                SpeechRecognizer.createSpeechRecognizer(context)
+        if (offlineModel != null) {
+            isListening = false
+            isProcessing = true
+            status = "Loading the installed offline speech model. Audio stays on this device."
+            translationScope.launch {
+                try {
+                    val session = OfflineVoskSpeechSession.create(context, offlineModel)
+                    if (!showDialog || !lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                        session.cancel()
+                        return@launch
+                    }
+                    offlineSessionRef.set(session)
+                    session.start(object : OfflineVoskSpeechSession.Listener {
+                        override fun onPartial(text: String) {
+                            transcript = text
+                            isListening = true
+                            isProcessing = false
+                            status = "Offline recognition · hearing: $text"
+                        }
+
+                        override fun onFinal(text: String) {
+                            offlineSessionRef.compareAndSet(session, null)
+                            if (text.isBlank()) {
+                                val onDeviceAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                                    runCatching { SpeechRecognizer.isOnDeviceRecognitionAvailable(context) }.getOrDefault(false)
+                                if (onDeviceAvailable) {
+                                    status = "Offline model returned no words. Trying Android's dedicated on-device recognizer."
+                                    translationScope.launch {
+                                        delay(500)
+                                        startListening(skipOfflineModel = true)
+                                    }
+                                } else if (SpeechRecognitionPolicy.allowNetworkFallback(context)) {
+                                    status = "Offline model returned no words. Trying the online provider you explicitly allowed."
+                                    translationScope.launch {
+                                        delay(500)
+                                        startListening(forceSystemProvider = true)
+                                    }
+                                } else {
+                                    isListening = false
+                                    isProcessing = false
+                                    status = "No speech was recognized. Try again or type your request."
+                                }
+                            } else {
+                                transcript = text
+                                isListening = false
+                                isProcessing = false
+                                status = "Transcribed offline. Review and correct the text before sending."
+                            }
+                        }
+
+                        override fun onError(message: String) {
+                            offlineSessionRef.compareAndSet(session, null)
+                            val onDeviceAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                                runCatching { SpeechRecognizer.isOnDeviceRecognitionAvailable(context) }.getOrDefault(false)
+                            if (onDeviceAvailable) {
+                                status = "Offline recognition failed. Trying Android's dedicated on-device recognizer."
+                                translationScope.launch {
+                                    delay(500)
+                                    startListening(skipOfflineModel = true)
+                                }
+                            } else if (SpeechRecognitionPolicy.allowNetworkFallback(context)) {
+                                status = "Offline recognition failed. Trying the online provider you explicitly allowed."
+                                translationScope.launch {
+                                    delay(500)
+                                    startListening(forceSystemProvider = true)
+                                }
+                            } else {
+                                isListening = false
+                                isProcessing = false
+                                status = message
+                            }
+                        }
+                    })
+                    isListening = true
+                    isProcessing = false
+                    status = "Listening offline. Speak your command."
+                } catch (cancel: CancellationException) {
+                    offlineSessionRef.getAndSet(null)?.cancel()
+                    throw cancel
+                } catch (error: Exception) {
+                    offlineSessionRef.getAndSet(null)?.cancel()
+                    if (!showDialog) return@launch
+                    val onDeviceAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                        runCatching { SpeechRecognizer.isOnDeviceRecognitionAvailable(context) }.getOrDefault(false)
+                    if (onDeviceAvailable) {
+                        status = "Offline speech could not start. Trying Android's dedicated on-device recognizer."
+                        delay(500)
+                        startListening(skipOfflineModel = true)
+                    } else if (SpeechRecognitionPolicy.allowNetworkFallback(context)) {
+                        status = "Offline speech could not start. Trying the online provider you explicitly allowed."
+                        delay(500)
+                        startListening(forceSystemProvider = true)
+                    } else {
+                        isListening = false
+                        isProcessing = false
+                        status = error.message ?: "Offline speech recognition could not start."
+                    }
+                }
             }
+            return
+        }
+        try {
+            val (instance, recognitionRoute) = if (forceSystemProvider) {
+                SpeechRecognitionPolicy.createSystemRecognizer(context)
+            } else {
+                SpeechRecognitionPolicy.createRecognizer(context)
+            }
+            val onDeviceAvailable = recognitionRoute == com.aistudio.dhanam.expense.voice.SpeechRecognitionRoute.ON_DEVICE
             recognizerRef.set(instance)
             instance.setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {
                     isListening = true
                     isProcessing = false
                     status = if (onDeviceAvailable) "On-device recognizer ready. Speak now."
-                    else "Speech service ready. Offline is requested but not guaranteed on this Android version."
+                    else "System speech provider ready. Remote processing may occur."
                 }
                 override fun onBeginningOfSpeech() {
                     isListening = true
                     isProcessing = false
-                    status = if (onDeviceAvailable) "Listening on-device…" else "Listening… Android's system service may require network access."
+                    status = if (onDeviceAvailable) "Listening on-device…" else "Listening through the Android system provider. Remote processing may occur."
                 }
                 override fun onRmsChanged(rmsdB: Float) = Unit
                 override fun onBufferReceived(buffer: ByteArray?) = Unit
@@ -137,6 +248,20 @@ fun AgentVoiceControl(
                 }
                 override fun onError(error: Int) {
                     if (recognizerRef.get() !== instance) return
+                    if (
+                        onDeviceAvailable &&
+                        SpeechRecognitionPolicy.allowNetworkFallback(context) &&
+                        (error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE ||
+                            error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED)
+                    ) {
+                        status = "The on-device recognizer does not support this language. Trying the online provider you explicitly allowed."
+                        releaseRecognizer(cancel = true)
+                        translationScope.launch {
+                            delay(500)
+                            startListening(forceSystemProvider = true)
+                        }
+                        return
+                    }
                     isListening = false
                     isProcessing = false
                     status = when (error) {
@@ -191,23 +316,39 @@ fun AgentVoiceControl(
                 onDeviceAvailable -> "Starting dedicated on-device recognition…"
                 Build.VERSION.SDK_INT < Build.VERSION_CODES.S ->
                     "Starting Android system recognition. Offline is only a preference on Android 8–11; test with airplane mode."
-                else -> "No dedicated on-device recognizer is installed. Using the system recognizer; offline use is not guaranteed."
+                else -> "Using the Android system provider. Remote processing may occur because you enabled the online fallback."
             }
         } catch (_: SecurityException) {
             releaseRecognizer(cancel = true)
             isListening = false
             isProcessing = false
             status = "Android denied microphone access. Enable Microphone in app permissions."
-        } catch (_: IllegalStateException) {
+        } catch (error: IllegalStateException) {
             releaseRecognizer(cancel = true)
-            isListening = false
-            isProcessing = false
-            status = "The speech service is already busy or unavailable. Wait briefly and retry."
+            if (!forceSystemProvider && SpeechRecognitionPolicy.allowNetworkFallback(context)) {
+                status = "On-device speech could not start. Trying the online provider you explicitly allowed."
+                translationScope.launch {
+                    delay(500)
+                    startListening(forceSystemProvider = true)
+                }
+            } else {
+                isListening = false
+                isProcessing = false
+                status = error.message ?: "The speech service is already busy or unavailable. Wait briefly and retry."
+            }
         } catch (error: Exception) {
             releaseRecognizer(cancel = true)
-            isListening = false
-            isProcessing = false
-            status = error.message?.take(180) ?: "Could not start speech recognition. Check microphone permission and the installed speech service."
+            if (!forceSystemProvider && SpeechRecognitionPolicy.allowNetworkFallback(context)) {
+                status = "On-device speech could not start. Trying the online provider you explicitly allowed."
+                translationScope.launch {
+                    delay(500)
+                    startListening(forceSystemProvider = true)
+                }
+            } else {
+                isListening = false
+                isProcessing = false
+                status = error.message?.take(180) ?: "Could not start speech recognition. Check microphone permission and the installed speech service."
+            }
         }
     }
 
@@ -224,7 +365,10 @@ fun AgentVoiceControl(
 
     DisposableEffect(context, lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP && recognizerRef.get() != null) {
+            if (
+                event == Lifecycle.Event.ON_STOP &&
+                (recognizerRef.get() != null || offlineSessionRef.get() != null || isProcessing)
+            ) {
                 releaseRecognizer(cancel = true)
                 isListening = false
                 isProcessing = false
@@ -261,9 +405,9 @@ fun AgentVoiceControl(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         when {
-                            dedicatedOnDeviceAvailable -> "The dedicated on-device speech recognizer is available. The selected language pack is checked when recognition starts."
-                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> "No dedicated on-device recognizer is installed. The system recognizer may use network services."
-                            else -> "Android 8–11 use the installed system speech service with an offline preference. This API cannot guarantee offline recognition; test with airplane mode."
+                            dedicatedOnDeviceAvailable -> "A dedicated on-device recognizer is available. The selected language pack is checked when recognition starts."
+                            SpeechRecognitionPolicy.allowNetworkFallback(context) -> "No dedicated on-device recognizer is available. You explicitly allowed the Android system provider, which may send audio to a remote service."
+                            else -> "No guaranteed on-device recognizer is available. Online speech processing is blocked until you explicitly enable it in Settings."
                         }
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -309,8 +453,9 @@ fun AgentVoiceControl(
                         isListening = false
                         isProcessing = true
                         status = "Finishing speech capture…"
-                        try { recognizerRef.get()?.stopListening() }
-                        catch (_: Exception) {
+                        try {
+                            offlineSessionRef.get()?.stop() ?: recognizerRef.get()?.stopListening()
+                        } catch (_: Exception) {
                             releaseRecognizer(cancel = true)
                             isProcessing = false
                             status = "Could not finish the speech session. Try again."

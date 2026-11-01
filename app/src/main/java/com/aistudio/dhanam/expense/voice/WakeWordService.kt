@@ -23,22 +23,36 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import ai.picovoice.porcupine.PorcupineManager
 import ai.picovoice.porcupine.PorcupineManagerCallback
+import ai.picovoice.porcupine.PorcupineManagerErrorCallback
 import com.aistudio.dhanam.expense.MainActivity
-import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * Explicitly user-enabled microphone foreground service.
  *
  * Porcupine owns the microphone while waiting for "Hey Jarvis". Once detected, it releases
- * the microphone and Android SpeechRecognizer converts the following utterance to text.
- * The finance LLM is not loaded or required by this service.
+ * the microphone and the installed Vosk model or an explicitly permitted Android recognizer
+ * converts the following utterance to text. The finance LLM is not loaded by this service.
  */
 class WakeWordService : Service() {
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val handlingUtterance = AtomicBoolean(false)
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val lifecycle = WakeWordLifecycleController()
     private var porcupineManager: PorcupineManager? = null
     private var speechRecognizer: SpeechRecognizer? = null
+    private var offlineSpeechSession: OfflineVoskSpeechSession? = null
     private var wakeTone: ToneGenerator? = null
+    private val speechTimeout = Runnable {
+        if (lifecycle.current() == WakeWordLifecycleState.TRANSCRIBING) {
+            updateNotification("Speech recognition timed out. Say Hey Jarvis to try again.")
+            finishUtteranceAndRearm()
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -49,18 +63,33 @@ class WakeWordService : Service() {
         when (intent?.action) {
             ACTION_STOP -> {
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
+                lifecycle.stop()
                 stopSelf()
                 return START_NOT_STICKY
             }
             ACTION_START, null -> {
                 if (!hasMicrophonePermission()) {
                     getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
+                    lifecycle.stop()
                     stopSelf()
                     return START_NOT_STICKY
                 }
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, true).apply()
-                startAsForeground()
-                mainHandler.post { startWakeWordDetection() }
+                lifecycle.beginStart()
+                try {
+                    startAsForeground()
+                    mainHandler.post { startWakeWordDetection() }
+                } catch (error: SecurityException) {
+                    getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
+                    lifecycle.stop()
+                    stopSelf()
+                    return START_NOT_STICKY
+                } catch (error: RuntimeException) {
+                    getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
+                    lifecycle.stop()
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
                 return START_STICKY
             }
             else -> return START_NOT_STICKY
@@ -85,8 +114,10 @@ class WakeWordService : Service() {
     }
 
     private fun startWakeWordDetection() {
-        if (porcupineManager != null || handlingUtterance.get()) return
+        if (porcupineManager != null || lifecycle.current() == WakeWordLifecycleState.TRANSCRIBING) return
+        lifecycle.beginStart()
         if (!getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(KEY_ENABLED, false)) {
+            lifecycle.stop()
             stopSelf()
             return
         }
@@ -95,6 +126,7 @@ class WakeWordService : Service() {
         if (key.isNullOrBlank() || !model.isFile || model.length() == 0L) {
             getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
             updateNotification("Hey Jarvis is not configured. Open Dhanam Settings.")
+            lifecycle.stop()
             stopSelf()
             return
         }
@@ -106,11 +138,24 @@ class WakeWordService : Service() {
                 .setAccessKey(key)
                 .setKeywordPath(model.absolutePath)
                 .setSensitivities(floatArrayOf(0.58f))
+                .setErrorCallback(PorcupineManagerErrorCallback { error ->
+                    mainHandler.post {
+                        if (lifecycle.current() == WakeWordLifecycleState.LISTENING) {
+                            lifecycle.fail()
+                            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
+                            updateNotification("Wake-word microphone failed: ${error.message?.take(100) ?: "restart Hey Jarvis"}")
+                            stopWakeWordEngine()
+                            stopSelf()
+                        }
+                    }
+                })
                 .build(this, callback)
             porcupineManager?.start()
+            check(lifecycle.beginListening()) { "Wake-word service was not in a startable lifecycle state." }
             updateNotification("Listening for Hey Jarvis · on-device")
         } catch (error: Exception) {
             getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
+            lifecycle.fail()
             updateNotification("Wake-word engine could not start: ${error.message?.take(100) ?: "check setup"}")
             stopWakeWordEngine()
             stopSelf()
@@ -118,7 +163,7 @@ class WakeWordService : Service() {
     }
 
     private fun onWakeWordDetected() {
-        if (!handlingUtterance.compareAndSet(false, true)) return
+        if (!lifecycle.beginTranscription()) return
         stopWakeWordEngine()
         playWakeTone()
         updateNotification("Jarvis heard you · listening for your command")
@@ -140,32 +185,60 @@ class WakeWordService : Service() {
         }
     }
 
-    private fun startSpeechToText() {
-        if (!hasMicrophonePermission() || !SpeechRecognizer.isRecognitionAvailable(this)) {
-            updateNotification("Speech recognition service unavailable. Check Android speech services.")
+    private fun startSpeechToText(forceSystemProvider: Boolean = false, skipOfflineModel: Boolean = false) {
+        if (!hasMicrophonePermission()) {
+            updateNotification("Microphone permission was revoked. Enable it in Android app settings.")
+            finishUtteranceAndRearm()
+            return
+        }
+        val language = getSharedPreferences("dhanam_voice", MODE_PRIVATE)
+            .getString("recognition_language", "en-IN") ?: "en-IN"
+        val offlineModel = if (forceSystemProvider || skipOfflineModel) null else OfflineSpeechModelCatalog.installedDirectory(this, language)
+        if (offlineModel != null) {
+            startOfflineSpeechToText(offlineModel)
+            return
+        }
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            updateNotification("No offline model for this language and no Android speech provider is installed.")
             finishUtteranceAndRearm()
             return
         }
         try {
-            val recognizer = if (
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                SpeechRecognizer.isOnDeviceRecognitionAvailable(this)
-            ) {
-                SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
+            val (recognizer, recognitionRoute) = if (forceSystemProvider) {
+                SpeechRecognitionPolicy.createSystemRecognizer(this)
             } else {
-                SpeechRecognizer.createSpeechRecognizer(this)
+                SpeechRecognitionPolicy.createRecognizer(this)
             }
             speechRecognizer = recognizer
             recognizer.setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: android.os.Bundle?) {
-                    updateNotification("Jarvis is listening · speak your finance command")
+                    updateNotification(
+                        if (recognitionRoute == SpeechRecognitionRoute.ON_DEVICE)
+                            "Jarvis is listening · speech stays on-device"
+                        else
+                            "Jarvis is listening · online speech fallback is enabled"
+                    )
                 }
                 override fun onBeginningOfSpeech() = Unit
                 override fun onRmsChanged(rmsdB: Float) = Unit
                 override fun onBufferReceived(buffer: ByteArray?) = Unit
                 override fun onEndOfSpeech() = Unit
                 override fun onError(error: Int) {
-                    updateNotification("Couldn't recognize speech (code $error). Say Hey Jarvis to retry.")
+                    if (
+                        recognitionRoute == SpeechRecognitionRoute.ON_DEVICE &&
+                        SpeechRecognitionPolicy.allowNetworkFallback(this@WakeWordService) &&
+                        (error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE ||
+                            error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED)
+                    ) {
+                        updateNotification("The on-device recognizer does not support this language. Using the online provider you explicitly allowed.")
+                        speechRecognizer?.destroy()
+                        speechRecognizer = null
+                        mainHandler.postDelayed({
+                            if (lifecycle.current() == WakeWordLifecycleState.TRANSCRIBING) startSpeechToText(forceSystemProvider = true)
+                        }, 500L)
+                        return
+                    }
+                    updateNotification("Speech recognition failed (code $error). Say Hey Jarvis to retry.")
                     finishUtteranceAndRearm()
                 }
                 override fun onResults(results: android.os.Bundle?) {
@@ -190,8 +263,80 @@ class WakeWordService : Service() {
                 putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak your Dhanam command")
             }
             recognizer.startListening(request)
+            mainHandler.removeCallbacks(speechTimeout)
+            mainHandler.postDelayed(speechTimeout, SPEECH_TIMEOUT_MS)
         } catch (error: Exception) {
-            updateNotification("Speech recognition could not start: ${error.message?.take(100) ?: "try again"}")
+            if (!forceSystemProvider && SpeechRecognitionPolicy.allowNetworkFallback(this) &&
+                SpeechRecognizer.isRecognitionAvailable(this)
+            ) {
+                updateNotification("On-device speech could not start. Using the online provider you explicitly allowed.")
+                mainHandler.postDelayed({
+                    if (lifecycle.current() == WakeWordLifecycleState.TRANSCRIBING) {
+                        startSpeechToText(forceSystemProvider = true)
+                    }
+                }, 500L)
+            } else {
+                updateNotification(error.message?.take(140) ?: "Speech recognition could not start. Check speech privacy settings.")
+                finishUtteranceAndRearm()
+            }
+        }
+    }
+
+    private fun startOfflineSpeechToText(modelDirectory: java.io.File) {
+        updateNotification("Using installed offline speech model · audio stays on this device")
+        serviceScope.launch {
+            try {
+                val session = OfflineVoskSpeechSession.create(this@WakeWordService, modelDirectory)
+                if (lifecycle.current() != WakeWordLifecycleState.TRANSCRIBING) {
+                    session.cancel()
+                    return@launch
+                }
+                offlineSpeechSession = session
+                session.start(object : OfflineVoskSpeechSession.Listener {
+                    override fun onPartial(text: String) {
+                        updateNotification("Offline speech is processing your command on this device.")
+                    }
+
+                    override fun onFinal(text: String) {
+                        if (text.isNotBlank()) deliverCommand(text)
+                        else updateNotification("No speech recognized. Say Hey Jarvis and try again.")
+                        finishUtteranceAndRearm()
+                    }
+
+                    override fun onError(message: String) {
+                        offlineSpeechSession = null
+                        fallbackAfterOfflineFailure(message)
+                    }
+                })
+            } catch (cancel: CancellationException) {
+                offlineSpeechSession?.cancel()
+                offlineSpeechSession = null
+                throw cancel
+            } catch (error: Exception) {
+                offlineSpeechSession?.cancel()
+                offlineSpeechSession = null
+                fallbackAfterOfflineFailure(error.message ?: "The offline model could not initialize.")
+            }
+        }
+    }
+
+    private fun fallbackAfterOfflineFailure(message: String) {
+        val onDeviceAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            runCatching { SpeechRecognizer.isOnDeviceRecognitionAvailable(this) }.getOrDefault(false)
+        if (onDeviceAvailable && SpeechRecognizer.isRecognitionAvailable(this)) {
+            updateNotification("Vosk offline speech failed. Trying Android's dedicated on-device recognizer.")
+            mainHandler.postDelayed({
+                if (lifecycle.current() == WakeWordLifecycleState.TRANSCRIBING) {
+                    startSpeechToText(skipOfflineModel = true)
+                }
+            }, 500L)
+        } else if (SpeechRecognitionPolicy.allowNetworkFallback(this) && SpeechRecognizer.isRecognitionAvailable(this)) {
+            updateNotification("Offline speech unavailable. Using the online provider you explicitly allowed.")
+            mainHandler.postDelayed({
+                if (lifecycle.current() == WakeWordLifecycleState.TRANSCRIBING) startSpeechToText(forceSystemProvider = true)
+            }, 500L)
+        } else {
+            updateNotification("Offline speech failed: ${message.take(110)}. Install a supported model or enable online fallback.")
             finishUtteranceAndRearm()
         }
     }
@@ -224,8 +369,8 @@ class WakeWordService : Service() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentTitle("Jarvis understood your command")
-            .setContentText(transcript.take(100))
-            .setStyle(NotificationCompat.BigTextStyle().bigText("Recognized: $transcript\nTap to review it in Dhanam. No financial changes are saved automatically."))
+            .setContentText("Tap to review your command in Dhanam.")
+            .setStyle(NotificationCompat.BigTextStyle().bigText("Your command was transcribed. Tap to review it in Dhanam. No financial changes are saved automatically."))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()
@@ -233,7 +378,11 @@ class WakeWordService : Service() {
     }
 
     private fun finishUtteranceAndRearm() {
-        if (!handlingUtterance.compareAndSet(true, false)) return
+        mainHandler.removeCallbacks(speechTimeout)
+        if (!lifecycle.beginRecovery()) return
+        val activeOfflineSession = offlineSpeechSession
+        offlineSpeechSession = null
+        activeOfflineSession?.cancel()
         val activeRecognizer = speechRecognizer
         speechRecognizer = null
         activeRecognizer?.let {
@@ -242,6 +391,8 @@ class WakeWordService : Service() {
         }
         if (getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(KEY_ENABLED, false)) {
             mainHandler.postDelayed({ startWakeWordDetection() }, REARM_DELAY_MS)
+        } else {
+            lifecycle.stop()
         }
     }
 
@@ -301,6 +452,10 @@ class WakeWordService : Service() {
 
     override fun onDestroy() {
         mainHandler.removeCallbacksAndMessages(null)
+        lifecycle.stop()
+        serviceScope.cancel()
+        offlineSpeechSession?.cancel()
+        offlineSpeechSession = null
         stopWakeWordEngine()
         speechRecognizer?.let {
             runCatching { it.cancel() }
@@ -310,6 +465,7 @@ class WakeWordService : Service() {
         wakeTone?.release()
         wakeTone = null
         getSystemService(NotificationManager::class.java).cancel(COMMAND_NOTIFICATION_ID)
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
 
@@ -328,5 +484,6 @@ class WakeWordService : Service() {
         private const val CHANNEL_ID = "dhanam_hey_jarvis"
         private const val NOTIFICATION_ID = 7041
         private const val REARM_DELAY_MS = 1200L
+        private const val SPEECH_TIMEOUT_MS = 20_000L
     }
 }

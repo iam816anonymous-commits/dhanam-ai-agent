@@ -105,3 +105,11 @@ See 2026-10-29-initial-source-review.md for exact commits, inspected paths, lice
 - The smoke-test chat is not connected to the finance database or write tools, and prompts/replies are not persisted or uploaded.
 - Automated validation: unit tests, lint, debug APK assembly, instrumented-test APK assembly, APK existence checks and artifact upload passed in https://github.com/iam816anonymous-commits/dhanam-ai-agent/actions/runs/40876779039. The instrumented smoke test compiles but has not been executed on a physical target device.
 - Physical-device inference, thermal/memory profiling, cancellation behavior and model artifact load success remain unverified until installed on the target phone.
+
+
+## Future-phase engineering roadmap — 2026-11-01
+
+- Preserved the supplied project audit and prioritized roadmap in [2026-11-01-dhanam-future-phase-roadmap.md](2026-11-01-dhanam-future-phase-roadmap.md).
+- Covers Phase A security/voice, Phase B model runtime intelligence, Phase C financial command accuracy, Phase D specialist-agent architecture and evaluated learning, Phase E deterministic financial intelligence, and Phase F production readiness.
+- This is a planning/research reference, not implementation evidence or device qualification. Revalidate platform documentation, dependency licenses, repository revisions, model artifacts, and hardware measurements before each phase.
+- Mandatory evidence gate: exact source revisions and licenses, alternatives/trade-offs, acceptance criteria, tests, CI SHA/run/artifacts, and separate physical-device results.

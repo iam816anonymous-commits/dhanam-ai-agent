@@ -18,6 +18,7 @@
         </intent>
     </queries>
     <application
+        android:name=".DhanamApplication"
         android:allowBackup="false"
         android:label="@string/app_name"
         android:supportsRtl="true"

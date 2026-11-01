@@ -1,0 +1,216 @@
+package com.aistudio.dhanam.expense.voice
+
+import android.app.ActivityManager
+import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import org.json.JSONObject
+import org.vosk.Model
+import org.vosk.Recognizer
+import org.vosk.android.RecognitionListener
+import org.vosk.android.SpeechService
+import java.io.File
+import java.io.IOException
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+
+/**
+ * A short-lived Vosk microphone session. The model is loaded off the main thread and all native
+ * objects/audio resources are released on completion, cancellation, timeout, or error.
+ */
+class OfflineVoskSpeechSession private constructor(
+    private val model: Model,
+    private val recognizer: Recognizer,
+    private val speechService: SpeechService
+) {
+    interface Listener {
+        fun onPartial(text: String)
+        fun onFinal(text: String)
+        fun onError(message: String)
+    }
+
+    private val handler = Handler(Looper.getMainLooper())
+    private val completed = AtomicBoolean(false)
+    private val stopStarted = AtomicBoolean(false)
+    private val stopFinished = CountDownLatch(1)
+    private var listener: Listener? = null
+    private val finalizedSegments = mutableListOf<String>()
+    private val timeout = Runnable {
+        if (!completed.get()) stop()
+    }
+    private val endOfUtteranceTimeout = Runnable {
+        if (!completed.get()) stop()
+    }
+
+    fun start(listener: Listener, timeoutMs: Long = DEFAULT_TIMEOUT_MS) {
+        check(!completed.get()) { "Speech session is already closed." }
+        this.listener = listener
+        if (!speechService.startListening(voskListener)) {
+            completed.set(true)
+            releaseResources(cancel = true)
+            throw IllegalStateException("The offline speech engine is already recording.")
+        }
+        handler.postDelayed(timeout, timeoutMs)
+    }
+
+    /** Stop microphone capture and flush the final partial transcript. */
+    fun stop() {
+        if (completed.get()) return
+        handler.removeCallbacks(endOfUtteranceTimeout)
+        Thread({
+            stopRecording(cancel = false)
+        }, "Dhanam-Vosk-stop").start()
+        // SpeechService posts its final callback to the main thread after its worker exits.
+    }
+
+    /** Cancel without returning any captured transcript. */
+    fun cancel() {
+        if (!completed.compareAndSet(false, true)) return
+        handler.removeCallbacks(timeout)
+        handler.removeCallbacks(endOfUtteranceTimeout)
+        listener = null
+        Thread({
+            releaseResources(cancel = true)
+        }, "Dhanam-Vosk-cancel").start()
+    }
+
+    private val voskListener = object : RecognitionListener {
+        override fun onPartialResult(hypothesis: String) {
+            if (completed.get()) return
+            handler.removeCallbacks(endOfUtteranceTimeout)
+            val partial = jsonText(hypothesis, "partial")
+            if (partial.isNotBlank()) listener?.onPartial(combineSegments(partial))
+        }
+
+        override fun onResult(hypothesis: String) {
+            val segment = jsonText(hypothesis, "text")
+            if (segment.isNotBlank()) {
+                finalizedSegments += segment
+                listener?.onPartial(combineSegments())
+                handler.removeCallbacks(endOfUtteranceTimeout)
+                handler.postDelayed(endOfUtteranceTimeout, END_OF_UTTERANCE_SILENCE_MS)
+            }
+        }
+
+        override fun onFinalResult(hypothesis: String) {
+            val finalSegment = jsonText(hypothesis, "text")
+            val transcript = combineSegments(finalSegment)
+            if (transcript.isNotBlank()) complete(transcript)
+            else fail("No speech was recognized. Try again and speak clearly.")
+        }
+
+        override fun onError(exception: Exception) {
+            fail(exception.message ?: "The offline speech engine could not access the microphone.")
+        }
+
+        override fun onTimeout() {
+            fail("Offline speech recognition timed out.")
+        }
+    }
+
+    private fun complete(text: String) {
+        if (!completed.compareAndSet(false, true)) return
+        handler.removeCallbacks(timeout)
+        handler.removeCallbacks(endOfUtteranceTimeout)
+        val callback = listener
+        listener = null
+        Thread({
+            releaseResources(cancel = false)
+            handler.post { callback?.onFinal(text) }
+        }, "Dhanam-Vosk-finish").start()
+    }
+
+    private fun fail(message: String) {
+        if (!completed.compareAndSet(false, true)) return
+        handler.removeCallbacks(timeout)
+        handler.removeCallbacks(endOfUtteranceTimeout)
+        val callback = listener
+        listener = null
+        Thread({
+            releaseResources(cancel = false)
+            handler.post { callback?.onError(message) }
+        }, "Dhanam-Vosk-error").start()
+    }
+
+    private fun stopRecording(cancel: Boolean) {
+        if (stopStarted.compareAndSet(false, true)) {
+            try {
+                if (cancel) runCatching { speechService.cancel() }
+                else runCatching { speechService.stop() }
+            } finally {
+                stopFinished.countDown()
+            }
+        } else {
+            runCatching { stopFinished.await(5, TimeUnit.SECONDS) }
+        }
+    }
+
+    private fun releaseResources(cancel: Boolean) {
+        stopRecording(cancel)
+        runCatching { speechService.shutdown() }
+        runCatching { recognizer.close() }
+        runCatching { model.close() }
+    }
+
+    private fun combineSegments(finalSegment: String = ""): String =
+        (finalizedSegments + finalSegment.takeIf { it.isNotBlank() }.orEmpty())
+            .filter { it.isNotBlank() }
+            .joinToString(" ")
+            .trim()
+
+    private fun jsonText(json: String, key: String): String =
+        runCatching { JSONObject(json).optString(key).trim() }.getOrDefault("")
+
+    companion object {
+        private const val DEFAULT_TIMEOUT_MS = 25_000L
+        private const val END_OF_UTTERANCE_SILENCE_MS = 1_200L
+
+        suspend fun create(context: Context, modelDirectory: File): OfflineVoskSpeechSession {
+            var createdSession: OfflineVoskSpeechSession? = null
+            return try {
+                val session = withContext(Dispatchers.IO) {
+                    val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                    val memoryInfo = ActivityManager.MemoryInfo().also(activityManager::getMemoryInfo)
+                    val minimumAvailableBytes = 512L * 1024L * 1024L
+                    val minimumTotalBytes = 2L * 1024L * 1024L * 1024L
+                    check(memoryInfo.totalMem >= minimumTotalBytes && memoryInfo.availMem >= minimumAvailableBytes && !memoryInfo.lowMemory) {
+                        "The offline speech model needs about 300 MB of runtime memory. Free memory is too low on this device; close other apps or use the explicitly enabled online fallback."
+                    }
+                    check(OfflineSpeechModelCatalog.isValidModelDirectory(modelDirectory)) {
+                        "The offline speech model is not installed correctly. Reinstall it from Voice settings."
+                    }
+                    val model = try {
+                        Model(modelDirectory.absolutePath)
+                    } catch (error: Exception) {
+                        throw IOException("Could not load the offline speech model: ${error.message ?: "model initialization failed"}", error)
+                    }
+                    try {
+                        val recognizer = Recognizer(model, SAMPLE_RATE)
+                        try {
+                            val service = SpeechService(recognizer, SAMPLE_RATE)
+                            OfflineVoskSpeechSession(model, recognizer, service).also { createdSession = it }
+                        } catch (error: Exception) {
+                            recognizer.close()
+                            throw error
+                        }
+                    } catch (error: Exception) {
+                        model.close()
+                        throw error
+                    }
+                }
+                currentCoroutineContext().ensureActive()
+                session
+            } catch (error: Exception) {
+                createdSession?.cancel()
+                throw error
+            }
+        }
+
+        private const val SAMPLE_RATE = 16_000.0f
+    }
+}

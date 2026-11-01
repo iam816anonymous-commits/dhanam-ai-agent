@@ -18,6 +18,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,6 +34,7 @@ import androidx.core.content.ContextCompat
 import com.aistudio.dhanam.expense.voice.WakeWordModelInstaller
 import com.aistudio.dhanam.expense.voice.WakeWordSecrets
 import com.aistudio.dhanam.expense.voice.WakeWordService
+import com.aistudio.dhanam.expense.voice.OfflineSpeechModelCatalog
 import kotlinx.coroutines.launch
 
 /** Explicit opt-in setup for the persistent, local Hey Jarvis wake-word service. */
@@ -51,6 +53,27 @@ fun WakeWordSettingsSection() {
         )
     }
     var listening by remember(context) { mutableStateOf(preferences.getBoolean(WakeWordService.KEY_ENABLED, false)) }
+    val voicePreferences = remember(context) { context.getSharedPreferences("dhanam_voice", 0) }
+    var selectedSpeechLanguage by remember(voicePreferences) {
+        mutableStateOf(voicePreferences.getString("recognition_language", "en-IN") ?: "en-IN")
+    }
+    var offlineSpeechModelInstalled by remember(voicePreferences) {
+        mutableStateOf(OfflineSpeechModelCatalog.installedDirectory(context, selectedSpeechLanguage) != null)
+    }
+    DisposableEffect(voicePreferences) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "wakeword_enabled") {
+                listening = voicePreferences.getBoolean("wakeword_enabled", false)
+            }
+            if (key == "recognition_language" || key?.startsWith("offline_speech_model_") == true) {
+                selectedSpeechLanguage = voicePreferences.getString("recognition_language", "en-IN") ?: "en-IN"
+                offlineSpeechModelInstalled =
+                    OfflineSpeechModelCatalog.installedDirectory(context, selectedSpeechLanguage) != null
+            }
+        }
+        voicePreferences.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { voicePreferences.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Wake-word listening is off.") }
     var pendingStart by remember { mutableStateOf(false) }
@@ -97,7 +120,7 @@ fun WakeWordSettingsSection() {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Hey Jarvis · hands-free assistant", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
-                "Say “Hey Jarvis”, wait for the short beep, then speak your command. Dhanam converts speech to text and routes it through the existing finance agent. The finance LLM is not used for wake-word detection or speech recognition.",
+                "Say “Hey Jarvis”, wait for the short beep, then speak your command. Dhanam uses an installed Vosk model first, then Android's dedicated on-device recognizer, and only uses a remote-capable Android provider when you explicitly allow it. The finance LLM is not used for wake-word detection or speech recognition.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -181,6 +204,11 @@ fun WakeWordSettingsSection() {
                 )
             }
             Text(
+                "Online speech fallback is controlled in Voice Preferences and is off by default. Enable it there only if you accept that Android's system speech provider may process audio remotely.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
                 when {
                     Build.VERSION.SDK_INT >= 34 -> "Android 14+: enable listening while Dhanam is visible. Android requires microphone foreground-service permission and restricts starting it from the background."
                     Build.VERSION.SDK_INT >= 26 -> "Android 8.1+: a persistent foreground-service notification is shown while listening is enabled."
@@ -190,7 +218,13 @@ fun WakeWordSettingsSection() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                "Wake-word detection runs locally after setup. Speech-to-text uses the selected Android speech provider and may need its own offline language pack. On Android 8.1, offline recognition is not guaranteed by the platform API. No expense is saved until you review and confirm it.",
+                if (offlineSpeechModelInstalled) "Offline speech model: installed for $selectedSpeechLanguage. The spoken command is transcribed on-device and does not need internet access."
+                else "Offline speech model: not installed for $selectedSpeechLanguage. Android 12+ may provide a dedicated on-device recognizer; older devices require an installed Vosk model for guaranteed offline speech. Online fallback remains blocked unless you enable it above.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                "No expense is saved automatically. Commands are sent to Dhanam for review and confirmation. The wake-word detector runs locally; online speech fallback, if enabled, applies only after the wake word.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
