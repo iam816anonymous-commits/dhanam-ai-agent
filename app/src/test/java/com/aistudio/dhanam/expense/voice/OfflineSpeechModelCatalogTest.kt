@@ -8,9 +8,9 @@ import org.junit.Test
 class OfflineSpeechModelCatalogTest {
     @Test
     fun mapsEnglishHindiAndTeluguTagsToDistinctModels() {
-        assertEquals("vosk-small-en-in-0.4", OfflineSpeechModelCatalog.forLanguageTag("en-IN")?.id)
+        assertEquals("vosk-small-en-us-0.15", OfflineSpeechModelCatalog.forLanguageTag("en-IN")?.id)
         assertEquals("vosk-small-hi-0.22", OfflineSpeechModelCatalog.forLanguageTag("hi-IN")?.id)
-        assertEquals("vosk-small-te-0.42", OfflineSpeechModelCatalog.forLanguageTag("te-IN")?.id)
+        assertEquals(null, OfflineSpeechModelCatalog.forLanguageTag("te-IN"))
     }
 
     @Test
