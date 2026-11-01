@@ -52,22 +52,23 @@ object SpeechRecognitionPolicy {
             SpeechRecognitionRoute.OFFLINE_VOSK_MODEL -> throw IllegalStateException(
                 "Use the installed Vosk model session for offline speech recognition."
             )
-            SpeechRecognitionRoute.ON_DEVICE -> createOnDeviceRecognizer(context)
+            SpeechRecognitionRoute.ON_DEVICE -> {
+                // Keep the SDK check adjacent to the API-31 invocation. Lint does not
+                // propagate @RequiresApi requirements through this policy helper.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+                } else {
+                    throw IllegalStateException(
+                        "The dedicated on-device speech recognizer requires Android 12 or newer."
+                    )
+                }
+            }
             SpeechRecognitionRoute.SYSTEM_PROVIDER_NETWORK_CONSENT -> SpeechRecognizer.createSpeechRecognizer(context)
             SpeechRecognitionRoute.BLOCKED -> throw IllegalStateException(
                 "A guaranteed on-device speech recognizer is unavailable on this device. Enable the explicit online speech fallback in Settings, or install a supported offline speech model when available."
             )
         }
         return recognizer to route
-    }
-
-    private fun createOnDeviceRecognizer(context: Context): SpeechRecognizer {
-        // Keep the platform check in the same method as the API-31 call so Android Lint can
-        // prove this invocation is unreachable on the app's API-27 through API-30 devices.
-        check(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            "The dedicated on-device speech recognizer requires Android 12 or newer."
-        }
-        return SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
     }
 
     fun createSystemRecognizer(context: Context): Pair<SpeechRecognizer, SpeechRecognitionRoute> {
