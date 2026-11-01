@@ -1,5 +1,7 @@
 package com.aistudio.dhanam.expense.voice
 
+import android.app.ActivityManager
+import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import kotlinx.coroutines.Dispatchers
@@ -124,7 +126,14 @@ class OfflineVoskSpeechSession private constructor(
     companion object {
         private const val DEFAULT_TIMEOUT_MS = 25_000L
 
-        suspend fun create(modelDirectory: File): OfflineVoskSpeechSession = withContext(Dispatchers.IO) {
+        suspend fun create(context: Context, modelDirectory: File): OfflineVoskSpeechSession = withContext(Dispatchers.IO) {
+            val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val memoryInfo = ActivityManager.MemoryInfo().also(activityManager::getMemoryInfo)
+            val minimumAvailableBytes = 512L * 1024L * 1024L
+            val minimumTotalBytes = 2L * 1024L * 1024L * 1024L
+            check(memoryInfo.totalMem >= minimumTotalBytes && memoryInfo.availMem >= minimumAvailableBytes && !memoryInfo.lowMemory) {
+                "The offline speech model needs about 300 MB of runtime memory. Free memory is too low on this device; close other apps or use the explicitly enabled online fallback."
+            }
             check(OfflineSpeechModelCatalog.isValidModelDirectory(modelDirectory)) {
                 "The offline speech model is not installed correctly. Reinstall it from Voice settings."
             }
