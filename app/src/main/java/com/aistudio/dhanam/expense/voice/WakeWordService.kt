@@ -24,7 +24,6 @@ import androidx.core.content.ContextCompat
 import ai.picovoice.porcupine.PorcupineManager
 import ai.picovoice.porcupine.PorcupineManagerCallback
 import com.aistudio.dhanam.expense.MainActivity
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,13 +40,13 @@ import kotlinx.coroutines.launch
 class WakeWordService : Service() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val handlingUtterance = AtomicBoolean(false)
+    private val lifecycle = WakeWordLifecycleController()
     private var porcupineManager: PorcupineManager? = null
     private var speechRecognizer: SpeechRecognizer? = null
     private var offlineSpeechSession: OfflineVoskSpeechSession? = null
     private var wakeTone: ToneGenerator? = null
     private val speechTimeout = Runnable {
-        if (handlingUtterance.get()) {
+        if (lifecycle.current() == WakeWordLifecycleState.TRANSCRIBING) {
             updateNotification("Speech recognition timed out. Say Hey Jarvis to try again.")
             finishUtteranceAndRearm()
         }
@@ -62,6 +61,7 @@ class WakeWordService : Service() {
         when (intent?.action) {
             ACTION_STOP -> {
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
+                lifecycle.stop()
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -72,15 +72,18 @@ class WakeWordService : Service() {
                     return START_NOT_STICKY
                 }
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, true).apply()
+                lifecycle.beginStart()
                 try {
                     startAsForeground()
                     mainHandler.post { startWakeWordDetection() }
                 } catch (error: SecurityException) {
                     getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
+                    lifecycle.stop()
                     stopSelf()
                     return START_NOT_STICKY
                 } catch (error: RuntimeException) {
                     getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
+                    lifecycle.stop()
                     stopSelf()
                     return START_NOT_STICKY
                 }
@@ -108,7 +111,8 @@ class WakeWordService : Service() {
     }
 
     private fun startWakeWordDetection() {
-        if (porcupineManager != null || handlingUtterance.get()) return
+        if (porcupineManager != null || lifecycle.current() == WakeWordLifecycleState.TRANSCRIBING) return
+        lifecycle.beginStart()
         if (!getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(KEY_ENABLED, false)) {
             stopSelf()
             return
@@ -131,9 +135,11 @@ class WakeWordService : Service() {
                 .setSensitivities(floatArrayOf(0.58f))
                 .build(this, callback)
             porcupineManager?.start()
+            check(lifecycle.beginListening()) { "Wake-word service was not in a startable lifecycle state." }
             updateNotification("Listening for Hey Jarvis · on-device")
         } catch (error: Exception) {
             getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
+            lifecycle.fail()
             updateNotification("Wake-word engine could not start: ${error.message?.take(100) ?: "check setup"}")
             stopWakeWordEngine()
             stopSelf()
@@ -141,7 +147,7 @@ class WakeWordService : Service() {
     }
 
     private fun onWakeWordDetected() {
-        if (!handlingUtterance.compareAndSet(false, true)) return
+        if (!lifecycle.beginTranscription()) return
         stopWakeWordEngine()
         playWakeTone()
         updateNotification("Jarvis heard you · listening for your command")
@@ -212,7 +218,7 @@ class WakeWordService : Service() {
                         speechRecognizer?.destroy()
                         speechRecognizer = null
                         mainHandler.postDelayed({
-                            if (handlingUtterance.get()) startSpeechToText(forceSystemProvider = true)
+                            if (lifecycle.current() == WakeWordLifecycleState.TRANSCRIBING) startSpeechToText(forceSystemProvider = true)
                         }, 500L)
                         return
                     }
@@ -254,7 +260,7 @@ class WakeWordService : Service() {
         serviceScope.launch {
             try {
                 val session = OfflineVoskSpeechSession.create(this@WakeWordService, modelDirectory)
-                if (!handlingUtterance.get()) {
+                if (lifecycle.current() != WakeWordLifecycleState.TRANSCRIBING) {
                     session.cancel()
                     return@launch
                 }
@@ -287,7 +293,7 @@ class WakeWordService : Service() {
         if (SpeechRecognitionPolicy.allowNetworkFallback(this) && SpeechRecognizer.isRecognitionAvailable(this)) {
             updateNotification("Offline speech unavailable. Using the online provider you explicitly allowed.")
             mainHandler.postDelayed({
-                if (handlingUtterance.get()) startSpeechToText(forceSystemProvider = true)
+                if (lifecycle.current() == WakeWordLifecycleState.TRANSCRIBING) startSpeechToText(forceSystemProvider = true)
             }, 500L)
         } else {
             updateNotification("Offline speech failed: ${message.take(110)}. Enable online fallback or reinstall the offline model.")
@@ -333,7 +339,7 @@ class WakeWordService : Service() {
 
     private fun finishUtteranceAndRearm() {
         mainHandler.removeCallbacks(speechTimeout)
-        if (!handlingUtterance.compareAndSet(true, false)) return
+        if (!lifecycle.beginRecovery()) return
         val activeOfflineSession = offlineSpeechSession
         offlineSpeechSession = null
         activeOfflineSession?.cancel()
@@ -345,6 +351,8 @@ class WakeWordService : Service() {
         }
         if (getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(KEY_ENABLED, false)) {
             mainHandler.postDelayed({ startWakeWordDetection() }, REARM_DELAY_MS)
+        } else {
+            lifecycle.stop()
         }
     }
 
@@ -404,6 +412,7 @@ class WakeWordService : Service() {
 
     override fun onDestroy() {
         mainHandler.removeCallbacksAndMessages(null)
+        lifecycle.stop()
         serviceScope.cancel()
         offlineSpeechSession?.cancel()
         offlineSpeechSession = null
