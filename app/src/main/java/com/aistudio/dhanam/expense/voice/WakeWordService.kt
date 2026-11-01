@@ -184,7 +184,7 @@ class WakeWordService : Service() {
         }
     }
 
-    private fun startSpeechToText(forceSystemProvider: Boolean = false) {
+    private fun startSpeechToText(forceSystemProvider: Boolean = false, skipOfflineModel: Boolean = false) {
         if (!hasMicrophonePermission()) {
             updateNotification("Microphone permission was revoked. Enable it in Android app settings.")
             finishUtteranceAndRearm()
@@ -192,7 +192,7 @@ class WakeWordService : Service() {
         }
         val language = getSharedPreferences("dhanam_voice", MODE_PRIVATE)
             .getString("recognition_language", "en-IN") ?: "en-IN"
-        val offlineModel = if (forceSystemProvider) null else OfflineSpeechModelCatalog.installedDirectory(this, language)
+        val offlineModel = if (forceSystemProvider || skipOfflineModel) null else OfflineSpeechModelCatalog.installedDirectory(this, language)
         if (offlineModel != null) {
             startOfflineSpeechToText(offlineModel)
             return
@@ -316,13 +316,22 @@ class WakeWordService : Service() {
     }
 
     private fun fallbackAfterOfflineFailure(message: String) {
-        if (SpeechRecognitionPolicy.allowNetworkFallback(this) && SpeechRecognizer.isRecognitionAvailable(this)) {
+        val onDeviceAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            runCatching { SpeechRecognizer.isOnDeviceRecognitionAvailable(this) }.getOrDefault(false)
+        if (onDeviceAvailable && SpeechRecognizer.isRecognitionAvailable(this)) {
+            updateNotification("Vosk offline speech failed. Trying Android's dedicated on-device recognizer.")
+            mainHandler.postDelayed({
+                if (lifecycle.current() == WakeWordLifecycleState.TRANSCRIBING) {
+                    startSpeechToText(skipOfflineModel = true)
+                }
+            }, 500L)
+        } else if (SpeechRecognitionPolicy.allowNetworkFallback(this) && SpeechRecognizer.isRecognitionAvailable(this)) {
             updateNotification("Offline speech unavailable. Using the online provider you explicitly allowed.")
             mainHandler.postDelayed({
                 if (lifecycle.current() == WakeWordLifecycleState.TRANSCRIBING) startSpeechToText(forceSystemProvider = true)
             }, 500L)
         } else {
-            updateNotification("Offline speech failed: ${message.take(110)}. Enable online fallback or reinstall the offline model.")
+            updateNotification("Offline speech failed: ${message.take(110)}. Install a supported model or enable online fallback.")
             finishUtteranceAndRearm()
         }
     }
