@@ -101,12 +101,12 @@ fun AgentVoiceControl(
         showDialog = false
     }
 
-    fun startListening(forceSystemProvider: Boolean = false) {
+    fun startListening(forceSystemProvider: Boolean = false, skipOfflineModel: Boolean = false) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             status = "Microphone permission is required. Grant it in Android app permissions and try again."
             return
         }
-        val offlineModel = if (forceSystemProvider) null else OfflineSpeechModelCatalog.installedDirectory(context, language)
+        val offlineModel = if (forceSystemProvider || skipOfflineModel) null else OfflineSpeechModelCatalog.installedDirectory(context, language)
         if (offlineModel == null && !SpeechRecognizer.isRecognitionAvailable(context)) {
             status = "No offline model for $language is installed and no Android speech provider is available."
             isListening = false
@@ -138,24 +138,45 @@ fun AgentVoiceControl(
 
                         override fun onFinal(text: String) {
                             offlineSessionRef.compareAndSet(session, null)
-                            if (text.isBlank() && SpeechRecognitionPolicy.allowNetworkFallback(context)) {
-                                status = "Offline recognition returned no words. Trying the online provider you explicitly allowed."
-                                translationScope.launch {
-                                    delay(500)
-                                    startListening(forceSystemProvider = true)
+                            if (text.isBlank()) {
+                                val onDeviceAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                                    runCatching { SpeechRecognizer.isOnDeviceRecognitionAvailable(context) }.getOrDefault(false)
+                                if (onDeviceAvailable) {
+                                    status = "Offline model returned no words. Trying Android's dedicated on-device recognizer."
+                                    translationScope.launch {
+                                        delay(500)
+                                        startListening(skipOfflineModel = true)
+                                    }
+                                } else if (SpeechRecognitionPolicy.allowNetworkFallback(context)) {
+                                    status = "Offline model returned no words. Trying the online provider you explicitly allowed."
+                                    translationScope.launch {
+                                        delay(500)
+                                        startListening(forceSystemProvider = true)
+                                    }
+                                } else {
+                                    isListening = false
+                                    isProcessing = false
+                                    status = "No speech was recognized. Try again or type your request."
                                 }
                             } else {
                                 transcript = text
                                 isListening = false
                                 isProcessing = false
-                                status = if (text.isBlank()) "No speech was recognized. Try again or type your request."
-                                else "Transcribed offline. Review and correct the text before sending."
+                                status = "Transcribed offline. Review and correct the text before sending."
                             }
                         }
 
                         override fun onError(message: String) {
                             offlineSessionRef.compareAndSet(session, null)
-                            if (SpeechRecognitionPolicy.allowNetworkFallback(context)) {
+                            val onDeviceAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                                runCatching { SpeechRecognizer.isOnDeviceRecognitionAvailable(context) }.getOrDefault(false)
+                            if (onDeviceAvailable) {
+                                status = "Offline recognition failed. Trying Android's dedicated on-device recognizer."
+                                translationScope.launch {
+                                    delay(500)
+                                    startListening(skipOfflineModel = true)
+                                }
+                            } else if (SpeechRecognitionPolicy.allowNetworkFallback(context)) {
                                 status = "Offline recognition failed. Trying the online provider you explicitly allowed."
                                 translationScope.launch {
                                     delay(500)
