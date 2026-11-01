@@ -153,7 +153,7 @@ fun VoicePreferencesSection() {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Voice and language", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
-                "Dhanam uses Android speech recognition for voice input and the phone's installed text-to-speech engine for optional replies. Voice recognition is separate from the downloaded finance LLM models.",
+                "Dhanam uses downloadable Vosk models for offline English/Hindi voice input, Android's on-device recognizer when available, and an opt-in system-provider fallback. Speech recognition is separate from the finance LLM models.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
