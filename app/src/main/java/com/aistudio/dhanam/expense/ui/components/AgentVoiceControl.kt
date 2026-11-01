@@ -122,7 +122,7 @@ fun AgentVoiceControl(
                 override fun onBeginningOfSpeech() {
                     isListening = true
                     isProcessing = false
-                    status = if (onDeviceAvailable) "Listening on-device…" else "Listening… Android's system service may require network access."
+                    status = if (onDeviceAvailable) "Listening on-device…" else "Listening through the Android system provider. Remote processing may occur."
                 }
                 override fun onRmsChanged(rmsdB: Float) = Unit
                 override fun onBufferReceived(buffer: ByteArray?) = Unit
@@ -194,11 +194,11 @@ fun AgentVoiceControl(
             isListening = false
             isProcessing = false
             status = "Android denied microphone access. Enable Microphone in app permissions."
-        } catch (_: IllegalStateException) {
+        } catch (error: IllegalStateException) {
             releaseRecognizer(cancel = true)
             isListening = false
             isProcessing = false
-            status = "The speech service is already busy or unavailable. Wait briefly and retry."
+            status = error.message ?: "The speech service is already busy or unavailable. Wait briefly and retry."
         } catch (error: Exception) {
             releaseRecognizer(cancel = true)
             isListening = false
