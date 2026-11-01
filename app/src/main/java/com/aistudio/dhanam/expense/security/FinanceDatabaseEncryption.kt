@@ -60,10 +60,13 @@ object FinanceDatabaseEncryption {
                 "Could not restore the staged original finance database. The backup has been preserved."
             }
         }
-        if (!database.exists() || database.length() == 0L) return passphrase
+        if (!database.exists() || database.length() == 0L) {
+            deleteDatabaseFiles(temporary)
+            return passphrase
+        }
 
         if (isReadableWithKey(database, passphrase)) {
-            temporary.delete()
+            deleteDatabaseFiles(temporary)
             return passphrase
         }
 
