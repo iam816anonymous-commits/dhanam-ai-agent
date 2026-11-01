@@ -97,6 +97,20 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
                 }
             }
         }
+        inferenceState.lastRuntimeMeasurement?.let { measurement ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Last model-load measurement", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text("Model: ${measurement.modelId}", style = MaterialTheme.typography.bodySmall)
+                    Text("Load duration: ${measurement.loadDurationMs} ms", style = MaterialTheme.typography.bodySmall)
+                    Text("Current process RSS after load: ${measurement.processResidentBytesAfterLoad?.let(::formatBytes) ?: "unavailable"}", style = MaterialTheme.typography.bodySmall)
+                    Text("Process lifetime high-water RSS: ${measurement.processHighWaterBytesAfterLoad?.let(::formatBytes) ?: "unavailable"}", style = MaterialTheme.typography.bodySmall)
+                    Text("Native heap after load: ${formatBytes(measurement.nativeHeapAllocatedBytesAfterLoad)}", style = MaterialTheme.typography.bodySmall)
+                    Text("System available RAM after load: ${formatBytes(measurement.systemAvailableRamBytesAfterLoad)}", style = MaterialTheme.typography.bodySmall)
+                    Text("Measurements are diagnostic snapshots, not a sustained benchmark or device qualification.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
         Text("Choose a model", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Text(
             "You can install multiple model files. Only one model is loaded into RAM at a time because all three agents share one LiteRT runtime; unload it before switching.",
@@ -188,7 +202,7 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
                     )
                 }
                 Text(
-                    "Download requires ${formatBytes(model.minTotalRamBytes)} physical total RAM and ${formatBytes(model.minFreeStorageBytes)} free app storage. Running now additionally requires ${formatBytes(model.minAvailableRamBytes)} currently available RAM. Process peak budget: ${formatBytes(model.maxProcessPeakBytes)}. ${model.runtimeRequirement}",
+                    "Download requires ${formatBytes(model.minTotalRamBytes)} physical total RAM and ${formatBytes(model.minFreeStorageBytes)} free app storage. Running now additionally requires ${formatBytes(model.minAvailableRamBytes)} currently available RAM. Current process RSS ceiling: ${formatBytes(model.maxProcessPeakBytes)}. ${model.runtimeRequirement}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
