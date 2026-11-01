@@ -109,12 +109,8 @@ fun AgentVoiceControl(
         translatedTranscript = ""
         status = "Preparing the speech service…"
         try {
-            val onDeviceAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && dedicatedOnDeviceAvailable
-            val instance = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && dedicatedOnDeviceAvailable) {
-                SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-            } else {
-                SpeechRecognizer.createSpeechRecognizer(context)
-            }
+            val (instance, recognitionRoute) = SpeechRecognitionPolicy.createRecognizer(context)
+            val onDeviceAvailable = recognitionRoute == com.aistudio.dhanam.expense.voice.SpeechRecognitionRoute.ON_DEVICE
             recognizerRef.set(instance)
             instance.setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {
@@ -261,9 +257,9 @@ fun AgentVoiceControl(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         when {
-                            dedicatedOnDeviceAvailable -> "The dedicated on-device speech recognizer is available. The selected language pack is checked when recognition starts."
-                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> "No dedicated on-device recognizer is installed. The system recognizer may use network services."
-                            else -> "Android 8–11 use the installed system speech service with an offline preference. This API cannot guarantee offline recognition; test with airplane mode."
+                            dedicatedOnDeviceAvailable -> "A dedicated on-device recognizer is available. The selected language pack is checked when recognition starts."
+                            SpeechRecognitionPolicy.allowNetworkFallback(context) -> "No dedicated on-device recognizer is available. You explicitly allowed the Android system provider, which may send audio to a remote service."
+                            else -> "No guaranteed on-device recognizer is available. Online speech processing is blocked until you explicitly enable it in Settings."
                         }
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
