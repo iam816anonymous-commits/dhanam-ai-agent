@@ -34,6 +34,14 @@ class SpeechRecognitionPolicyTest {
     }
 
     @Test
+    fun api30DoesNotSelectApi31OnDeviceRecognizer() {
+        assertEquals(
+            SpeechRecognitionRoute.BLOCKED,
+            SpeechRecognitionPolicy.route(30, onDeviceRecognizerAvailable = true, allowNetworkFallback = false)
+        )
+    }
+
+    @Test
     fun api31UsesDedicatedOnDeviceRecognizerWhenAvailable() {
         assertEquals(
             SpeechRecognitionRoute.ON_DEVICE,
