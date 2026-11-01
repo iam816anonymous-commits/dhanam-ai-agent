@@ -125,7 +125,7 @@ fun AgentVoiceControl(
             translationScope.launch {
                 try {
                     val session = OfflineVoskSpeechSession.create(context, offlineModel)
-                    if (!showDialog) {
+                    if (!showDialog || !lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
                         session.cancel()
                         return@launch
                     }
@@ -365,7 +365,10 @@ fun AgentVoiceControl(
 
     DisposableEffect(context, lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP && recognizerRef.get() != null) {
+            if (
+                event == Lifecycle.Event.ON_STOP &&
+                (recognizerRef.get() != null || offlineSessionRef.get() != null || isProcessing)
+            ) {
                 releaseRecognizer(cancel = true)
                 isListening = false
                 isProcessing = false
