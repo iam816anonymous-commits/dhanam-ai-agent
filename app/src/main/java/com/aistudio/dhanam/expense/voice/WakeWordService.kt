@@ -265,8 +265,19 @@ class WakeWordService : Service() {
             mainHandler.removeCallbacks(speechTimeout)
             mainHandler.postDelayed(speechTimeout, SPEECH_TIMEOUT_MS)
         } catch (error: Exception) {
-            updateNotification(error.message?.take(140) ?: "Speech recognition could not start. Check speech privacy settings.")
-            finishUtteranceAndRearm()
+            if (!forceSystemProvider && SpeechRecognitionPolicy.allowNetworkFallback(this) &&
+                SpeechRecognizer.isRecognitionAvailable(this)
+            ) {
+                updateNotification("On-device speech could not start. Using the online provider you explicitly allowed.")
+                mainHandler.postDelayed({
+                    if (lifecycle.current() == WakeWordLifecycleState.TRANSCRIBING) {
+                        startSpeechToText(forceSystemProvider = true)
+                    }
+                }, 500L)
+            } else {
+                updateNotification(error.message?.take(140) ?: "Speech recognition could not start. Check speech privacy settings.")
+                finishUtteranceAndRearm()
+            }
         }
     }
 
