@@ -18,6 +18,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.onDispose
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,8 +55,23 @@ fun WakeWordSettingsSection() {
     }
     var listening by remember(context) { mutableStateOf(preferences.getBoolean(WakeWordService.KEY_ENABLED, false)) }
     val voicePreferences = remember(context) { context.getSharedPreferences("dhanam_voice", 0) }
-    val selectedSpeechLanguage = voicePreferences.getString("recognition_language", "en-IN") ?: "en-IN"
-    val offlineSpeechModelInstalled = OfflineSpeechModelCatalog.installedDirectory(context, selectedSpeechLanguage) != null
+    var selectedSpeechLanguage by remember(voicePreferences) {
+        mutableStateOf(voicePreferences.getString("recognition_language", "en-IN") ?: "en-IN")
+    }
+    var offlineSpeechModelInstalled by remember(voicePreferences) {
+        mutableStateOf(OfflineSpeechModelCatalog.installedDirectory(context, selectedSpeechLanguage) != null)
+    }
+    DisposableEffect(voicePreferences) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "recognition_language" || key?.startsWith("offline_speech_model_") == true) {
+                selectedSpeechLanguage = voicePreferences.getString("recognition_language", "en-IN") ?: "en-IN"
+                offlineSpeechModelInstalled =
+                    OfflineSpeechModelCatalog.installedDirectory(context, selectedSpeechLanguage) != null
+            }
+        }
+        voicePreferences.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { voicePreferences.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Wake-word listening is off.") }
     var pendingStart by remember { mutableStateOf(false) }
