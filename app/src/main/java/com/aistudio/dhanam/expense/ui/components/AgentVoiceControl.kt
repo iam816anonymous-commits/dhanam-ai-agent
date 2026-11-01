@@ -45,6 +45,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.aistudio.dhanam.expense.voice.SpeechRecognitionPolicy
+import com.aistudio.dhanam.expense.voice.OfflineSpeechModelCatalog
+import com.aistudio.dhanam.expense.voice.OfflineVoskSpeechSession
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -80,11 +82,16 @@ fun AgentVoiceControl(
     val translationScope = rememberCoroutineScope()
     var status by remember { mutableStateOf<String?>(null) }
     val recognizerRef = remember { AtomicReference<SpeechRecognizer?>(null) }
+    val offlineSessionRef = remember { AtomicReference<OfflineVoskSpeechSession?>(null) }
 
     fun releaseRecognizer(cancel: Boolean) {
-        val active = recognizerRef.getAndSet(null) ?: return
-        try { if (cancel) active.cancel() } catch (_: Exception) { }
-        try { active.destroy() } catch (_: Exception) { }
+        val offline = offlineSessionRef.getAndSet(null)
+        if (cancel) offline?.cancel()
+        val active = recognizerRef.getAndSet(null)
+        if (active != null) {
+            try { if (cancel) active.cancel() } catch (_: Exception) { }
+            try { active.destroy() } catch (_: Exception) { }
+        }
     }
 
     fun closeDialog() {
@@ -99,8 +106,9 @@ fun AgentVoiceControl(
             status = "Microphone permission is required. Grant it in Android app permissions and try again."
             return
         }
-        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-            status = "No Android speech-recognition service is installed or enabled. Install or enable one, then retry."
+        val offlineModel = OfflineSpeechModelCatalog.installedDirectory(context, language)
+        if (offlineModel == null && !SpeechRecognizer.isRecognitionAvailable(context)) {
+            status = "No offline model for $language is installed and no Android speech provider is available."
             isListening = false
             isProcessing = false
             return
@@ -109,6 +117,49 @@ fun AgentVoiceControl(
         transcript = ""
         translatedTranscript = ""
         status = "Preparing the speech service…"
+        if (offlineModel != null) {
+            isListening = true
+            status = "Loading the installed offline speech model. Audio stays on this device."
+            translationScope.launch {
+                try {
+                    val session = OfflineVoskSpeechSession.create(offlineModel)
+                    if (!showDialog) {
+                        session.cancel()
+                        return@launch
+                    }
+                    offlineSessionRef.set(session)
+                    session.start(object : OfflineVoskSpeechSession.Listener {
+                        override fun onPartial(text: String) {
+                            transcript = text
+                            isListening = true
+                            isProcessing = false
+                            status = "Offline recognition · hearing: $text"
+                        }
+
+                        override fun onFinal(text: String) {
+                            offlineSessionRef.compareAndSet(session, null)
+                            transcript = text
+                            isListening = false
+                            isProcessing = false
+                            status = "Transcribed offline. Review and correct the text before sending."
+                        }
+
+                        override fun onError(message: String) {
+                            offlineSessionRef.compareAndSet(session, null)
+                            isListening = false
+                            isProcessing = false
+                            status = message
+                        }
+                    })
+                } catch (error: Exception) {
+                    offlineSessionRef.set(null)
+                    isListening = false
+                    isProcessing = false
+                    status = error.message ?: "Offline speech recognition could not start."
+                }
+            }
+            return
+        }
         try {
             val (instance, recognitionRoute) = SpeechRecognitionPolicy.createRecognizer(context)
             val onDeviceAvailable = recognitionRoute == com.aistudio.dhanam.expense.voice.SpeechRecognitionRoute.ON_DEVICE
@@ -118,7 +169,7 @@ fun AgentVoiceControl(
                     isListening = true
                     isProcessing = false
                     status = if (onDeviceAvailable) "On-device recognizer ready. Speak now."
-                    else "Speech service ready. Offline is requested but not guaranteed on this Android version."
+                    else "System speech provider ready. Remote processing may occur."
                 }
                 override fun onBeginningOfSpeech() {
                     isListening = true
@@ -306,8 +357,9 @@ fun AgentVoiceControl(
                         isListening = false
                         isProcessing = true
                         status = "Finishing speech capture…"
-                        try { recognizerRef.get()?.stopListening() }
-                        catch (_: Exception) {
+                        try {
+                            offlineSessionRef.get()?.stop() ?: recognizerRef.get()?.stopListening()
+                        } catch (_: Exception) {
                             releaseRecognizer(cancel = true)
                             isProcessing = false
                             status = "Could not finish the speech session. Try again."
