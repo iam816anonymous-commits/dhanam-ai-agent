@@ -2,22 +2,32 @@ package com.aistudio.dhanam.expense.model
 
 import java.io.File
 
-/**
- * Reads the process's CURRENT resident set size (VmRSS), not VmHWM.
- *
- * VmHWM is a lifetime high-water mark and never resets when memory is released.
- * Using it as a pre-load/current safety gate permanently penalizes an app after
- * an unrelated earlier memory spike. VmRSS is the current resident snapshot.
- */
+data class ProcessMemorySnapshot(
+    val residentBytes: Long,
+    val highWaterBytes: Long?,
+    val anonymousBytes: Long?,
+    val fileBackedBytes: Long?,
+    val sharedBytes: Long?
+)
+
+/** VmRSS is current residency; VmHWM is a lifetime diagnostic, never a current gate. */
 object ProcessMemoryBudget {
-    fun readCurrentResidentBytes(statusFile: File = File("/proc/self/status")): Long? = try {
+    fun readSnapshot(statusFile: File = File("/proc/self/status")): ProcessMemorySnapshot? = try {
         statusFile.useLines { lines ->
-            val line = lines.firstOrNull { it.startsWith("VmRSS:") } ?: return@useLines null
-            val valueKb = line.substringAfter(':').trim().substringBefore(' ').toLongOrNull()
-                ?: return@useLines null
-            valueKb * 1024L
+            val values = lines.mapNotNull { line ->
+                val key = line.substringBefore(':')
+                if (key !in MEMORY_FIELDS) return@mapNotNull null
+                val valueKb = line.substringAfter(':').trim().substringBefore(' ').toLongOrNull()
+                    ?: return@mapNotNull null
+                key to valueKb * 1024L
+            }.toMap()
+            val resident = values["VmRSS"] ?: return@useLines null
+            ProcessMemorySnapshot(resident, values["VmHWM"], values["RssAnon"], values["RssFile"], values["RssShmem"])
         }
-    } catch (_: Exception) {
-        null
-    }
+    } catch (_: Exception) { null }
+
+    fun readCurrentResidentBytes(statusFile: File = File("/proc/self/status")): Long? =
+        readSnapshot(statusFile)?.residentBytes
+
+    private val MEMORY_FIELDS = setOf("VmRSS", "VmHWM", "RssAnon", "RssFile", "RssShmem")
 }

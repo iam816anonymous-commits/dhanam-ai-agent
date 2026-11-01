@@ -83,11 +83,31 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
                     Text("Physical RAM reported by Android: ${formatBytes(deviceResources.totalRamBytes)}", style = MaterialTheme.typography.bodySmall)
                     Text("Currently available system RAM: ${formatBytes(deviceResources.availableRamBytes)}", style = MaterialTheme.typography.bodySmall)
                     Text("Free app-private storage: ${formatBytes(deviceResources.freeStorageBytes)}", style = MaterialTheme.typography.bodySmall)
+                    Text("Android low-memory signal: ${if (deviceResources.lowMemory) "active" else "not active"}", style = MaterialTheme.typography.bodySmall)
+                    Text("Android low-memory threshold: ${formatBytes(deviceResources.memoryThresholdBytes)}", style = MaterialTheme.typography.bodySmall)
+                    Text("Required available RAM including safety reserve: ${if (deviceResources.requiredAvailableRamBytes > 0L) formatBytes(deviceResources.requiredAvailableRamBytes) else "not applicable to download"}", style = MaterialTheme.typography.bodySmall)
+                    Text("Current app process RSS: ${deviceResources.processResidentBytes?.let(::formatBytes) ?: "unavailable"}", style = MaterialTheme.typography.bodySmall)
+                    Text("Process lifetime high-water RSS: ${deviceResources.processHighWaterBytes?.let(::formatBytes) ?: "unavailable"}", style = MaterialTheme.typography.bodySmall)
+                    Text("Native heap allocated: ${formatBytes(deviceResources.nativeHeapAllocatedBytes)}", style = MaterialTheme.typography.bodySmall)
                     Text(
                         "Model eligibility uses Android's physical-memory report, not the phone manufacturer's advertised RAM Plus / Memory Fusion / virtual RAM figure. Download eligibility and run-now eligibility are separate checks.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+        }
+        inferenceState.lastRuntimeMeasurement?.let { measurement ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Last model-load measurement", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text("Model: ${measurement.modelId}", style = MaterialTheme.typography.bodySmall)
+                    Text("Load duration: ${measurement.loadDurationMs} ms", style = MaterialTheme.typography.bodySmall)
+                    Text("Current process RSS after load: ${measurement.processResidentBytesAfterLoad?.let(::formatBytes) ?: "unavailable"}", style = MaterialTheme.typography.bodySmall)
+                    Text("Process lifetime high-water RSS: ${measurement.processHighWaterBytesAfterLoad?.let(::formatBytes) ?: "unavailable"}", style = MaterialTheme.typography.bodySmall)
+                    Text("Native heap after load: ${formatBytes(measurement.nativeHeapAllocatedBytesAfterLoad)}", style = MaterialTheme.typography.bodySmall)
+                    Text("System available RAM after load: ${formatBytes(measurement.systemAvailableRamBytesAfterLoad)}", style = MaterialTheme.typography.bodySmall)
+                    Text("Measurements are diagnostic snapshots, not a sustained benchmark or device qualification.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -182,7 +202,7 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
                     )
                 }
                 Text(
-                    "Download requires ${formatBytes(model.minTotalRamBytes)} physical total RAM and ${formatBytes(model.minFreeStorageBytes)} free app storage. Running now additionally requires ${formatBytes(model.minAvailableRamBytes)} currently available RAM. Process peak budget: ${formatBytes(model.maxProcessPeakBytes)}. ${model.runtimeRequirement}",
+                    "Download requires ${formatBytes(model.minTotalRamBytes)} physical total RAM and ${formatBytes(model.minFreeStorageBytes)} free app storage. Running now additionally requires ${formatBytes(model.minAvailableRamBytes)} currently available RAM. Current process RSS ceiling: ${formatBytes(model.maxProcessPeakBytes)}. ${model.runtimeRequirement}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
