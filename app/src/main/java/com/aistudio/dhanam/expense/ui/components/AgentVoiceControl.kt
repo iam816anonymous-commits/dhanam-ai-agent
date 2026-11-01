@@ -119,7 +119,8 @@ fun AgentVoiceControl(
         translatedTranscript = ""
         status = "Preparing the speech service…"
         if (offlineModel != null) {
-            isListening = true
+            isListening = false
+            isProcessing = true
             status = "Loading the installed offline speech model. Audio stays on this device."
             translationScope.launch {
                 try {
@@ -190,6 +191,9 @@ fun AgentVoiceControl(
                             }
                         }
                     })
+                    isListening = true
+                    isProcessing = false
+                    status = "Listening offline. Speak your command."
                 } catch (cancel: CancellationException) {
                     offlineSessionRef.getAndSet(null)?.cancel()
                     throw cancel
