@@ -1,6 +1,11 @@
 package com.aistudio.dhanam.expense.ui
 
 import android.app.Application
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,6 +26,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -29,6 +36,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.core.app.NotificationManagerCompat
+import com.aistudio.dhanam.expense.voice.WakeCommandBus
+import com.aistudio.dhanam.expense.voice.WakeWordService
+import com.aistudio.dhanam.expense.voice.VoiceCommandRouter
+import com.aistudio.dhanam.expense.ui.components.VoiceTranslationEngine
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.collect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
@@ -74,6 +89,61 @@ fun DhanamApp(
             popUpTo(navController.graph.startDestinationId) { saveState = true }
             launchSingleTop = true
             restoreState = true
+        }
+    }
+
+    fun handleVoiceText(original: String, translated: String) {
+        val destination = VoiceCommandRouter.destinationFor(translated)
+        if (destination != null) {
+            navigateTo(destination)
+        } else {
+            navigateTo(AppDestination.AGENT)
+            agentViewModel.submit(
+                translated,
+                displayText = "🎙️ $original\nEnglish interpretation: $translated"
+            )
+        }
+    }
+
+    DisposableEffect(context) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(receiverContext: Context?, intent: Intent?) {
+                val transcript = intent?.getStringExtra(WakeWordService.EXTRA_TRANSCRIPT).orEmpty()
+                val language = intent?.getStringExtra(WakeWordService.EXTRA_LANGUAGE) ?: "en-IN"
+                WakeCommandBus.offer(transcript, language)
+                NotificationManagerCompat.from(context).cancel(WakeWordService.COMMAND_NOTIFICATION_ID)
+            }
+        }
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            IntentFilter(WakeWordService.ACTION_VOICE_COMMAND),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        onDispose { context.unregisterReceiver(receiver) }
+    }
+
+    LaunchedEffect(agentViewModel) {
+        WakeCommandBus.commands.collect { command ->
+            try {
+                val translation = VoiceTranslationEngine.translateToEnglish(
+                    command.transcript,
+                    command.languageTag
+                )
+                handleVoiceText(command.transcript, translation.normalizedText)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                if (command.languageTag.startsWith("en", ignoreCase = true)) {
+                    handleVoiceText(command.transcript, command.transcript)
+                } else {
+                    Toast.makeText(
+                        context,
+                        error.message ?: "Voice translation is unavailable. Your command was not submitted.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
         }
     }
 
@@ -174,11 +244,7 @@ fun DhanamApp(
                 status = agentState.status,
                 onNavigate = ::navigateTo,
                 onVoiceRecognized = { original, translated ->
-                    navigateTo(AppDestination.AGENT)
-                    agentViewModel.submit(
-                        translated,
-                        displayText = "🎙️ $original\nEnglish interpretation: $translated"
-                    )
+                    handleVoiceText(original, translated)
                 },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
             )

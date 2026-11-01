@@ -234,7 +234,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                 thinkingConfig = ThinkingConfig(enableThinking = false, thinkingTokenBudget = 0)
             ).collect { chunk ->
                 val residentBytes = ProcessMemoryBudget.readCurrentResidentBytes()
-                if (peakBytes == null || peakBytes >= model.maxProcessPeakBytes) {
+                if (residentBytes == null || residentBytes >= model.maxProcessPeakBytes) {
                     shouldUnload = true
                     try { agentConversation.cancelProcess() } catch (_: Exception) { }
                     throw IllegalStateException("The selected model's ${model.maxProcessPeakBytes / (1024L * 1024L)} MiB current resident-memory safety limit was reached or could not be measured.")
@@ -324,7 +324,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
             )
                     .collect { chunk ->
                         val residentBytes = ProcessMemoryBudget.readCurrentResidentBytes()
-                        if (peakBytes == null || peakBytes >= model.maxProcessPeakBytes) {
+                        if (residentBytes == null || residentBytes >= model.maxProcessPeakBytes) {
                             memoryBudgetExceeded = true
                             stopRequested = true
                             _state.update {

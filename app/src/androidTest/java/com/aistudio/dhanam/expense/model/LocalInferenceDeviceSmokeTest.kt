@@ -34,7 +34,7 @@ class LocalInferenceDeviceSmokeTest {
         val eligibility = ModelCatalog.runtimeEligibility(context, selectedModel)
         assumeTrue("The device does not meet runtime resource thresholds.", eligibility.allowed)
 
-        val initialPeak = ProcessMemoryBudget.readPeakResidentBytes()
+        val initialPeak = ProcessMemoryBudget.readCurrentResidentBytes()
         assumeTrue("Cannot read this process's peak RSS; refusing to run the memory-qualified test.", initialPeak != null)
         assumeTrue(
             "Process has already reached this model's declared peak-memory budget.",
@@ -51,7 +51,7 @@ class LocalInferenceDeviceSmokeTest {
         // Do not close the engine if initialize() throws; this is LiteRT-LM's documented lifecycle rule.
         engine.initialize()
         try {
-            val peakAfterLoad = ProcessMemoryBudget.readPeakResidentBytes()
+            val peakAfterLoad = ProcessMemoryBudget.readCurrentResidentBytes()
             assertTrue("Could not measure process peak RSS after load.", peakAfterLoad != null)
             assertTrue(
                 "Model load exceeded its declared process peak budget.",
@@ -63,7 +63,7 @@ class LocalInferenceDeviceSmokeTest {
             try {
                 val reply = conversation.sendMessage("Reply with one short sentence saying the local model is ready.")
                 assertTrue("The model returned an empty response.", reply.toString().isNotBlank())
-                val peakAfterGeneration = ProcessMemoryBudget.readPeakResidentBytes()
+                val peakAfterGeneration = ProcessMemoryBudget.readCurrentResidentBytes()
                 assertTrue("Could not measure process peak RSS after generation.", peakAfterGeneration != null)
                 assertTrue(
                     "Inference exceeded its declared process peak budget.",

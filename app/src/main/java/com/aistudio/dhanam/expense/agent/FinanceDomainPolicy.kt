@@ -34,7 +34,7 @@ object FinanceDomainPolicy {
     )
 
     fun normalizeRequest(input: String): String =
-        input.trim().replace(Regex("""(?i)^(?:hey\s+)?dhanam[,!:\s]+"""), "").trim()
+        input.trim().replace(Regex("""(?i)^(?:hey\s+)?(?:dhanam|jarvis)[,!:\s]+"""), "").trim()
 
     fun isSupportedRequest(input: String, hasPendingFinanceAction: Boolean = false): Boolean {
         val normalized = normalizeRequest(input)
