@@ -50,6 +50,9 @@ fun VoicePreferencesSection() {
     var voiceReplies by remember(context) {
         mutableStateOf(preferences.getBoolean("voice_feedback_enabled", false))
     }
+    var allowNetworkFallback by remember(context) {
+        mutableStateOf(preferences.getBoolean("allow_network_speech_recognition", false))
+    }
     var permissionGranted by remember(context) {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
     }
@@ -67,6 +70,9 @@ fun VoicePreferencesSection() {
                 }
                 "voice_feedback_enabled" -> {
                     voiceReplies = preferences.getBoolean("voice_feedback_enabled", false)
+                }
+                "allow_network_speech_recognition" -> {
+                    allowNetworkFallback = preferences.getBoolean("allow_network_speech_recognition", false)
                 }
             }
         }
@@ -133,6 +139,33 @@ fun VoicePreferencesSection() {
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> "Dedicated on-device recognizer: unavailable. The system recognizer may use network services."
                     else -> "Android 8–11: the system recognizer accepts an offline preference, but Android cannot guarantee offline processing through this API."
                 },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Allow online speech fallback", fontWeight = FontWeight.Medium)
+                    Text(
+                        "When a guaranteed on-device recognizer is unavailable, allow Android's system speech provider. It may send microphone audio to a remote service. Off by default.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = allowNetworkFallback,
+                    onCheckedChange = { enabled ->
+                        allowNetworkFallback = enabled
+                        preferences.edit().putBoolean("allow_network_speech_recognition", enabled).apply()
+                    }
+                )
+            }
+            Text(
+                if (allowNetworkFallback) "Remote speech processing is permitted as a fallback. Dhanam still does not send your finance ledger to a cloud LLM."
+                else "Remote speech processing is blocked by Dhanam when no dedicated on-device recognizer is available. Android 8.1 does not provide a guaranteed offline-only SpeechRecognizer API.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
