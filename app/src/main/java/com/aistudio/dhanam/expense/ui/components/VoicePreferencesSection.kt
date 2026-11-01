@@ -42,6 +42,7 @@ import com.aistudio.dhanam.expense.voice.OfflineSpeechModelCatalog
 import com.aistudio.dhanam.expense.voice.OfflineSpeechModelInstaller
 import com.aistudio.dhanam.expense.voice.OfflineSpeechModelSpec
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 
 @Composable
 private fun OfflineSpeechModelRow(
@@ -267,6 +268,8 @@ fun VoicePreferencesSection() {
                                 installedModels = installedModels + spec.id
                                 OfflineSpeechModelCatalog.selectModel(context, spec)
                                 modelMessage = "${spec.displayName} installed and selected for ${spec.languageTag}."
+                            } catch (cancel: CancellationException) {
+                                throw cancel
                             } catch (error: Exception) {
                                 modelMessage = error.message ?: "Could not install ${spec.displayName}."
                             } finally {
