@@ -51,6 +51,10 @@ fun WakeWordSettingsSection() {
         )
     }
     var listening by remember(context) { mutableStateOf(preferences.getBoolean(WakeWordService.KEY_ENABLED, false)) }
+    val voicePreferences = remember(context) { context.getSharedPreferences("dhanam_voice", 0) }
+    var allowNetworkSpeech by remember(context) {
+        mutableStateOf(voicePreferences.getBoolean("allow_network_speech_recognition", false))
+    }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Wake-word listening is off.") }
     var pendingStart by remember { mutableStateOf(false) }
@@ -177,6 +181,29 @@ fun WakeWordSettingsSection() {
                             listening = false
                             status = "Hey Jarvis listening stopped."
                         }
+                    }
+                )
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Allow online speech-to-text fallback", fontWeight = FontWeight.Medium)
+                    Text(
+                        "Wake-word detection stays on-device. After Hey Jarvis wakes, Android's system speech provider may send the spoken command to a remote service. Off by default.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = allowNetworkSpeech,
+                    onCheckedChange = { enabled ->
+                        allowNetworkSpeech = enabled
+                        voicePreferences.edit().putBoolean("allow_network_speech_recognition", enabled).apply()
+                        status = if (enabled) "Online speech fallback enabled. Audio after the wake word may be sent to the Android speech provider."
+                        else "Online speech fallback disabled. Only a dedicated on-device recognizer can transcribe commands."
                     }
                 )
             }
