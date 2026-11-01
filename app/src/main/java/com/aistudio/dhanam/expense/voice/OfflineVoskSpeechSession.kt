@@ -53,7 +53,9 @@ class OfflineVoskSpeechSession private constructor(
     /** Stop microphone capture and flush the final partial transcript. */
     fun stop() {
         if (completed.get()) return
-        runCatching { speechService.stop() }
+        Thread({
+            runCatching { speechService.stop() }
+        }, "Dhanam-Vosk-stop").start()
         // SpeechService posts its final callback to the main thread after its worker exits.
     }
 
@@ -62,7 +64,9 @@ class OfflineVoskSpeechSession private constructor(
         if (!completed.compareAndSet(false, true)) return
         handler.removeCallbacks(timeout)
         listener = null
-        releaseResources(cancel = true)
+        Thread({
+            releaseResources(cancel = true)
+        }, "Dhanam-Vosk-cancel").start()
     }
 
     private val voskListener = object : RecognitionListener {
@@ -95,23 +99,23 @@ class OfflineVoskSpeechSession private constructor(
     private fun complete(text: String) {
         if (!completed.compareAndSet(false, true)) return
         handler.removeCallbacks(timeout)
-        try {
-            listener?.onFinal(text)
-        } finally {
-            listener = null
+        val callback = listener
+        listener = null
+        Thread({
             releaseResources(cancel = false)
-        }
+            handler.post { callback?.onFinal(text) }
+        }, "Dhanam-Vosk-finish").start()
     }
 
     private fun fail(message: String) {
         if (!completed.compareAndSet(false, true)) return
         handler.removeCallbacks(timeout)
-        try {
-            listener?.onError(message)
-        } finally {
-            listener = null
+        val callback = listener
+        listener = null
+        Thread({
             releaseResources(cancel = false)
-        }
+            handler.post { callback?.onError(message) }
+        }, "Dhanam-Vosk-error").start()
     }
 
     private fun releaseResources(cancel: Boolean) {
