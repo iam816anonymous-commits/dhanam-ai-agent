@@ -20,7 +20,8 @@ class DhanamApplication : Application() {
         super.onCreate()
         startupScope.launch {
             try {
-                FinanceDatabase.getInstance(applicationContext)
+                val database = FinanceDatabase.getInstance(applicationContext)
+                database.openHelper.writableDatabase
                 databaseInitialization.complete(Unit)
             } catch (error: Exception) {
                 databaseInitialization.completeExceptionally(error)
