@@ -5,6 +5,19 @@ import org.junit.Test
 
 class SpeechRecognitionPolicyTest {
     @Test
+    fun installedVoskModelAlwaysWinsAndStaysOffline() {
+        assertEquals(
+            SpeechRecognitionRoute.OFFLINE_VOSK_MODEL,
+            SpeechRecognitionPolicy.route(
+                sdkInt = 27,
+                onDeviceRecognizerAvailable = false,
+                allowNetworkFallback = true,
+                offlineModelInstalled = true
+            )
+        )
+    }
+
+    @Test
     fun api27WithoutNetworkConsentIsBlocked() {
         assertEquals(
             SpeechRecognitionRoute.BLOCKED,
