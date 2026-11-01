@@ -33,4 +33,13 @@ class ModelResourceProfilerTest {
         val reasons = ModelResourceProfiler.runtimeBlockReasons(model(), profile(), 50L)
         assertTrue(reasons.any { it.contains("storage") })
     }
+    @Test fun enforcesMinimumReserveWhenAndroidThresholdIsSmall() {
+        val smallThreshold = profile(threshold = 64L * mib)
+        assertEquals(1280L * mib, ModelResourceProfiler.requiredAvailableRamBytes(model(), smallThreshold))
+    }
+    @Test fun blocksWhenPhysicalRamIsBelowModelMinimum() {
+        val lowTotal = profile().copy(totalRamBytes = 1500L * mib)
+        val reasons = ModelResourceProfiler.runtimeBlockReasons(model(), lowTotal, 1024L * mib)
+        assertTrue(reasons.any { it.contains("physical RAM") })
+    }
 }
