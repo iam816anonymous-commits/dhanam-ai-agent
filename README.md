@@ -148,3 +148,12 @@ The Android CI workflow runs `testDebugUnitTest`, `lintDebug`, `assembleDebug`, 
 - Verify WorkManager execution across reboot, Doze, force-stop and battery restrictions.
 - Complete remaining feature-parity, security, backup/restore and release-signing work.
 - Expand persistent per-agent memory from latest verified summaries into evaluated trend memory, and add broader recommendation feedback and rollback workflows.
+
+
+## Implementation references
+
+- [Vosk Android demo](https://github.com/alphacep/vosk-android-demo) and [Vosk Android API](https://github.com/alphacep/vosk-api) — offline streaming recognition and Android lifecycle.
+- [Vosk model catalogue and benchmark results](https://alphacephei.com/vosk/models) — model sizes, languages and published WER scores.
+- [SQLCipher Android](https://github.com/sqlcipher/sqlcipher-android) — encrypted SQLite and Room SupportOpenHelper integration.
+- [Picovoice Porcupine Android binding](https://github.com/Picovoice/porcupine/tree/master/binding/android) — local wake-word engine and asynchronous microphone error callback.
+- [Android SpeechRecognizer](https://developer.android.com/reference/android/speech/SpeechRecognizer) and [microphone foreground-service requirements](https://developer.android.com/develop/background-work/services/fgs/service-types#microphone) — on-device recognition availability and Android background microphone restrictions.
