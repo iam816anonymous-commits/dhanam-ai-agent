@@ -440,6 +440,7 @@ class WakeWordService : Service() {
         wakeTone?.release()
         wakeTone = null
         getSystemService(NotificationManager::class.java).cancel(COMMAND_NOTIFICATION_ID)
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
 
