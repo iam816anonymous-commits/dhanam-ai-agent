@@ -25,6 +25,7 @@ import ai.picovoice.porcupine.PorcupineManager
 import ai.picovoice.porcupine.PorcupineManagerCallback
 import ai.picovoice.porcupine.PorcupineManagerErrorCallback
 import com.aistudio.dhanam.expense.MainActivity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -307,6 +308,10 @@ class WakeWordService : Service() {
                         fallbackAfterOfflineFailure(message)
                     }
                 })
+            } catch (cancel: CancellationException) {
+                offlineSpeechSession?.cancel()
+                offlineSpeechSession = null
+                throw cancel
             } catch (error: Exception) {
                 offlineSpeechSession?.cancel()
                 offlineSpeechSession = null
