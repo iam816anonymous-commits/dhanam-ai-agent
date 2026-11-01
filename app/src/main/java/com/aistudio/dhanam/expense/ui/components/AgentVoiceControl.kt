@@ -123,7 +123,7 @@ fun AgentVoiceControl(
             status = "Loading the installed offline speech model. Audio stays on this device."
             translationScope.launch {
                 try {
-                    val session = OfflineVoskSpeechSession.create(offlineModel)
+                    val session = OfflineVoskSpeechSession.create(context, offlineModel)
                     if (!showDialog) {
                         session.cancel()
                         return@launch
