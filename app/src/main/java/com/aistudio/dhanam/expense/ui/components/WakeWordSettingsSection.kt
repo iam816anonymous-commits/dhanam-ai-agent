@@ -63,6 +63,9 @@ fun WakeWordSettingsSection() {
     }
     DisposableEffect(voicePreferences) {
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "wakeword_enabled") {
+                listening = voicePreferences.getBoolean("wakeword_enabled", false)
+            }
             if (key == "recognition_language" || key?.startsWith("offline_speech_model_") == true) {
                 selectedSpeechLanguage = voicePreferences.getString("recognition_language", "en-IN") ?: "en-IN"
                 offlineSpeechModelInstalled =
