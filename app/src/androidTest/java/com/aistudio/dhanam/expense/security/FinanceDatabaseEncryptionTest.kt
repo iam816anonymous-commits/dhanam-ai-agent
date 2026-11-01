@@ -27,6 +27,8 @@ class FinanceDatabaseEncryptionTest {
             val plaintext = PlainSQLiteDatabase.openOrCreateDatabase(file, null)
             plaintext.execSQL("CREATE TABLE security_probe (id INTEGER PRIMARY KEY, value TEXT NOT NULL)")
             plaintext.execSQL("INSERT INTO security_probe(value) VALUES ('ledger-preserved')")
+            plaintext.execSQL("PRAGMA user_version = 11")
+            plaintext.execSQL("PRAGMA application_id = 12345")
             plaintext.close()
 
             val passphrase = FinanceDatabaseEncryption.prepare(context, name)
@@ -41,6 +43,14 @@ class FinanceDatabaseEncryptionTest {
                 encrypted.rawQuery("SELECT value FROM security_probe WHERE id = 1", emptyArray()).use { cursor ->
                     assertEquals(true, cursor.moveToFirst())
                     assertEquals("ledger-preserved", cursor.getString(0))
+                }
+                encrypted.rawQuery("PRAGMA user_version", emptyArray()).use { cursor ->
+                    assertEquals(true, cursor.moveToFirst())
+                    assertEquals(11, cursor.getInt(0))
+                }
+                encrypted.rawQuery("PRAGMA application_id", emptyArray()).use { cursor ->
+                    assertEquals(true, cursor.moveToFirst())
+                    assertEquals(12345, cursor.getInt(0))
                 }
             } finally {
                 encrypted.close()
