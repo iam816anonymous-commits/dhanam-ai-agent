@@ -50,6 +50,7 @@ private fun OfflineSpeechModelRow(
     installed: Boolean,
     downloading: Boolean,
     progress: Int,
+    downloadEnabled: Boolean,
     onDownload: () -> Unit
 ) {
     Row(
@@ -68,7 +69,7 @@ private fun OfflineSpeechModelRow(
         when {
             installed -> Text("Installed", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
             downloading -> Text("$progress%", style = MaterialTheme.typography.labelMedium)
-            else -> OutlinedButton(onClick = onDownload) { Text("Download") }
+            else -> OutlinedButton(onClick = onDownload, enabled = downloadEnabled) { Text("Download") }
         }
     }
 }
@@ -93,7 +94,7 @@ fun VoicePreferencesSection() {
     }
     var recognitionAvailable by remember(context) { mutableStateOf(SpeechRecognizer.isRecognitionAvailable(context)) }
     var onDeviceAvailable by remember(context) {
-        mutableStateOf(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && SpeechRecognizer.isOnDeviceRecognitionAvailable(context))
+        mutableStateOf(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && runCatching { SpeechRecognizer.isOnDeviceRecognitionAvailable(context) }.getOrDefault(false))
     }
     var permissionMessage by remember { mutableStateOf<String?>(null) }
     var installedModels by remember(context) {
@@ -125,7 +126,7 @@ fun VoicePreferencesSection() {
     fun refreshDiagnostics() {
         permissionGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         recognitionAvailable = SpeechRecognizer.isRecognitionAvailable(context)
-        onDeviceAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+        onDeviceAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && runCatching { SpeechRecognizer.isOnDeviceRecognitionAvailable(context) }.getOrDefault(false)
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -171,21 +172,23 @@ fun VoicePreferencesSection() {
                 style = MaterialTheme.typography.bodyMedium
             )
             val selectedOfflineModel = OfflineSpeechModelCatalog.forLanguageTag(language)
-            val selectedModelInstalled = selectedOfflineModel?.id in installedModels
+            val selectedModelInstalled = selectedOfflineModel != null && selectedOfflineModel.id in installedModels
             Text(
                 "Speech service: " + when {
                     selectedModelInstalled -> "Offline Vosk model installed for $language"
-                    recognitionAvailable -> "Android provider available"
+                    onDeviceAvailable -> "Android on-device provider available"
+                    recognitionAvailable && allowNetworkFallback -> "Android provider available (online fallback allowed)"
+                    recognitionAvailable -> "Android provider found, but online fallback is disabled"
                     else -> "No speech engine available for the selected language"
                 },
-                color = if (selectedModelInstalled || recognitionAvailable) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                color = if (selectedModelInstalled || onDeviceAvailable || (recognitionAvailable && allowNetworkFallback)) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
                 when {
                     onDeviceAvailable -> "Dedicated on-device recognizer: available. Language support is checked when you start recognition."
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> "Dedicated on-device recognizer: unavailable. The system recognizer may use network services."
-                    else -> "Android 8–11: the system recognizer accepts an offline preference, but Android cannot guarantee offline processing through this API."
+                    else -> "Android 8–11: install a Vosk model below for guaranteed local speech-to-text. The built-in Android speech API cannot guarantee offline processing."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -248,6 +251,7 @@ fun VoicePreferencesSection() {
                     installed = spec.id in installedModels,
                     downloading = downloadingModelId == spec.id,
                     progress = if (downloadingModelId == spec.id) downloadProgress else 0,
+                    downloadEnabled = downloadingModelId == null,
                     onDownload = {
                         downloadingModelId = spec.id
                         downloadProgress = 0
