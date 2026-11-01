@@ -87,10 +87,13 @@ object OfflineSpeechModelCatalog {
     fun availableBytes(context: Context): Long =
         StatFs(context.filesDir.absolutePath).availableBytes
 
-    internal fun isValidModelDirectory(directory: File): Boolean =
-        File(directory, "am/final.mdl").isFile &&
+    internal fun isValidModelDirectory(directory: File): Boolean {
+        val splitGraph = File(directory, "graph/HCLr.fst").isFile &&
+            File(directory, "graph/Gr.fst").isFile
+        val combinedGraph = File(directory, "graph/HCLG.fst").isFile
+        return File(directory, "am/final.mdl").isFile &&
             File(directory, "conf/mfcc.conf").isFile &&
             File(directory, "conf/model.conf").isFile &&
-            File(directory, "graph/Gr.fst").isFile &&
-            File(directory, "graph/HCLr.fst").isFile
+            (splitGraph || combinedGraph)
+    }
 }
