@@ -20,31 +20,31 @@ object OfflineSpeechModelCatalog {
 
     val models = listOf(
         OfflineSpeechModelSpec(
+            id = "vosk-small-en-us-0.15",
+            displayName = "English · General",
+            languageTag = "en-US",
+            archiveRoot = "vosk-model-small-en-us-0.15",
+            downloadUrl = "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip",
+            approximateDownloadBytes = 40L * MIB,
+            accuracyNote = "Published WER 9.85 on LibriSpeech test-clean and 10.38 on TEDLIUM; accent mismatch can affect results."
+        ),
+        OfflineSpeechModelSpec(
             id = "vosk-small-en-in-0.4",
-            displayName = "Indian English · Vosk small",
+            displayName = "English · Indian accent",
             languageTag = "en-IN",
             archiveRoot = "vosk-model-small-en-in-0.4",
             downloadUrl = "https://alphacephei.com/vosk/models/vosk-model-small-en-in-0.4.zip",
             approximateDownloadBytes = 36L * MIB,
-            accuracyNote = "Optimized for Indian English; verify amounts and merchant names."
+            accuracyNote = "Published WER 49.05 on NPTEL Pure. Experimental for financial commands; verify every amount."
         ),
         OfflineSpeechModelSpec(
             id = "vosk-small-hi-0.22",
-            displayName = "Hindi · Vosk small",
+            displayName = "Hindi",
             languageTag = "hi-IN",
             archiveRoot = "vosk-model-small-hi-0.22",
             downloadUrl = "https://alphacephei.com/vosk/models/vosk-model-small-hi-0.22.zip",
             approximateDownloadBytes = 42L * MIB,
-            accuracyNote = "Hindi offline recognition; verify financial amounts before submission."
-        ),
-        OfflineSpeechModelSpec(
-            id = "vosk-small-te-0.42",
-            displayName = "Telugu · Vosk small",
-            languageTag = "te-IN",
-            archiveRoot = "vosk-model-small-te-0.42",
-            downloadUrl = "https://alphacephei.com/vosk/models/vosk-model-small-te-0.42.zip",
-            approximateDownloadBytes = 58L * MIB,
-            accuracyNote = "Experimental-quality Telugu small model; recognition accuracy is limited. Review every transcript."
+            accuracyNote = "Published WER 20.89 on IITM Challenge and 24.72 on MUCS Challenge; verify amounts."
         )
     )
 
@@ -54,9 +54,31 @@ object OfflineSpeechModelCatalog {
     }
 
     fun installedDirectory(context: Context, languageTag: String): File? {
-        val spec = forLanguageTag(languageTag) ?: return null
-        val directory = File(File(context.filesDir, "speech/models"), spec.id)
-        return directory.takeIf(::isValidModelDirectory)
+        val prefix = languageTag.substringBefore('-').lowercase()
+        val candidates = models.filter { it.languageTag.substringBefore('-').lowercase() == prefix }
+        if (candidates.isEmpty()) return null
+        val preferences = context.getSharedPreferences("dhanam_voice", Context.MODE_PRIVATE)
+        val selectedId = preferences.getString("offline_speech_model_$prefix", null)
+        val ordered = candidates.sortedByDescending { it.id == selectedId }
+        return ordered.firstNotNullOfOrNull { spec ->
+            File(File(context.filesDir, "speech/models"), spec.id)
+                .takeIf(::isValidModelDirectory)
+        }
+    }
+
+    fun selectedModelId(context: Context, languageTag: String): String? {
+        val prefix = languageTag.substringBefore('-').lowercase()
+        val directory = installedDirectory(context, languageTag) ?: return null
+        return models.firstOrNull { it.id == directory.name }?.id
+    }
+
+    fun selectModel(context: Context, spec: OfflineSpeechModelSpec) {
+        require(isInstalled(context, spec)) { "Install this speech model before selecting it." }
+        val prefix = spec.languageTag.substringBefore('-').lowercase()
+        context.getSharedPreferences("dhanam_voice", Context.MODE_PRIVATE)
+            .edit()
+            .putString("offline_speech_model_$prefix", spec.id)
+            .apply()
     }
 
     fun isInstalled(context: Context, spec: OfflineSpeechModelSpec): Boolean =
