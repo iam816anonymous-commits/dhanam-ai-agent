@@ -9,7 +9,7 @@ import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
-import java.net.HttpURLConnection
+import javax.net.ssl.HttpsURLConnection
 import java.net.URL
 import java.util.zip.ZipInputStream
 
@@ -71,7 +71,7 @@ object OfflineSpeechModelInstaller {
     }
 
     private fun download(spec: OfflineSpeechModelSpec, destination: File, onProgress: (Int) -> Unit) {
-        val connection = (URL(spec.downloadUrl).openConnection() as HttpURLConnection).apply {
+        val connection = (URL(spec.downloadUrl).openConnection() as HttpsURLConnection).apply {
             connectTimeout = 20_000
             readTimeout = 45_000
             instanceFollowRedirects = true
@@ -80,6 +80,7 @@ object OfflineSpeechModelInstaller {
         }
         try {
             val response = connection.responseCode
+            check(connection.url.protocol == "https") { "Speech model download attempted to leave the secure HTTPS connection." }
             check(response in 200..299) { "Speech model download failed (HTTP $response)." }
             val contentLength = connection.contentLengthLong
             check(contentLength <= MAX_DOWNLOAD_BYTES) { "Speech model archive is larger than the allowed download limit." }
