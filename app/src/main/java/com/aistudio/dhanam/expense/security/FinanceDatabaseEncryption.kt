@@ -43,7 +43,7 @@ object FinanceDatabaseEncryption {
             }
         }
 
-        val passphrase = readOrCreatePassphrase(context, database.exists() && database.length() > 0L)
+        val passphrase = readOrCreatePassphrase(context, database)
         if (backup.exists()) {
             if (database.exists() && isReadableWithKey(database, passphrase)) {
                 backup.delete()
@@ -104,15 +104,17 @@ object FinanceDatabaseEncryption {
         deleteSidecars(database)
     }
 
-    private fun readOrCreatePassphrase(context: Context, databaseAlreadyExists: Boolean): ByteArray {
+    private fun readOrCreatePassphrase(context: Context, database: File): ByteArray {
         val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val encodedCiphertext = preferences.getString(CIPHER_TEXT_KEY, null)
         val encodedIv = preferences.getString(IV_KEY, null)
         if (!encodedCiphertext.isNullOrBlank() && !encodedIv.isNullOrBlank()) {
             return decryptKey(encodedCiphertext, encodedIv)
         }
-        check(!databaseAlreadyExists) {
-            "The finance database exists but its encryption key is missing. Dhanam has stopped to protect your data; do not uninstall the app or clear its storage."
+        if (database.exists() && database.length() > 0L) {
+            check(isReadableAsPlaintext(database)) {
+                "The finance database exists but its encryption key is missing or unavailable. Dhanam has stopped to protect your data; do not uninstall the app or clear its storage."
+            }
         }
 
         val rawKey = ByteArray(KEY_SIZE_BYTES).also(SecureRandom()::nextBytes)
@@ -157,6 +159,23 @@ object FinanceDatabaseEncryption {
         )
         return generator.generateKey()
     }
+
+    private fun isReadableAsPlaintext(file: File): Boolean = runCatching {
+        val database = SQLiteDatabase.openDatabase(
+            file.absolutePath,
+            byteArrayOf(),
+            null,
+            SQLiteDatabase.OPEN_READONLY,
+            null
+        )
+        try {
+            database.rawQuery("SELECT COUNT(*) FROM sqlite_master", emptyArray()).use { cursor ->
+                cursor.moveToFirst() && cursor.getLong(0) >= 0L
+            }
+        } finally {
+            database.close()
+        }
+    }.getOrDefault(false)
 
     private fun isReadableWithKey(file: File, passphrase: ByteArray): Boolean = runCatching {
         val database = SQLiteDatabase.openDatabase(
