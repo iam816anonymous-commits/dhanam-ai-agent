@@ -61,10 +61,14 @@ Android background execution is best-effort. Doze, OEM battery management, force
 
 ## Privacy and safety
 
-- Financial records and analysis remain local. The Internet permission is used for explicit model downloads and user-initiated Picovoice wake-word model creation/AccessKey validation; no financial records or finance prompts are sent to Picovoice.
-- No cloud inference or automatic financial transfers.
+- The finance ledger, deterministic calculations, and LiteRT-LM inference are local to the device. Dhanam does not send finance prompts or ledger records to Picovoice.
+- **Speech-recognition privacy depends on the Android speech provider.** Dhanam requests offline recognition, but Android documents that recognizer implementations may ignore this preference. On Android 8.1 there is no public on-device-only `SpeechRecognizer` factory; the default provider may use remote servers. Do not assume voice commands are offline/private unless the selected provider and language pack have been verified. See the [Android offline preference](https://developer.android.com/reference/android/speech/RecognizerIntent#EXTRA_PREFER_OFFLINE) and [SpeechRecognizer documentation](https://developer.android.com/reference/android/speech/SpeechRecognizer).
+- Android 12+ can expose a dedicated on-device recognizer when the device provides one. Dhanam selects it when available; otherwise it falls back to the system provider. This fallback is a compatibility path, not an offline guarantee.
+- The Internet permission is also used for explicit model downloads, ML Kit language/translation model downloads, and user-initiated Picovoice wake-word model creation/AccessKey validation.
+- No cloud LLM inference or automatic financial transfers. This does **not** mean the Android speech provider cannot process audio remotely.
+- The Picovoice AccessKey is encrypted with Android Keystore. Wake-word detection runs on-device after the custom keyword model has been generated.
 - No generic device-control or AccessibilityService automation.
-- Model output cannot directly write financial records or alter permissions.
+- Model output cannot directly write financial records or alter permissions. Financial mutations continue through deterministic validation, preview and explicit confirmation.
 - Learned skills are data-only exact-description category rules, never executable code. They require successful validation and user approval before use.
 - No neural-network weight fine-tuning is performed. Capability improvement is through validated local rules, persistent reports and advisory model suggestions.
 
@@ -87,6 +91,33 @@ gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assemb
 ```
 
 The debug APK is generated at `app/build/outputs/apk/debug/app-debug.apk`; the unsigned release APK is generated at `app/build/outputs/apk/release/app-release-unsigned.apk`. GitHub Actions verifies and uploads both APKs plus the instrumented-test APK. Release signing remains a separate release-readiness task.
+
+## Engineering assessment and improvement priorities
+
+This is a code-level review of the current repository, not a claim that the following work has already been implemented or verified on a handset.
+
+### P0 — Resolve before calling the app privacy-ready
+
+1. **Make speech privacy explicit and enforceable.** The current Android speech fallback requests `EXTRA_PREFER_OFFLINE`, but Android says a recognizer implementation may ignore it. Add an explicit user-visible online-recognition consent path and, for a genuine offline guarantee on API 27+, evaluate a bundled/on-device STT engine with model download, storage, RAM and language support checks. Do not label the current fallback as guaranteed offline.
+2. **Protect financial data at rest.** The Room database is opened with the standard Android SQLite driver; the PIN gate and PBKDF2 hash protect app access but do not encrypt the database file themselves. Evaluate SQLCipher/Room encryption or another well-reviewed encrypted-storage design, including key lifecycle, migration, export and recovery. `allowBackup=false` prevents ordinary Android backup, but a secure user-controlled encrypted backup/restore flow is still needed.
+3. **Qualify financial command safety with real examples.** Build a reviewed test corpus for English, Telugu and Hindi voice transcripts, including ambiguous amounts, dates, categories, corrections, duplicate commands and Khata repayments. Require clarification for uncertain fields and preserve preview/confirmation for every write.
+
+### P1 — Reliability and device qualification
+
+4. **Test the voice lifecycle on real devices.** Validate API 27 / Android 8.1 and current Android versions for permission denial/revocation, notification denial, screen lock, service restart, repeated wake phrases, recognizer errors, no-speech timeouts, language availability, battery drain and thermal impact. Add a Porcupine error callback and observable recovery states for asynchronous microphone/engine failures. Android 14+ microphone foreground services must be started while the app is visible and satisfy the microphone permission/type requirements; see [Android microphone foreground-service requirements](https://developer.android.com/develop/background-work/services/fgs/service-types#microphone).
+5. **Add migration and ledger integration tests.** Room currently has additive migrations through schema version 11. Test upgrades from every supported historical schema using representative real legacy databases, verify row counts and monetary totals before/after, and test interruption/retry/duplicate import behaviour. Keep migration tests separate from unit tests.
+6. **Benchmark each model on target hardware.** Catalogue RAM/storage thresholds are admission heuristics, not measured guarantees. Collect per-device load time, peak RSS, available RAM, token latency, OOM rate, thermal throttling and battery use for all six artifacts. Include low-memory 4 GB devices and devices advertising RAM expansion; never treat swap/virtual RAM as equivalent to physical RAM. Keep download eligibility separate from run eligibility.
+7. **Expand automated voice and service coverage.** CI currently runs JVM unit tests, lint, and compiles the debug, release and instrumented-test APKs. It does not execute instrumented tests on a physical device or emulator. Add deterministic tests around service state transitions and command dispatch, then maintain a small physical-device release matrix for microphone and wake-word behaviour.
+
+### P2 — Product quality and maintainability
+
+8. **Measure agent usefulness, not just successful inference.** Track structured parse accuracy, clarification rate, false expense creation, correction success and recommendation usefulness against a fixed evaluation set. Deterministic Kotlin/Room calculations remain authoritative; LLM text must never become the source of financial totals.
+9. **Make nightly learning observable and bounded.** Report each specialist's start/end time, skipped reason, timeout, model status and validated proposal count. Test reboot, Doze, force-stop, battery constraints and time-zone changes. WorkManager is best-effort, not a guaranteed 01:00–06:00 scheduler.
+10. **Complete operational safeguards.** Add encrypted backup/restore, export verification, retention controls for agent reports/memories, a user-facing data deletion/export checklist, dependency/license review and a signed release pipeline. Remove duplicate dependencies and keep dependency versions centrally managed.
+
+### Current verification boundary
+
+The Android CI workflow runs `testDebugUnitTest`, `lintDebug`, `assembleDebug`, `assembleDebugAndroidTest` and `assembleRelease`, then checks and uploads the APK artifacts. A successful CI run proves compilation, JVM tests, lint and packaging; it does not prove wake-word accuracy, offline speech recognition, model performance, battery behaviour, or financial correctness on a real handset. Release signing is not configured in this workflow.
 
 ## Remaining acceptance work
 
