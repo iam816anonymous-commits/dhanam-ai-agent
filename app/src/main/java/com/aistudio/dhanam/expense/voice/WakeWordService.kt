@@ -25,6 +25,11 @@ import ai.picovoice.porcupine.PorcupineManager
 import ai.picovoice.porcupine.PorcupineManagerCallback
 import com.aistudio.dhanam.expense.MainActivity
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * Explicitly user-enabled microphone foreground service.
@@ -35,9 +40,11 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class WakeWordService : Service() {
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val handlingUtterance = AtomicBoolean(false)
     private var porcupineManager: PorcupineManager? = null
     private var speechRecognizer: SpeechRecognizer? = null
+    private var offlineSpeechSession: OfflineVoskSpeechSession? = null
     private var wakeTone: ToneGenerator? = null
     private val speechTimeout = Runnable {
         if (handlingUtterance.get()) {
@@ -157,8 +164,20 @@ class WakeWordService : Service() {
     }
 
     private fun startSpeechToText() {
-        if (!hasMicrophonePermission() || !SpeechRecognizer.isRecognitionAvailable(this)) {
-            updateNotification("Speech recognition service unavailable. Check Android speech services.")
+        if (!hasMicrophonePermission()) {
+            updateNotification("Microphone permission was revoked. Enable it in Android app settings.")
+            finishUtteranceAndRearm()
+            return
+        }
+        val language = getSharedPreferences("dhanam_voice", MODE_PRIVATE)
+            .getString("recognition_language", "en-IN") ?: "en-IN"
+        val offlineModel = OfflineSpeechModelCatalog.installedDirectory(this, language)
+        if (offlineModel != null) {
+            startOfflineSpeechToText(offlineModel)
+            return
+        }
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            updateNotification("No offline model for this language and no Android speech provider is installed.")
             finishUtteranceAndRearm()
             return
         }
@@ -212,6 +231,39 @@ class WakeWordService : Service() {
         }
     }
 
+    private fun startOfflineSpeechToText(modelDirectory: java.io.File) {
+        updateNotification("Using installed offline speech model · audio stays on this device")
+        serviceScope.launch {
+            try {
+                val session = OfflineVoskSpeechSession.create(modelDirectory)
+                if (!handlingUtterance.get()) {
+                    session.cancel()
+                    return@launch
+                }
+                offlineSpeechSession = session
+                session.start(object : OfflineVoskSpeechSession.Listener {
+                    override fun onPartial(text: String) {
+                        updateNotification("Offline recognition · hearing: ${text.take(75)}")
+                    }
+
+                    override fun onFinal(text: String) {
+                        if (text.isNotBlank()) deliverCommand(text)
+                        else updateNotification("No speech recognized. Say Hey Jarvis and try again.")
+                        finishUtteranceAndRearm()
+                    }
+
+                    override fun onError(message: String) {
+                        updateNotification("Offline speech failed: ${message.take(110)}")
+                        finishUtteranceAndRearm()
+                    }
+                })
+            } catch (error: Exception) {
+                updateNotification("Offline speech could not start: ${error.message?.take(110) ?: "check the installed model"}")
+                finishUtteranceAndRearm()
+            }
+        }
+    }
+
     private fun deliverCommand(transcript: String) {
         val language = getSharedPreferences("dhanam_voice", MODE_PRIVATE)
             .getString("recognition_language", "en-IN") ?: "en-IN"
@@ -251,6 +303,9 @@ class WakeWordService : Service() {
     private fun finishUtteranceAndRearm() {
         mainHandler.removeCallbacks(speechTimeout)
         if (!handlingUtterance.compareAndSet(true, false)) return
+        val activeOfflineSession = offlineSpeechSession
+        offlineSpeechSession = null
+        activeOfflineSession?.cancel()
         val activeRecognizer = speechRecognizer
         speechRecognizer = null
         activeRecognizer?.let {
@@ -318,6 +373,9 @@ class WakeWordService : Service() {
 
     override fun onDestroy() {
         mainHandler.removeCallbacksAndMessages(null)
+        serviceScope.cancel()
+        offlineSpeechSession?.cancel()
+        offlineSpeechSession = null
         stopWakeWordEngine()
         speechRecognizer?.let {
             runCatching { it.cancel() }
