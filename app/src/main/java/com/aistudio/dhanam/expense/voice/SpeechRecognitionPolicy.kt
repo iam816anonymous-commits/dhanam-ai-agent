@@ -1,7 +1,6 @@
 package com.aistudio.dhanam.expense.voice
 
 import android.content.Context
-import androidx.annotation.RequiresApi
 import android.os.Build
 import android.speech.SpeechRecognizer
 
@@ -62,9 +61,14 @@ object SpeechRecognitionPolicy {
         return recognizer to route
     }
 
-    @RequiresApi(Build.VERSION_CODES.S)
-    private fun createOnDeviceRecognizer(context: Context): SpeechRecognizer =
-        SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+    private fun createOnDeviceRecognizer(context: Context): SpeechRecognizer {
+        // Keep the platform check in the same method as the API-31 call so Android Lint can
+        // prove this invocation is unreachable on the app's API-27 through API-30 devices.
+        check(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            "The dedicated on-device speech recognizer requires Android 12 or newer."
+        }
+        return SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+    }
 
     fun createSystemRecognizer(context: Context): Pair<SpeechRecognizer, SpeechRecognitionRoute> {
         check(allowNetworkFallback(context)) {
