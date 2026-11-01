@@ -213,11 +213,22 @@ object FinanceDatabaseEncryption {
             // Force a schema read before export so an encrypted file with a missing key cannot
             // be mistaken for a plaintext database.
             database.rawQuery("SELECT COUNT(*) FROM sqlite_master", emptyArray()).use { it.moveToFirst() }
+            val userVersion = database.rawQuery("PRAGMA user_version", emptyArray()).use {
+                check(it.moveToFirst())
+                it.getInt(0)
+            }
+            val applicationId = database.rawQuery("PRAGMA application_id", emptyArray()).use {
+                check(it.moveToFirst())
+                it.getInt(0)
+            }
             database.execSQL(
                 "ATTACH DATABASE ? AS encrypted KEY ?",
                 arrayOf(destination.absolutePath, String(passphrase, Charsets.UTF_8))
             )
             database.rawExecSQL("SELECT sqlcipher_export('encrypted')")
+            // sqlcipher_export copies schema and rows; preserve SQLite metadata used by Room.
+            database.execSQL("PRAGMA encrypted.user_version = $userVersion")
+            database.execSQL("PRAGMA encrypted.application_id = $applicationId")
             database.execSQL("DETACH DATABASE encrypted")
         } catch (error: Exception) {
             destination.delete()
