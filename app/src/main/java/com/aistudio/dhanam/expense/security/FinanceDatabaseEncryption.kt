@@ -46,6 +46,9 @@ object FinanceDatabaseEncryption {
         val passphrase = readOrCreatePassphrase(context, database)
         if (backup.exists()) {
             if (database.exists() && isReadableWithKey(database, passphrase)) {
+                // A process may have stopped after replacing the DB file but before removing
+                // the plaintext database's old WAL/journal sidecars.
+                deleteSidecars(database)
                 backup.delete()
                 temporary.delete()
                 return passphrase
