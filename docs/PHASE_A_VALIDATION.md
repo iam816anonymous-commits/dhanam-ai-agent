@@ -53,7 +53,7 @@ This checklist is for physical-device qualification. A green compile/lint workfl
 - [ ] Confirm the service releases AudioRecord, SpeechService, Recognizer, Model, PorcupineManager and ToneGenerator resources on every exit path.
 - [ ] Confirm it rearms only after the previous speech session releases the microphone.
 - [ ] Confirm a Porcupine error updates the notification, disables the persisted listening state and stops the service rather than leaving a dead “enabled” switch.
-- [ ] When Dhanam is visible, confirm the command broadcast is delivered directly to the app. When Dhanam is backgrounded, confirm the notification opens the review screen after a user tap.
+- [ ] When Dhanam's in-process receiver is active, confirm the command broadcast is routed without launching an Activity. If the receiver is not active (for example after process restart), confirm the notification opens the review flow only after a user tap; never launch an Activity automatically from the background.
 - [ ] Test screen lock, app process death, service restart, force-stop, OEM battery management and notification permission denial.
 
 ## 5. Financial command safety
