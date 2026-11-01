@@ -1,6 +1,5 @@
 package com.aistudio.dhanam.expense.model
 
-import android.app.ActivityManager
 import android.content.Context
 import android.os.StatFs
 import java.io.File
@@ -34,7 +33,13 @@ data class DeviceEligibility(
     val totalRamBytes: Long,
     val availableRamBytes: Long,
     val freeStorageBytes: Long,
-    val reasons: List<String>
+    val reasons: List<String>,
+    val memoryThresholdBytes: Long = 0L,
+    val lowMemory: Boolean = false,
+    val requiredAvailableRamBytes: Long = 0L,
+    val processResidentBytes: Long? = null,
+    val processHighWaterBytes: Long? = null,
+    val nativeHeapAllocatedBytes: Long = 0L
 )
 
 object ModelCatalog {
@@ -155,31 +160,44 @@ object ModelCatalog {
      * Temporary RAM pressure must not hide a model the user can download for later.
      */
     fun eligibility(context: Context, model: ModelSpec): DeviceEligibility {
-        val memory = readMemory(context)
+        val profile = ModelResourceProfiler.capture(context)
         val freeStorage = StatFs(context.filesDir.absolutePath).availableBytes
         val reasons = buildList {
-            if (memory.totalMem < model.minTotalRamBytes) add("Android-reported physical RAM is below this model's minimum.")
+            if (profile.totalRamBytes < model.minTotalRamBytes) add("Android-reported physical RAM is below this model's minimum.")
             if (freeStorage < model.minFreeStorageBytes) add("Free more app storage before downloading this model.")
         }
-        return DeviceEligibility(reasons.isEmpty(), memory.totalMem, memory.availMem, freeStorage, reasons)
+        return profile.toEligibility(reasons, freeStorage, requiredAvailableRamBytes = 0L)
     }
 
-    /** Runtime eligibility also checks current free RAM immediately before engine creation. */
+    /** Runtime eligibility rechecks Android pressure and reserves the system low-memory threshold. */
     fun runtimeEligibility(context: Context, model: ModelSpec): DeviceEligibility {
-        val memory = readMemory(context)
+        val profile = ModelResourceProfiler.capture(context)
         val freeStorage = StatFs(context.filesDir.absolutePath).availableBytes
-        val reasons = buildList {
-            if (memory.totalMem < model.minTotalRamBytes) add("Android-reported physical RAM is below this model's minimum.")
-            if (memory.availMem < model.minAvailableRamBytes) add("Currently available system RAM is below this model's runtime requirement. Close other apps and recheck.")
-            if (freeStorage < model.minFreeStorageBytes) add("Free app storage is below this model's runtime reserve of ${model.minFreeStorageBytes / MIB} MiB.")
-        }
-        return DeviceEligibility(reasons.isEmpty(), memory.totalMem, memory.availMem, freeStorage, reasons)
+        val reasons = ModelResourceProfiler.runtimeBlockReasons(model, profile, freeStorage)
+        return profile.toEligibility(
+            reasons = reasons,
+            freeStorageBytes = freeStorage,
+            requiredAvailableRamBytes = ModelResourceProfiler.requiredAvailableRamBytes(model, profile)
+        )
     }
 
-    private fun readMemory(context: Context): ActivityManager.MemoryInfo {
-        val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        return ActivityManager.MemoryInfo().also(manager::getMemoryInfo)
-    }
+    private fun DeviceMemoryProfile.toEligibility(
+        reasons: List<String>,
+        freeStorageBytes: Long,
+        requiredAvailableRamBytes: Long
+    ) = DeviceEligibility(
+        allowed = reasons.isEmpty(),
+        totalRamBytes = totalRamBytes,
+        availableRamBytes = availableRamBytes,
+        freeStorageBytes = freeStorageBytes,
+        reasons = reasons,
+        memoryThresholdBytes = systemLowMemoryThresholdBytes,
+        lowMemory = lowMemory,
+        requiredAvailableRamBytes = requiredAvailableRamBytes,
+        processResidentBytes = process?.residentBytes,
+        processHighWaterBytes = process?.highWaterBytes,
+        nativeHeapAllocatedBytes = nativeHeapAllocatedBytes
+    )
 
     /** Remove only the superseded, fixed catalog artifact from the previous app version. */
     fun removeLegacyArtifact(context: Context) {
