@@ -27,6 +27,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +38,40 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.aistudio.dhanam.expense.voice.OfflineSpeechModelCatalog
+import com.aistudio.dhanam.expense.voice.OfflineSpeechModelInstaller
+import com.aistudio.dhanam.expense.voice.OfflineSpeechModelSpec
+import kotlinx.coroutines.launch
+
+@Composable
+private fun OfflineSpeechModelRow(
+    contextLabel: String,
+    spec: OfflineSpeechModelSpec,
+    installed: Boolean,
+    downloading: Boolean,
+    progress: Int,
+    onDownload: () -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(Modifier.weight(1f).padding(end = 8.dp)) {
+            Text(contextLabel, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "${spec.approximateDownloadBytes / (1024L * 1024L)} MB · ${spec.accuracyNote}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        when {
+            installed -> Text("Installed", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
+            downloading -> Text("$progress%", style = MaterialTheme.typography.labelMedium)
+            else -> OutlinedButton(onClick = onDownload) { Text("Download") }
+        }
+    }
+}
 
 /** Persistent voice preferences plus live Android microphone/speech-service diagnostics. */
 @Composable
@@ -61,6 +96,13 @@ fun VoicePreferencesSection() {
         mutableStateOf(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && SpeechRecognizer.isOnDeviceRecognitionAvailable(context))
     }
     var permissionMessage by remember { mutableStateOf<String?>(null) }
+    var installedModels by remember(context) {
+        mutableStateOf(OfflineSpeechModelCatalog.models.filter { OfflineSpeechModelCatalog.isInstalled(context, it) }.map { it.id }.toSet())
+    }
+    var downloadingModelId by remember { mutableStateOf<String?>(null) }
+    var downloadProgress by remember { mutableStateOf(0) }
+    var modelMessage by remember { mutableStateOf<String?>(null) }
+    val modelScope = rememberCoroutineScope()
 
     DisposableEffect(preferences) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -128,9 +170,15 @@ fun VoicePreferencesSection() {
                 color = if (permissionGranted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyMedium
             )
+            val selectedOfflineModel = OfflineSpeechModelCatalog.forLanguageTag(language)
+            val selectedModelInstalled = selectedOfflineModel?.id in installedModels
             Text(
-                "Speech service: " + (if (recognitionAvailable) "Available" else "Not found"),
-                color = if (recognitionAvailable) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                "Speech service: " + when {
+                    selectedModelInstalled -> "Offline Vosk model installed for $language"
+                    recognitionAvailable -> "Android provider available"
+                    else -> "No speech engine available for the selected language"
+                },
+                color = if (selectedModelInstalled || recognitionAvailable) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
@@ -187,11 +235,42 @@ fun VoicePreferencesSection() {
                     }
                 }) { Text("Open app permissions") }
             }
+            Text("Download offline speech models", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Text(
-                "For Android 8.1, test voice in airplane mode after installing English/Telugu offline speech packs in the system speech engine. If it fails offline, this Android version needs a dedicated downloadable speech-recognition model; the finance LLM download does not provide speech recognition.",
+                "These are separate from the finance LLMs. Download only the languages you use. Once installed, transcription runs locally and does not need internet access.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            OfflineSpeechModelCatalog.models.forEach { spec ->
+                OfflineSpeechModelRow(
+                    contextLabel = spec.displayName,
+                    spec = spec,
+                    installed = spec.id in installedModels,
+                    downloading = downloadingModelId == spec.id,
+                    progress = if (downloadingModelId == spec.id) downloadProgress else 0,
+                    onDownload = {
+                        downloadingModelId = spec.id
+                        downloadProgress = 0
+                        modelMessage = "Downloading ${spec.displayName}…"
+                        modelScope.launch {
+                            try {
+                                OfflineSpeechModelInstaller.install(context, spec) { percent ->
+                                    downloadProgress = percent
+                                }
+                                installedModels = installedModels + spec.id
+                                modelMessage = "${spec.displayName} installed. Select its language above to use offline transcription."
+                            } catch (error: Exception) {
+                                modelMessage = error.message ?: "Could not install ${spec.displayName}."
+                            } finally {
+                                downloadingModelId = null
+                            }
+                        }
+                    }
+                )
+            }
+            modelMessage?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Row(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
