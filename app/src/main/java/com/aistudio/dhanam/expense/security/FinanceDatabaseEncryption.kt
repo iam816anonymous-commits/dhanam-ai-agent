@@ -157,7 +157,7 @@ object FinanceDatabaseEncryption {
         val database = try {
             SQLiteDatabase.openDatabase(
                 source.absolutePath,
-                null,
+                byteArrayOf(),
                 null,
                 SQLiteDatabase.OPEN_READWRITE,
                 null
