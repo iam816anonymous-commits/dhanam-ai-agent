@@ -24,6 +24,8 @@ class DhanamApplication : Application() {
                 databaseInitialization.complete(Unit)
             } catch (error: Exception) {
                 databaseInitialization.completeExceptionally(error)
+            } catch (error: LinkageError) {
+                databaseInitialization.completeExceptionally(error)
             }
         }
     }
