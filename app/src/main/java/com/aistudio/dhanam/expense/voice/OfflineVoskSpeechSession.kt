@@ -39,7 +39,11 @@ class OfflineVoskSpeechSession private constructor(
     private val stopStarted = AtomicBoolean(false)
     private val stopFinished = CountDownLatch(1)
     private var listener: Listener? = null
+    private val finalizedSegments = mutableListOf<String>()
     private val timeout = Runnable {
+        if (!completed.get()) stop()
+    }
+    private val endOfUtteranceTimeout = Runnable {
         if (!completed.get()) stop()
     }
 
@@ -57,6 +61,7 @@ class OfflineVoskSpeechSession private constructor(
     /** Stop microphone capture and flush the final partial transcript. */
     fun stop() {
         if (completed.get()) return
+        handler.removeCallbacks(endOfUtteranceTimeout)
         Thread({
             stopRecording(cancel = false)
         }, "Dhanam-Vosk-stop").start()
@@ -67,6 +72,7 @@ class OfflineVoskSpeechSession private constructor(
     fun cancel() {
         if (!completed.compareAndSet(false, true)) return
         handler.removeCallbacks(timeout)
+        handler.removeCallbacks(endOfUtteranceTimeout)
         listener = null
         Thread({
             releaseResources(cancel = true)
@@ -76,18 +82,25 @@ class OfflineVoskSpeechSession private constructor(
     private val voskListener = object : RecognitionListener {
         override fun onPartialResult(hypothesis: String) {
             if (completed.get()) return
-            val text = jsonText(hypothesis, "partial")
-            if (text.isNotBlank()) listener?.onPartial(text)
+            handler.removeCallbacks(endOfUtteranceTimeout)
+            val partial = jsonText(hypothesis, "partial")
+            if (partial.isNotBlank()) listener?.onPartial(combineSegments(partial))
         }
 
         override fun onResult(hypothesis: String) {
-            val text = jsonText(hypothesis, "text")
-            if (text.isNotBlank()) complete(text)
+            val segment = jsonText(hypothesis, "text")
+            if (segment.isNotBlank()) {
+                finalizedSegments += segment
+                listener?.onPartial(combineSegments())
+                handler.removeCallbacks(endOfUtteranceTimeout)
+                handler.postDelayed(endOfUtteranceTimeout, END_OF_UTTERANCE_SILENCE_MS)
+            }
         }
 
         override fun onFinalResult(hypothesis: String) {
-            val text = jsonText(hypothesis, "text")
-            if (text.isNotBlank()) complete(text)
+            val finalSegment = jsonText(hypothesis, "text")
+            val transcript = combineSegments(finalSegment)
+            if (transcript.isNotBlank()) complete(transcript)
             else fail("No speech was recognized. Try again and speak clearly.")
         }
 
@@ -103,6 +116,7 @@ class OfflineVoskSpeechSession private constructor(
     private fun complete(text: String) {
         if (!completed.compareAndSet(false, true)) return
         handler.removeCallbacks(timeout)
+        handler.removeCallbacks(endOfUtteranceTimeout)
         val callback = listener
         listener = null
         Thread({
@@ -114,6 +128,7 @@ class OfflineVoskSpeechSession private constructor(
     private fun fail(message: String) {
         if (!completed.compareAndSet(false, true)) return
         handler.removeCallbacks(timeout)
+        handler.removeCallbacks(endOfUtteranceTimeout)
         val callback = listener
         listener = null
         Thread({
@@ -142,11 +157,18 @@ class OfflineVoskSpeechSession private constructor(
         runCatching { model.close() }
     }
 
+    private fun combineSegments(finalSegment: String = ""): String =
+        (finalizedSegments + finalSegment.takeIf { it.isNotBlank() }.orEmpty())
+            .filter { it.isNotBlank() }
+            .joinToString(" ")
+            .trim()
+
     private fun jsonText(json: String, key: String): String =
         runCatching { JSONObject(json).optString(key).trim() }.getOrDefault("")
 
     companion object {
         private const val DEFAULT_TIMEOUT_MS = 25_000L
+        private const val END_OF_UTTERANCE_SILENCE_MS = 1_200L
 
         suspend fun create(context: Context, modelDirectory: File): OfflineVoskSpeechSession {
             var createdSession: OfflineVoskSpeechSession? = null
