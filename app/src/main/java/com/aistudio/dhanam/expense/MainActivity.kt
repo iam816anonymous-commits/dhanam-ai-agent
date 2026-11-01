@@ -1,6 +1,9 @@
 package com.aistudio.dhanam.expense
 
 import android.os.Bundle
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
 import android.view.WindowManager
 import androidx.fragment.app.FragmentActivity
 import androidx.core.content.ContextCompat
@@ -19,6 +22,37 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 
 class MainActivity : FragmentActivity() {
+    private var voiceReceiverRegistered = false
+    private val voiceCommandReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != WakeWordService.ACTION_VOICE_COMMAND) return
+            val transcript = intent.getStringExtra(WakeWordService.EXTRA_TRANSCRIPT).orEmpty()
+            val language = intent.getStringExtra(WakeWordService.EXTRA_LANGUAGE) ?: "en-IN"
+            WakeCommandBus.offer(transcript, language)
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (!voiceReceiverRegistered) {
+            ContextCompat.registerReceiver(
+                this,
+                voiceCommandReceiver,
+                IntentFilter(WakeWordService.ACTION_VOICE_COMMAND),
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+            voiceReceiverRegistered = true
+        }
+    }
+
+    override fun onStop() {
+        if (voiceReceiverRegistered) {
+            unregisterReceiver(voiceCommandReceiver)
+            voiceReceiverRegistered = false
+        }
+        super.onStop()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         dispatchWakeCommand(intent)
