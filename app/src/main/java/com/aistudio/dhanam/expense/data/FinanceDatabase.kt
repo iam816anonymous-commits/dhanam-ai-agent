@@ -1,6 +1,7 @@
 package com.aistudio.dhanam.expense.data
 
 import android.content.Context
+import com.aistudio.dhanam.expense.security.FinanceDatabaseEncryption
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -210,11 +211,19 @@ abstract class FinanceDatabase : RoomDatabase() {
 
         fun getInstance(context: Context): FinanceDatabase =
             instance ?: synchronized(this) {
-                instance ?: Room.databaseBuilder(
-                    context.applicationContext,
-                    FinanceDatabase::class.java,
-                    DATABASE_NAME
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11).build().also { instance = it }
+                instance ?: run {
+                    val passphrase = FinanceDatabaseEncryption.prepare(context.applicationContext, DATABASE_NAME)
+                    val factory = FinanceDatabaseEncryption.createRoomFactory(passphrase)
+                    Room.databaseBuilder(
+                        context.applicationContext,
+                        FinanceDatabase::class.java,
+                        DATABASE_NAME
+                    )
+                        .openHelperFactory(factory)
+                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+                        .build()
+                        .also { instance = it }
+                }
             }
     }
 }
