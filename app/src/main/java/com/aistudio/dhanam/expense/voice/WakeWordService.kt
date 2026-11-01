@@ -23,6 +23,7 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import ai.picovoice.porcupine.PorcupineManager
 import ai.picovoice.porcupine.PorcupineManagerCallback
+import ai.picovoice.porcupine.PorcupineManagerErrorCallback
 import com.aistudio.dhanam.expense.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -68,6 +69,7 @@ class WakeWordService : Service() {
             ACTION_START, null -> {
                 if (!hasMicrophonePermission()) {
                     getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
+                    lifecycle.stop()
                     stopSelf()
                     return START_NOT_STICKY
                 }
@@ -114,6 +116,7 @@ class WakeWordService : Service() {
         if (porcupineManager != null || lifecycle.current() == WakeWordLifecycleState.TRANSCRIBING) return
         lifecycle.beginStart()
         if (!getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(KEY_ENABLED, false)) {
+            lifecycle.stop()
             stopSelf()
             return
         }
@@ -122,6 +125,7 @@ class WakeWordService : Service() {
         if (key.isNullOrBlank() || !model.isFile || model.length() == 0L) {
             getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
             updateNotification("Hey Jarvis is not configured. Open Dhanam Settings.")
+            lifecycle.stop()
             stopSelf()
             return
         }
@@ -133,6 +137,17 @@ class WakeWordService : Service() {
                 .setAccessKey(key)
                 .setKeywordPath(model.absolutePath)
                 .setSensitivities(floatArrayOf(0.58f))
+                .setErrorCallback(PorcupineManagerErrorCallback { error ->
+                    mainHandler.post {
+                        if (lifecycle.current() == WakeWordLifecycleState.LISTENING) {
+                            lifecycle.fail()
+                            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
+                            updateNotification("Wake-word microphone failed: ${error.message?.take(100) ?: "restart Hey Jarvis"}")
+                            stopWakeWordEngine()
+                            stopSelf()
+                        }
+                    }
+                })
                 .build(this, callback)
             porcupineManager?.start()
             check(lifecycle.beginListening()) { "Wake-word service was not in a startable lifecycle state." }
