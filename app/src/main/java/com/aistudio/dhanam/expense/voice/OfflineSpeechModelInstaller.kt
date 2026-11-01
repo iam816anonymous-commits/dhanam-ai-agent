@@ -4,6 +4,8 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -77,7 +79,8 @@ object OfflineSpeechModelInstaller {
         }
     }
 
-    private fun download(spec: OfflineSpeechModelSpec, destination: File, onProgress: (Int) -> Unit) {
+    private suspend fun download(spec: OfflineSpeechModelSpec, destination: File, onProgress: (Int) -> Unit) {
+        val coroutineContext = currentCoroutineContext()
         val connection = (URL(spec.downloadUrl).openConnection() as HttpsURLConnection).apply {
             connectTimeout = 20_000
             readTimeout = 45_000
@@ -97,6 +100,7 @@ object OfflineSpeechModelInstaller {
                     BufferedOutputStream(fileOutput).use { output ->
                         val buffer = ByteArray(BUFFER_SIZE)
                         while (true) {
+                            coroutineContext.ensureActive()
                             val count = input.read(buffer)
                             if (count < 0) break
                             downloaded += count
@@ -124,7 +128,8 @@ object OfflineSpeechModelInstaller {
         }
     }
 
-    private fun extractSafely(archive: File, destination: File, archiveRoot: String) {
+    private suspend fun extractSafely(archive: File, destination: File, archiveRoot: String) {
+        val coroutineContext = currentCoroutineContext()
         val canonicalRoot = destination.canonicalFile
         val canonicalPrefix = canonicalRoot.path + File.separator
         val expectedPrefix = archiveRoot + "/"
@@ -133,6 +138,7 @@ object OfflineSpeechModelInstaller {
 
         ZipInputStream(BufferedInputStream(archive.inputStream())).use { zip ->
             while (true) {
+                coroutineContext.ensureActive()
                 val entry = zip.nextEntry ?: break
                 entries += 1
                 check(entries <= MAX_ZIP_ENTRIES) { "Speech model archive contains too many files." }
@@ -161,6 +167,7 @@ object OfflineSpeechModelInstaller {
                     FileOutputStream(output).use { fileOutput ->
                         val buffer = ByteArray(BUFFER_SIZE)
                         while (true) {
+                            coroutineContext.ensureActive()
                             val count = zip.read(buffer)
                             if (count < 0) break
                             totalBytes += count
