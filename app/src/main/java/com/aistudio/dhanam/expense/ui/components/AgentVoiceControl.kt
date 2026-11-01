@@ -52,10 +52,9 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * One in-app voice path for the floating assistant.
- * API 31+ uses Android's dedicated on-device recognizer when installed. Older Android
- * versions use the platform recognizer with EXTRA_PREFER_OFFLINE; Android 8.1 cannot
- * guarantee offline recognition through the public platform API.
- * Speech is editable before submission; financial writes still require explicit confirmation.
+ * An installed Vosk model is preferred and runs fully offline. Without one, API 31+ uses
+ * Android's dedicated on-device recognizer when available. The remote-capable system provider
+ * is used only after explicit user consent. Speech remains editable before submission.
  */
 @Composable
 fun AgentVoiceControl(
