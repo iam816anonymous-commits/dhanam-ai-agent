@@ -5,6 +5,7 @@ import android.os.Build
 import android.speech.SpeechRecognizer
 
 enum class SpeechRecognitionRoute {
+    OFFLINE_VOSK_MODEL,
     ON_DEVICE,
     SYSTEM_PROVIDER_NETWORK_CONSENT,
     BLOCKED
@@ -26,8 +27,10 @@ object SpeechRecognitionPolicy {
     fun route(
         sdkInt: Int,
         onDeviceRecognizerAvailable: Boolean,
-        allowNetworkFallback: Boolean
+        allowNetworkFallback: Boolean,
+        offlineModelInstalled: Boolean = false
     ): SpeechRecognitionRoute = when {
+        offlineModelInstalled -> SpeechRecognitionRoute.OFFLINE_VOSK_MODEL
         sdkInt >= Build.VERSION_CODES.S && onDeviceRecognizerAvailable ->
             SpeechRecognitionRoute.ON_DEVICE
         allowNetworkFallback -> SpeechRecognitionRoute.SYSTEM_PROVIDER_NETWORK_CONSENT
@@ -46,6 +49,9 @@ object SpeechRecognitionPolicy {
             allowNetworkFallback(context)
         )
         val recognizer = when (route) {
+            SpeechRecognitionRoute.OFFLINE_VOSK_MODEL -> throw IllegalStateException(
+                "Use the installed Vosk model session for offline speech recognition."
+            )
             SpeechRecognitionRoute.ON_DEVICE -> SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
             SpeechRecognitionRoute.SYSTEM_PROVIDER_NETWORK_CONSENT -> SpeechRecognizer.createSpeechRecognizer(context)
             SpeechRecognitionRoute.BLOCKED -> throw IllegalStateException(
@@ -67,6 +73,7 @@ object SpeechRecognitionPolicy {
     }
 
     fun description(route: SpeechRecognitionRoute): String = when (route) {
+        SpeechRecognitionRoute.OFFLINE_VOSK_MODEL -> "Speech is processed by the installed Vosk model on this device."
         SpeechRecognitionRoute.ON_DEVICE -> "Speech is processed by Android's dedicated on-device recognizer."
         SpeechRecognitionRoute.SYSTEM_PROVIDER_NETWORK_CONSENT -> "You allowed the Android system speech provider. It may send audio to a remote service."
         SpeechRecognitionRoute.BLOCKED -> "No guaranteed on-device recognizer is available and online speech fallback is disabled."
