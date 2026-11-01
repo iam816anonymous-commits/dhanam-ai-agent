@@ -191,7 +191,13 @@ fun AgentVoiceControl(
                     })
                 } catch (error: Exception) {
                     offlineSessionRef.getAndSet(null)?.cancel()
-                    if (SpeechRecognitionPolicy.allowNetworkFallback(context)) {
+                    val onDeviceAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                        runCatching { SpeechRecognizer.isOnDeviceRecognitionAvailable(context) }.getOrDefault(false)
+                    if (onDeviceAvailable) {
+                        status = "Offline speech could not start. Trying Android's dedicated on-device recognizer."
+                        delay(500)
+                        startListening(skipOfflineModel = true)
+                    } else if (SpeechRecognitionPolicy.allowNetworkFallback(context)) {
                         status = "Offline speech could not start. Trying the online provider you explicitly allowed."
                         delay(500)
                         startListening(forceSystemProvider = true)
