@@ -280,7 +280,7 @@ fun AgentVoiceControl(
                 onDeviceAvailable -> "Starting dedicated on-device recognition…"
                 Build.VERSION.SDK_INT < Build.VERSION_CODES.S ->
                     "Starting Android system recognition. Offline is only a preference on Android 8–11; test with airplane mode."
-                else -> "No dedicated on-device recognizer is installed. Using the system recognizer; offline use is not guaranteed."
+                else -> "Using the Android system provider. Remote processing may occur because you enabled the online fallback."
             }
         } catch (_: SecurityException) {
             releaseRecognizer(cancel = true)
@@ -289,14 +289,30 @@ fun AgentVoiceControl(
             status = "Android denied microphone access. Enable Microphone in app permissions."
         } catch (error: IllegalStateException) {
             releaseRecognizer(cancel = true)
-            isListening = false
-            isProcessing = false
-            status = error.message ?: "The speech service is already busy or unavailable. Wait briefly and retry."
+            if (!forceSystemProvider && SpeechRecognitionPolicy.allowNetworkFallback(context)) {
+                status = "On-device speech could not start. Trying the online provider you explicitly allowed."
+                translationScope.launch {
+                    delay(500)
+                    startListening(forceSystemProvider = true)
+                }
+            } else {
+                isListening = false
+                isProcessing = false
+                status = error.message ?: "The speech service is already busy or unavailable. Wait briefly and retry."
+            }
         } catch (error: Exception) {
             releaseRecognizer(cancel = true)
-            isListening = false
-            isProcessing = false
-            status = error.message?.take(180) ?: "Could not start speech recognition. Check microphone permission and the installed speech service."
+            if (!forceSystemProvider && SpeechRecognitionPolicy.allowNetworkFallback(context)) {
+                status = "On-device speech could not start. Trying the online provider you explicitly allowed."
+                translationScope.launch {
+                    delay(500)
+                    startListening(forceSystemProvider = true)
+                }
+            } else {
+                isListening = false
+                isProcessing = false
+                status = error.message?.take(180) ?: "Could not start speech recognition. Check microphone permission and the installed speech service."
+            }
         }
     }
 
