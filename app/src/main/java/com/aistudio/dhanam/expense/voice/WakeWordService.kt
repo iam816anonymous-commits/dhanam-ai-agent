@@ -257,19 +257,27 @@ class WakeWordService : Service() {
                     }
 
                     override fun onError(message: String) {
-                        updateNotification("Offline speech failed: ${message.take(110)}")
-                        finishUtteranceAndRearm()
+                        offlineSpeechSession = null
+                        fallbackAfterOfflineFailure(message)
                     }
                 })
             } catch (error: Exception) {
-                if (SpeechRecognitionPolicy.allowNetworkFallback(this) && SpeechRecognizer.isRecognitionAvailable(this)) {
-                    updateNotification("Offline speech failed. Switching to the online provider you explicitly allowed.")
-                    startSpeechToText(forceSystemProvider = true)
-                } else {
-                    updateNotification("Offline speech could not start: ${error.message?.take(110) ?: "check the installed model"}")
-                    finishUtteranceAndRearm()
-                }
+                offlineSpeechSession?.cancel()
+                offlineSpeechSession = null
+                fallbackAfterOfflineFailure(error.message ?: "The offline model could not initialize.")
             }
+        }
+    }
+
+    private fun fallbackAfterOfflineFailure(message: String) {
+        if (SpeechRecognitionPolicy.allowNetworkFallback(this) && SpeechRecognizer.isRecognitionAvailable(this)) {
+            updateNotification("Offline speech unavailable. Using the online provider you explicitly allowed.")
+            mainHandler.postDelayed({
+                if (handlingUtterance.get()) startSpeechToText(forceSystemProvider = true)
+            }, 500L)
+        } else {
+            updateNotification("Offline speech failed: ${message.take(110)}. Enable online fallback or reinstall the offline model.")
+            finishUtteranceAndRearm()
         }
     }
 
