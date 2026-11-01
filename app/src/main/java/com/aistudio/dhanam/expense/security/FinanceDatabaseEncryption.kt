@@ -44,10 +44,22 @@ object FinanceDatabaseEncryption {
         }
 
         val passphrase = readOrCreatePassphrase(context, database.exists() && database.length() > 0L)
+        if (backup.exists()) {
+            if (database.exists() && isReadableWithKey(database, passphrase)) {
+                backup.delete()
+                temporary.delete()
+                return passphrase
+            }
+            // A previous process may have stopped after staging the plaintext original but
+            // before successfully installing the encrypted replacement.
+            if (database.exists()) deleteDatabaseFiles(database)
+            check(backup.renameTo(database)) {
+                "Could not restore the staged original finance database. The backup has been preserved."
+            }
+        }
         if (!database.exists() || database.length() == 0L) return passphrase
 
         if (isReadableWithKey(database, passphrase)) {
-            backup.delete()
             temporary.delete()
             return passphrase
         }
@@ -70,17 +82,27 @@ object FinanceDatabaseEncryption {
         }
 
         // The export has been verified and the encrypted file is now in place.
-        File(database.absolutePath + "-wal").delete()
-        File(database.absolutePath + "-shm").delete()
-        backup.delete()
+        deleteSidecars(database)
         check(isReadableWithKey(database, passphrase)) {
-            "The installed encrypted finance database could not be reopened. Do not clear app data; contact support."
+            "The installed encrypted finance database could not be reopened. The original plaintext backup has been preserved."
         }
+        backup.delete()
         return passphrase
     }
 
     fun createRoomFactory(passphrase: ByteArray): SupportOpenHelperFactory =
         SupportOpenHelperFactory(passphrase)
+
+    private fun deleteSidecars(database: File) {
+        File(database.absolutePath + "-wal").delete()
+        File(database.absolutePath + "-shm").delete()
+        File(database.absolutePath + "-journal").delete()
+    }
+
+    private fun deleteDatabaseFiles(database: File) {
+        database.delete()
+        deleteSidecars(database)
+    }
 
     private fun readOrCreatePassphrase(context: Context, databaseAlreadyExists: Boolean): ByteArray {
         val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
