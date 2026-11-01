@@ -213,6 +213,20 @@ fun AgentVoiceControl(
                 }
                 override fun onError(error: Int) {
                     if (recognizerRef.get() !== instance) return
+                    if (
+                        onDeviceAvailable &&
+                        SpeechRecognitionPolicy.allowNetworkFallback(context) &&
+                        (error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE ||
+                            error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED)
+                    ) {
+                        status = "The on-device recognizer does not support this language. Trying the online provider you explicitly allowed."
+                        releaseRecognizer(cancel = true)
+                        translationScope.launch {
+                            delay(500)
+                            startListening(forceSystemProvider = true)
+                        }
+                        return
+                    }
                     isListening = false
                     isProcessing = false
                     status = when (error) {
