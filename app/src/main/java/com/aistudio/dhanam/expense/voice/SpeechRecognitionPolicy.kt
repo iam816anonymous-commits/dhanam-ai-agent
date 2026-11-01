@@ -12,9 +12,9 @@ enum class SpeechRecognitionRoute {
 }
 
 /**
- * SpeechRecognizer is not an offline engine on API 27–30. EXTRA_PREFER_OFFLINE is only a
- * preference and providers may ignore it. A network-capable system provider is therefore used
- * only after the user explicitly enables that fallback.
+ * Vosk supplies a real offline route on API 27+. Android's SpeechRecognizer is not a guaranteed
+ * offline engine on API 27–30, and EXTRA_PREFER_OFFLINE may be ignored. The remote-capable
+ * system provider is therefore used only after explicit user consent.
  */
 object SpeechRecognitionPolicy {
     const val PREFS = "dhanam_voice"
