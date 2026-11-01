@@ -35,8 +35,8 @@ import kotlinx.coroutines.launch
  * Explicitly user-enabled microphone foreground service.
  *
  * Porcupine owns the microphone while waiting for "Hey Jarvis". Once detected, it releases
- * the microphone and Android SpeechRecognizer converts the following utterance to text.
- * The finance LLM is not loaded or required by this service.
+ * the microphone and the installed Vosk model or an explicitly permitted Android recognizer
+ * converts the following utterance to text. The finance LLM is not loaded by this service.
  */
 class WakeWordService : Service() {
     private val mainHandler = Handler(Looper.getMainLooper())
