@@ -239,7 +239,7 @@ class WakeWordService : Service() {
         updateNotification("Using installed offline speech model · audio stays on this device")
         serviceScope.launch {
             try {
-                val session = OfflineVoskSpeechSession.create(modelDirectory)
+                val session = OfflineVoskSpeechSession.create(this@WakeWordService, modelDirectory)
                 if (!handlingUtterance.get()) {
                     session.cancel()
                     return@launch
