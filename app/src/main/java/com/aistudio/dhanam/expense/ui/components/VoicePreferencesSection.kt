@@ -48,10 +48,12 @@ private fun OfflineSpeechModelRow(
     contextLabel: String,
     spec: OfflineSpeechModelSpec,
     installed: Boolean,
+    selected: Boolean,
     downloading: Boolean,
     progress: Int,
     downloadEnabled: Boolean,
-    onDownload: () -> Unit
+    onDownload: () -> Unit,
+    onSelect: () -> Unit
 ) {
     Row(
         Modifier.fillMaxWidth(),
@@ -67,8 +69,9 @@ private fun OfflineSpeechModelRow(
             )
         }
         when {
-            installed -> Text("Installed", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
             downloading -> Text("$progress%", style = MaterialTheme.typography.labelMedium)
+            selected -> Text("Selected", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
+            installed -> OutlinedButton(onClick = onSelect) { Text("Use") }
             else -> OutlinedButton(onClick = onDownload, enabled = downloadEnabled) { Text("Download") }
         }
     }
@@ -171,8 +174,7 @@ fun VoicePreferencesSection() {
                 color = if (permissionGranted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyMedium
             )
-            val selectedOfflineModel = OfflineSpeechModelCatalog.forLanguageTag(language)
-            val selectedModelInstalled = selectedOfflineModel != null && selectedOfflineModel.id in installedModels
+            val selectedModelInstalled = OfflineSpeechModelCatalog.selectedModelId(context, language) != null
             Text(
                 "Speech service: " + when {
                     selectedModelInstalled -> "Offline Vosk model installed for $language"
@@ -249,6 +251,7 @@ fun VoicePreferencesSection() {
                     contextLabel = spec.displayName,
                     spec = spec,
                     installed = spec.id in installedModels,
+                    selected = OfflineSpeechModelCatalog.selectedModelId(context, spec.languageTag) == spec.id,
                     downloading = downloadingModelId == spec.id,
                     progress = if (downloadingModelId == spec.id) downloadProgress else 0,
                     downloadEnabled = downloadingModelId == null,
@@ -262,14 +265,26 @@ fun VoicePreferencesSection() {
                                     downloadProgress = percent
                                 }
                                 installedModels = installedModels + spec.id
-                                modelMessage = "${spec.displayName} installed. Select its language above to use offline transcription."
+                                OfflineSpeechModelCatalog.selectModel(context, spec)
+                                modelMessage = "${spec.displayName} installed and selected for ${spec.languageTag}."
                             } catch (error: Exception) {
                                 modelMessage = error.message ?: "Could not install ${spec.displayName}."
                             } finally {
                                 downloadingModelId = null
                             }
                         }
+                    },
+                    onSelect = {
+                        OfflineSpeechModelCatalog.selectModel(context, spec)
+                        modelMessage = "${spec.displayName} selected for ${spec.languageTag}."
                     }
+                )
+            }
+            if (language.startsWith("te", ignoreCase = true)) {
+                Text(
+                    "Telugu offline model: no reliable small Vosk model is offered. The published small Telugu model reports 87.9 word error rate, so it is deliberately not offered for financial commands. Use Android's dedicated on-device recognizer if it supports Telugu, or enable online fallback explicitly.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             modelMessage?.let {
