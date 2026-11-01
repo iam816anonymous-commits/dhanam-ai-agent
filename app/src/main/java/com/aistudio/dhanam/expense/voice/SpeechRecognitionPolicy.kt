@@ -55,6 +55,17 @@ object SpeechRecognitionPolicy {
         return recognizer to route
     }
 
+    fun createSystemRecognizer(context: Context): Pair<SpeechRecognizer, SpeechRecognitionRoute> {
+        check(allowNetworkFallback(context)) {
+            "Online speech recognition is disabled. Enable the explicit online fallback in Voice settings to use this provider."
+        }
+        check(SpeechRecognizer.isRecognitionAvailable(context)) {
+            "No Android speech-recognition provider is installed or enabled."
+        }
+        return SpeechRecognizer.createSpeechRecognizer(context) to
+            SpeechRecognitionRoute.SYSTEM_PROVIDER_NETWORK_CONSENT
+    }
+
     fun description(route: SpeechRecognitionRoute): String = when (route) {
         SpeechRecognitionRoute.ON_DEVICE -> "Speech is processed by Android's dedicated on-device recognizer."
         SpeechRecognitionRoute.SYSTEM_PROVIDER_NETWORK_CONSENT -> "You allowed the Android system speech provider. It may send audio to a remote service."
