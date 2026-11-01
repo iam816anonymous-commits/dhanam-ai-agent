@@ -1,6 +1,7 @@
 package com.aistudio.dhanam.expense.model
 
 import android.app.Application
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Contents
@@ -39,7 +40,8 @@ data class LocalInferenceState(
     val isGenerating: Boolean = false,
     val reply: String = "",
     val status: String = "Local inference is not loaded.",
-    val error: String? = null
+    val error: String? = null,
+    val lastRuntimeMeasurement: ModelRuntimeMeasurement? = null
 )
 
 /**
@@ -109,7 +111,9 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
         _state.update { it.copy(isLoading = true, error = null, status = "Checking model integrity and device resources…") }
         loadJob = scope.launch {
             _state.update { it.copy(isLoading = true, error = null, status = "Checking model integrity and device resources…") }
+            var runtimeMeasurement: ModelRuntimeMeasurement? = null
             try {
+                val loadStartedAt = SystemClock.elapsedRealtime()
                 check(preferences.getString("preferred_model_id", null) == model.id) {
                     "Set this verified model as preferred before loading it."
                 }
@@ -136,13 +140,29 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                 engine = candidate
                 try {
                     currentCoroutineContext().ensureActive()
-                    val residentBytes = ProcessMemoryBudget.readCurrentResidentBytes()
+                    val postLoadProfile = ModelResourceProfiler.capture(getApplication())
+                    val residentBytes = postLoadProfile.process?.residentBytes
                     check(residentBytes != null) {
-                        "Cannot verify this process's peak memory. Model loading is blocked for safety."
+                        "Cannot verify this process's current resident memory. Model loading is blocked for safety."
                     }
                     check(residentBytes < model.maxProcessPeakBytes) {
                         "The app's current resident memory is above this model's safety limit. Close other apps and try again."
                     }
+                    check(!postLoadProfile.lowMemory) {
+                        "Android reported low memory after loading. The model will be unloaded to protect the device."
+                    }
+                    check(postLoadProfile.availableRamBytes >=
+                        ModelResourceProfiler.requiredAvailableRamBytes(model, postLoadProfile)) {
+                        "Available system memory fell below the model's safety reserve during loading. The model will be unloaded."
+                    }
+                    runtimeMeasurement = ModelRuntimeMeasurement(
+                        modelId = model.id,
+                        loadDurationMs = postLoadProfile.capturedAtElapsedRealtimeMs - loadStartedAt,
+                        processResidentBytesAfterLoad = residentBytes,
+                        processHighWaterBytesAfterLoad = postLoadProfile.process.highWaterBytes,
+                        nativeHeapAllocatedBytesAfterLoad = postLoadProfile.nativeHeapAllocatedBytes,
+                        systemAvailableRamBytesAfterLoad = postLoadProfile.availableRamBytes
+                    )
                     conversation = candidate.createConversation(createConversationConfig())
                 } catch (error: OutOfMemoryError) {
                     try { candidate.close() } catch (_: Exception) { }
@@ -158,7 +178,8 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                         isLoading = false,
                         isReady = true,
                         status = "Model loaded locally on CPU. Prompts are not saved by Dhanam.",
-                        error = null
+                        error = null,
+                        lastRuntimeMeasurement = runtimeMeasurement
                     )
                 }
             } catch (cancelled: CancellationException) {
