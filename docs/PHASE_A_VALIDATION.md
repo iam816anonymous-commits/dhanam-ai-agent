@@ -5,7 +5,7 @@ This checklist is for physical-device qualification. A green compile/lint workfl
 ## 1. Database encryption and upgrade safety
 
 - [ ] Install the previous plaintext-database release and create representative expenses, income, budgets, categories, Khata entries and repayments.
-- [ ] Upgrade in place to the Phase A build. Confirm the first launch completes the encryption migration without losing rows or changing paise totals.
+- [ ] Upgrade in place to the Phase A build. Confirm the first launch shows the database-startup gate while migration runs off the main thread, then completes without losing rows or changing paise totals.
 - [ ] Confirm Room opens the encrypted database and the stored user_version remains the supported schema version.
 - [ ] Force-stop during a migration test build at each rename boundary. On next launch, confirm the original database is restored or the verified encrypted database is opened; never accept an empty replacement database.
 - [ ] Reboot and relaunch. Confirm the Keystore-wrapped key still opens the database.
