@@ -37,6 +37,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -189,8 +190,12 @@ fun AgentVoiceControl(
                             }
                         }
                     })
+                } catch (cancel: CancellationException) {
+                    offlineSessionRef.getAndSet(null)?.cancel()
+                    throw cancel
                 } catch (error: Exception) {
                     offlineSessionRef.getAndSet(null)?.cancel()
+                    if (!showDialog) return@launch
                     val onDeviceAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
                         runCatching { SpeechRecognizer.isOnDeviceRecognitionAvailable(context) }.getOrDefault(false)
                     if (onDeviceAvailable) {
