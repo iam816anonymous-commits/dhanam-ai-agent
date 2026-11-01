@@ -104,7 +104,7 @@ fun WakeWordSettingsSection() {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Hey Jarvis · hands-free assistant", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
-                "Say “Hey Jarvis”, wait for the short beep, then speak your command. Dhanam converts speech to text and routes it through the existing finance agent. The finance LLM is not used for wake-word detection or speech recognition.",
+                "Say “Hey Jarvis”, wait for the short beep, then speak your command. Dhanam uses an installed Vosk model first, then Android's dedicated on-device recognizer, and only uses a remote-capable Android provider when you explicitly allow it. The finance LLM is not used for wake-word detection or speech recognition.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
