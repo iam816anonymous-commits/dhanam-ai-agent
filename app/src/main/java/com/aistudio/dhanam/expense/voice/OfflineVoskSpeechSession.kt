@@ -38,8 +38,10 @@ class OfflineVoskSpeechSession private constructor(
     fun start(listener: Listener, timeoutMs: Long = DEFAULT_TIMEOUT_MS) {
         check(!completed.get()) { "Speech session is already closed." }
         this.listener = listener
-        check(speechService.startListening(voskListener)) {
-            "The offline speech engine is already recording."
+        if (!speechService.startListening(voskListener)) {
+            completed.set(true)
+            releaseResources(cancel = true)
+            throw IllegalStateException("The offline speech engine is already recording.")
         }
         handler.postDelayed(timeout, timeoutMs)
     }
