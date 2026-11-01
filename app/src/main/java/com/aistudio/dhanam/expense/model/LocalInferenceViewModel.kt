@@ -159,7 +159,7 @@ class LocalInferenceViewModel(application: Application) : AndroidViewModel(appli
                         modelId = model.id,
                         loadDurationMs = postLoadProfile.capturedAtElapsedRealtimeMs - loadStartedAt,
                         processResidentBytesAfterLoad = residentBytes,
-                        processHighWaterBytesAfterLoad = postLoadProfile.process.highWaterBytes,
+                        processHighWaterBytesAfterLoad = postLoadProfile.process?.highWaterBytes,
                         nativeHeapAllocatedBytesAfterLoad = postLoadProfile.nativeHeapAllocatedBytes,
                         systemAvailableRamBytesAfterLoad = postLoadProfile.availableRamBytes
                     )
