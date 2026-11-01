@@ -163,7 +163,7 @@ class WakeWordService : Service() {
         }
     }
 
-    private fun startSpeechToText() {
+    private fun startSpeechToText(forceSystemProvider: Boolean = false) {
         if (!hasMicrophonePermission()) {
             updateNotification("Microphone permission was revoked. Enable it in Android app settings.")
             finishUtteranceAndRearm()
@@ -171,7 +171,7 @@ class WakeWordService : Service() {
         }
         val language = getSharedPreferences("dhanam_voice", MODE_PRIVATE)
             .getString("recognition_language", "en-IN") ?: "en-IN"
-        val offlineModel = OfflineSpeechModelCatalog.installedDirectory(this, language)
+        val offlineModel = if (forceSystemProvider) null else OfflineSpeechModelCatalog.installedDirectory(this, language)
         if (offlineModel != null) {
             startOfflineSpeechToText(offlineModel)
             return
@@ -182,7 +182,11 @@ class WakeWordService : Service() {
             return
         }
         try {
-            val (recognizer, recognitionRoute) = SpeechRecognitionPolicy.createRecognizer(this)
+            val (recognizer, recognitionRoute) = if (forceSystemProvider) {
+                SpeechRecognitionPolicy.createSystemRecognizer(this)
+            } else {
+                SpeechRecognitionPolicy.createRecognizer(this)
+            }
             speechRecognizer = recognizer
             recognizer.setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: android.os.Bundle?) {
@@ -258,8 +262,13 @@ class WakeWordService : Service() {
                     }
                 })
             } catch (error: Exception) {
-                updateNotification("Offline speech could not start: ${error.message?.take(110) ?: "check the installed model"}")
-                finishUtteranceAndRearm()
+                if (SpeechRecognitionPolicy.allowNetworkFallback(this) && SpeechRecognizer.isRecognitionAvailable(this)) {
+                    updateNotification("Offline speech failed. Switching to the online provider you explicitly allowed.")
+                    startSpeechToText(forceSystemProvider = true)
+                } else {
+                    updateNotification("Offline speech could not start: ${error.message?.take(110) ?: "check the installed model"}")
+                    finishUtteranceAndRearm()
+                }
             }
         }
     }
