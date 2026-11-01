@@ -33,6 +33,7 @@ import androidx.core.content.ContextCompat
 import com.aistudio.dhanam.expense.voice.WakeWordModelInstaller
 import com.aistudio.dhanam.expense.voice.WakeWordSecrets
 import com.aistudio.dhanam.expense.voice.WakeWordService
+import com.aistudio.dhanam.expense.voice.OfflineSpeechModelCatalog
 import kotlinx.coroutines.launch
 
 /** Explicit opt-in setup for the persistent, local Hey Jarvis wake-word service. */
@@ -55,6 +56,8 @@ fun WakeWordSettingsSection() {
     var allowNetworkSpeech by remember(context) {
         mutableStateOf(voicePreferences.getBoolean("allow_network_speech_recognition", false))
     }
+    val selectedSpeechLanguage = voicePreferences.getString("recognition_language", "en-IN") ?: "en-IN"
+    val offlineSpeechModelInstalled = OfflineSpeechModelCatalog.installedDirectory(context, selectedSpeechLanguage) != null
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Wake-word listening is off.") }
     var pendingStart by remember { mutableStateOf(false) }
@@ -217,7 +220,13 @@ fun WakeWordSettingsSection() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                "Wake-word detection runs locally after setup. Speech-to-text uses the selected Android speech provider and may need its own offline language pack. On Android 8.1, offline recognition is not guaranteed by the platform API. No expense is saved until you review and confirm it.",
+                if (offlineSpeechModelInstalled) "Offline speech model: installed for $selectedSpeechLanguage. The spoken command is transcribed on-device and does not need internet access."
+                else "Offline speech model: not installed for $selectedSpeechLanguage. Android 12+ may provide a dedicated on-device recognizer; older devices require an installed Vosk model for guaranteed offline speech. Online fallback remains blocked unless you enable it above.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                "No expense is saved automatically. Commands are sent to Dhanam for review and confirmation. The wake-word detector runs locally; online speech fallback, if enabled, applies only after the wake word.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
