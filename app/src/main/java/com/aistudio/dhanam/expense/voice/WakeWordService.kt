@@ -39,6 +39,12 @@ class WakeWordService : Service() {
     private var porcupineManager: PorcupineManager? = null
     private var speechRecognizer: SpeechRecognizer? = null
     private var wakeTone: ToneGenerator? = null
+    private val speechTimeout = Runnable {
+        if (handlingUtterance.get()) {
+            updateNotification("Speech recognition timed out. Say Hey Jarvis to try again.")
+            finishUtteranceAndRearm()
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -59,8 +65,18 @@ class WakeWordService : Service() {
                     return START_NOT_STICKY
                 }
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, true).apply()
-                startAsForeground()
-                mainHandler.post { startWakeWordDetection() }
+                try {
+                    startAsForeground()
+                    mainHandler.post { startWakeWordDetection() }
+                } catch (error: SecurityException) {
+                    getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
+                    stopSelf()
+                    return START_NOT_STICKY
+                } catch (error: RuntimeException) {
+                    getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
                 return START_STICKY
             }
             else -> return START_NOT_STICKY
@@ -147,25 +163,23 @@ class WakeWordService : Service() {
             return
         }
         try {
-            val recognizer = if (
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                SpeechRecognizer.isOnDeviceRecognitionAvailable(this)
-            ) {
-                SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
-            } else {
-                SpeechRecognizer.createSpeechRecognizer(this)
-            }
+            val (recognizer, recognitionRoute) = SpeechRecognitionPolicy.createRecognizer(this)
             speechRecognizer = recognizer
             recognizer.setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: android.os.Bundle?) {
-                    updateNotification("Jarvis is listening · speak your finance command")
+                    updateNotification(
+                        if (recognitionRoute == SpeechRecognitionRoute.ON_DEVICE)
+                            "Jarvis is listening · speech stays on-device"
+                        else
+                            "Jarvis is listening · online speech fallback is enabled"
+                    )
                 }
                 override fun onBeginningOfSpeech() = Unit
                 override fun onRmsChanged(rmsdB: Float) = Unit
                 override fun onBufferReceived(buffer: ByteArray?) = Unit
                 override fun onEndOfSpeech() = Unit
                 override fun onError(error: Int) {
-                    updateNotification("Couldn't recognize speech (code $error). Say Hey Jarvis to retry.")
+                    updateNotification("Speech recognition failed (code $error). Say Hey Jarvis to retry.")
                     finishUtteranceAndRearm()
                 }
                 override fun onResults(results: android.os.Bundle?) {
@@ -190,8 +204,10 @@ class WakeWordService : Service() {
                 putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak your Dhanam command")
             }
             recognizer.startListening(request)
+            mainHandler.removeCallbacks(speechTimeout)
+            mainHandler.postDelayed(speechTimeout, SPEECH_TIMEOUT_MS)
         } catch (error: Exception) {
-            updateNotification("Speech recognition could not start: ${error.message?.take(100) ?: "try again"}")
+            updateNotification(error.message?.take(140) ?: "Speech recognition could not start. Check speech privacy settings.")
             finishUtteranceAndRearm()
         }
     }
@@ -233,6 +249,7 @@ class WakeWordService : Service() {
     }
 
     private fun finishUtteranceAndRearm() {
+        mainHandler.removeCallbacks(speechTimeout)
         if (!handlingUtterance.compareAndSet(true, false)) return
         val activeRecognizer = speechRecognizer
         speechRecognizer = null
@@ -328,5 +345,6 @@ class WakeWordService : Service() {
         private const val CHANNEL_ID = "dhanam_hey_jarvis"
         private const val NOTIFICATION_ID = 7041
         private const val REARM_DELAY_MS = 1200L
+        private const val SPEECH_TIMEOUT_MS = 20_000L
     }
 }
