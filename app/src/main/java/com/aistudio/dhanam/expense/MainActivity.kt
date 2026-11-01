@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.CancellationException
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,6 +47,8 @@ class MainActivity : FragmentActivity() {
                 try {
                     dhanamApplication.databaseInitialization.await()
                     databaseReady = true
+                } catch (cancel: CancellationException) {
+                    throw cancel
                 } catch (error: Exception) {
                     databaseError = error.message?.take(180) ?: "Database initialization failed."
                 }
