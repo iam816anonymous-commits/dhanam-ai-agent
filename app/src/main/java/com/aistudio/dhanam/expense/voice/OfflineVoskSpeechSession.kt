@@ -16,6 +16,8 @@ import org.vosk.android.SpeechService
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * A short-lived Vosk microphone session. The model is loaded off the main thread and all native
@@ -34,6 +36,8 @@ class OfflineVoskSpeechSession private constructor(
 
     private val handler = Handler(Looper.getMainLooper())
     private val completed = AtomicBoolean(false)
+    private val stopStarted = AtomicBoolean(false)
+    private val stopFinished = CountDownLatch(1)
     private var listener: Listener? = null
     private val timeout = Runnable {
         if (!completed.get()) stop()
@@ -54,7 +58,7 @@ class OfflineVoskSpeechSession private constructor(
     fun stop() {
         if (completed.get()) return
         Thread({
-            runCatching { speechService.stop() }
+            stopRecording(cancel = false)
         }, "Dhanam-Vosk-stop").start()
         // SpeechService posts its final callback to the main thread after its worker exits.
     }
@@ -118,9 +122,21 @@ class OfflineVoskSpeechSession private constructor(
         }, "Dhanam-Vosk-error").start()
     }
 
+    private fun stopRecording(cancel: Boolean) {
+        if (stopStarted.compareAndSet(false, true)) {
+            try {
+                if (cancel) runCatching { speechService.cancel() }
+                else runCatching { speechService.stop() }
+            } finally {
+                stopFinished.countDown()
+            }
+        } else {
+            runCatching { stopFinished.await(5, TimeUnit.SECONDS) }
+        }
+    }
+
     private fun releaseResources(cancel: Boolean) {
-        if (cancel) runCatching { speechService.cancel() }
-        else runCatching { speechService.stop() }
+        stopRecording(cancel)
         runCatching { speechService.shutdown() }
         runCatching { recognizer.close() }
         runCatching { model.close() }
