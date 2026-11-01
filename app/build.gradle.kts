@@ -53,6 +53,8 @@ dependencies {
     implementation("androidx.room:room-ktx:2.8.5")
     implementation("androidx.sqlite:sqlite:2.7.0")
     implementation("net.zetetic:sqlcipher-android:4.19.1@aar")
+    implementation("net.java.dev.jna:jna:5.18.1@aar")
+    implementation("com.alphacephei:vosk-android:0.3.75@aar")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.18.0")
     implementation("com.google.mlkit:language-id:17.0.6")
