@@ -62,7 +62,7 @@ object ModelCatalog {
             minTotalRamBytes = 3L * GIB,
             minAvailableRamBytes = 768L * MIB,
             minFreeStorageBytes = 1024L * MIB,
-            runtimeRequirement = "CPU; compact 360M instruction model. Conservative app-process peak budget: 1.5 GiB.",
+            runtimeRequirement = "CPU; compact 360M instruction model. Conservative app-current process RSS ceiling: 1.5 GiB.",
             sourceUrl = "https://huggingface.co/litert-community/SmolLM2-360M-Instruct",
             maxProcessPeakBytes = 1536L * MIB
         ),
@@ -79,7 +79,7 @@ object ModelCatalog {
             minTotalRamBytes = 3500L * MIB,
             minAvailableRamBytes = 1536L * MIB,
             minFreeStorageBytes = 2L * GIB,
-            runtimeRequirement = "CPU; 4,096-token context; LiteRT-LM 0.18-compatible metadata and corrected tokenizer; process peak RSS must remain below 2 GiB.",
+            runtimeRequirement = "CPU; 4,096-token context; LiteRT-LM 0.18-compatible metadata and corrected tokenizer; current process RSS must remain below 2 GiB.",
             sourceUrl = "https://huggingface.co/litert-community/Qwen3-0.6B",
             maxProcessPeakBytes = 2L * GIB
         ),
@@ -96,7 +96,7 @@ object ModelCatalog {
             minTotalRamBytes = 8L * GIB,
             minAvailableRamBytes = 4L * GIB,
             minFreeStorageBytes = 3L * GIB,
-            runtimeRequirement = "CPU; 4,096-token context. Community CPU benchmark reports about 2.5 GiB peak RSS; device-specific testing is still required.",
+            runtimeRequirement = "CPU; 4,096-token context. Community CPU benchmark reports about 2.5 GiB peak RSS in the cited benchmark; catalogue ceiling is a separate configured guard; device-specific testing is still required.",
             sourceUrl = "https://huggingface.co/litert-community/Qwen3-1.7B",
             maxProcessPeakBytes = 3L * GIB
         ),
@@ -113,7 +113,7 @@ object ModelCatalog {
             minTotalRamBytes = 8L * GIB,
             minAvailableRamBytes = 4L * GIB,
             minFreeStorageBytes = 4L * GIB,
-            runtimeRequirement = "CPU INT8; 4,096-token context. Published Android CPU benchmark reports about 2.2 GiB peak RSS.",
+            runtimeRequirement = "CPU INT8; 4,096-token context. Published Android CPU benchmark reports about 2.2 GiB peak RSS in the cited benchmark; catalogue ceiling is a separate configured guard.",
             sourceUrl = "https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct",
             maxProcessPeakBytes = 3L * GIB
         ),
@@ -147,7 +147,7 @@ object ModelCatalog {
             minTotalRamBytes = 16L * GIB,
             minAvailableRamBytes = 8L * GIB,
             minFreeStorageBytes = 7L * GIB,
-            runtimeRequirement = "CPU/GPU bundle; 4,096-token context; large reasoning model. Conservative 5 GiB process peak limit; validate on the target device before regular use.",
+            runtimeRequirement = "CPU/GPU bundle; 4,096-token context; large reasoning model. configured 5 GiB current process RSS ceiling; validate on the target device before regular use.",
             sourceUrl = "https://huggingface.co/litert-community/Phi-4-mini-reasoning",
             maxProcessPeakBytes = 5L * GIB
         )
