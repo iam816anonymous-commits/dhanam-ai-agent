@@ -53,9 +53,6 @@ fun WakeWordSettingsSection() {
     }
     var listening by remember(context) { mutableStateOf(preferences.getBoolean(WakeWordService.KEY_ENABLED, false)) }
     val voicePreferences = remember(context) { context.getSharedPreferences("dhanam_voice", 0) }
-    var allowNetworkSpeech by remember(context) {
-        mutableStateOf(voicePreferences.getBoolean("allow_network_speech_recognition", false))
-    }
     val selectedSpeechLanguage = voicePreferences.getString("recognition_language", "en-IN") ?: "en-IN"
     val offlineSpeechModelInstalled = OfflineSpeechModelCatalog.installedDirectory(context, selectedSpeechLanguage) != null
     var busy by remember { mutableStateOf(false) }
@@ -187,29 +184,11 @@ fun WakeWordSettingsSection() {
                     }
                 )
             }
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text("Allow online speech-to-text fallback", fontWeight = FontWeight.Medium)
-                    Text(
-                        "Wake-word detection stays on-device. After Hey Jarvis wakes, Android's system speech provider may send the spoken command to a remote service. Off by default.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(
-                    checked = allowNetworkSpeech,
-                    onCheckedChange = { enabled ->
-                        allowNetworkSpeech = enabled
-                        voicePreferences.edit().putBoolean("allow_network_speech_recognition", enabled).apply()
-                        status = if (enabled) "Online speech fallback enabled. Audio after the wake word may be sent to the Android speech provider."
-                        else "Online speech fallback disabled. Only a dedicated on-device recognizer can transcribe commands."
-                    }
-                )
-            }
+            Text(
+                "Online speech fallback is controlled in Voice Preferences and is off by default. Enable it there only if you accept that Android's system speech provider may process audio remotely.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Text(
                 when {
                     Build.VERSION.SDK_INT >= 34 -> "Android 14+: enable listening while Dhanam is visible. Android requires microphone foreground-service permission and restricts starting it from the background."
