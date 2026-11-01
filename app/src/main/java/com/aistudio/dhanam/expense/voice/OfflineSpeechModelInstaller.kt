@@ -128,7 +128,8 @@ object OfflineSpeechModelInstaller {
                 val entry = zip.nextEntry ?: break
                 entries += 1
                 check(entries <= MAX_ZIP_ENTRIES) { "Speech model archive contains too many files." }
-                val entryName = entry.name.replace('\\\\', '/')
+                check(!entry.name.contains(92.toChar())) { "Speech model archive contains an unsafe path separator." }
+                val entryName = entry.name
                 check(!entryName.startsWith("/") && !entryName.split('/').any { it == ".." }) {
                     "Speech model archive contains an unsafe file path."
                 }
