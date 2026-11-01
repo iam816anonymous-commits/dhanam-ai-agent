@@ -51,6 +51,8 @@ class MainActivity : FragmentActivity() {
                     throw cancel
                 } catch (error: Exception) {
                     databaseError = error.message?.take(180) ?: "Database initialization failed."
+                } catch (error: LinkageError) {
+                    databaseError = error.message?.take(180) ?: "The encrypted database engine could not be loaded."
                 }
             }
 
