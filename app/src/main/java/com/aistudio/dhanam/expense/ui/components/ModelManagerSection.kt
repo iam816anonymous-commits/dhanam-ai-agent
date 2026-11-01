@@ -83,6 +83,12 @@ fun ModelManagerSection(viewModel: ModelManagerViewModel = viewModel(), inferenc
                     Text("Physical RAM reported by Android: ${formatBytes(deviceResources.totalRamBytes)}", style = MaterialTheme.typography.bodySmall)
                     Text("Currently available system RAM: ${formatBytes(deviceResources.availableRamBytes)}", style = MaterialTheme.typography.bodySmall)
                     Text("Free app-private storage: ${formatBytes(deviceResources.freeStorageBytes)}", style = MaterialTheme.typography.bodySmall)
+                    Text("Android low-memory signal: ${if (deviceResources.lowMemory) "active" else "not active"}", style = MaterialTheme.typography.bodySmall)
+                    Text("Android low-memory threshold: ${formatBytes(deviceResources.memoryThresholdBytes)}", style = MaterialTheme.typography.bodySmall)
+                    Text("Required available RAM including safety reserve: ${if (deviceResources.requiredAvailableRamBytes > 0L) formatBytes(deviceResources.requiredAvailableRamBytes) else "not applicable to download"}", style = MaterialTheme.typography.bodySmall)
+                    Text("Current app process RSS: ${deviceResources.processResidentBytes?.let(::formatBytes) ?: "unavailable"}", style = MaterialTheme.typography.bodySmall)
+                    Text("Process lifetime high-water RSS: ${deviceResources.processHighWaterBytes?.let(::formatBytes) ?: "unavailable"}", style = MaterialTheme.typography.bodySmall)
+                    Text("Native heap allocated: ${formatBytes(deviceResources.nativeHeapAllocatedBytes)}", style = MaterialTheme.typography.bodySmall)
                     Text(
                         "Model eligibility uses Android's physical-memory report, not the phone manufacturer's advertised RAM Plus / Memory Fusion / virtual RAM figure. Download eligibility and run-now eligibility are separate checks.",
                         style = MaterialTheme.typography.bodySmall,
