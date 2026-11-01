@@ -50,7 +50,7 @@ object FinanceDatabaseEncryption {
                 // the plaintext database's old WAL/journal sidecars.
                 deleteSidecars(database)
                 backup.delete()
-                temporary.delete()
+                deleteDatabaseFiles(temporary)
                 return passphrase
             }
             // A previous process may have stopped after staging the plaintext original but
@@ -69,11 +69,12 @@ object FinanceDatabaseEncryption {
 
         // If the key does not open the file, only a valid plaintext SQLite database may be
         // migrated. An encrypted/corrupt file is never overwritten as a recovery shortcut.
-        temporary.delete()
+        deleteDatabaseFiles(temporary)
         exportPlaintextToEncrypted(database, temporary, passphrase)
         check(isReadableWithKey(temporary, passphrase)) {
             "The encrypted finance database failed verification. The original database has not been replaced."
         }
+        deleteSidecars(temporary)
 
         if (backup.exists()) backup.delete()
         check(database.renameTo(backup)) {
