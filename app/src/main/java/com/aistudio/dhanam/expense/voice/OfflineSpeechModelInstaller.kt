@@ -29,7 +29,15 @@ object OfflineSpeechModelInstaller {
         }
         val root = File(context.filesDir, "speech/models").apply { mkdirs() }
         val finalDirectory = File(root, spec.id)
+        val backup = File(root, spec.id + ".previous")
         if (OfflineSpeechModelCatalog.isValidModelDirectory(finalDirectory)) return@withContext finalDirectory
+        if (OfflineSpeechModelCatalog.isValidModelDirectory(backup)) {
+            if (finalDirectory.exists()) deleteRecursively(finalDirectory)
+            check(backup.renameTo(finalDirectory)) {
+                "Could not recover the previous offline speech model installation."
+            }
+            return@withContext finalDirectory
+        }
 
         val requiredBytes = spec.approximateDownloadBytes * 3L + 64L * 1024L * 1024L
         check(OfflineSpeechModelCatalog.availableBytes(context) >= requiredBytes) {
@@ -38,10 +46,9 @@ object OfflineSpeechModelInstaller {
 
         val archive = File(root, spec.id + ".zip.part")
         val staging = File(root, spec.id + ".installing")
-        val backup = File(root, spec.id + ".previous")
         archive.delete()
         deleteRecursively(staging)
-        deleteRecursively(backup)
+        if (backup.exists()) deleteRecursively(backup)
 
         try {
             download(spec, archive, onProgress)
