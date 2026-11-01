@@ -6,6 +6,8 @@ import android.os.Handler
 import android.os.Looper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import org.json.JSONObject
 import org.vosk.Model
 import org.vosk.Recognizer
@@ -126,33 +128,43 @@ class OfflineVoskSpeechSession private constructor(
     companion object {
         private const val DEFAULT_TIMEOUT_MS = 25_000L
 
-        suspend fun create(context: Context, modelDirectory: File): OfflineVoskSpeechSession = withContext(Dispatchers.IO) {
-            val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            val memoryInfo = ActivityManager.MemoryInfo().also(activityManager::getMemoryInfo)
-            val minimumAvailableBytes = 512L * 1024L * 1024L
-            val minimumTotalBytes = 2L * 1024L * 1024L * 1024L
-            check(memoryInfo.totalMem >= minimumTotalBytes && memoryInfo.availMem >= minimumAvailableBytes && !memoryInfo.lowMemory) {
-                "The offline speech model needs about 300 MB of runtime memory. Free memory is too low on this device; close other apps or use the explicitly enabled online fallback."
-            }
-            check(OfflineSpeechModelCatalog.isValidModelDirectory(modelDirectory)) {
-                "The offline speech model is not installed correctly. Reinstall it from Voice settings."
-            }
-            val model = try {
-                Model(modelDirectory.absolutePath)
-            } catch (error: Exception) {
-                throw IOException("Could not load the offline speech model: ${error.message ?: "model initialization failed"}", error)
-            }
-            try {
-                val recognizer = Recognizer(model, SAMPLE_RATE)
-                try {
-                    val service = SpeechService(recognizer, SAMPLE_RATE)
-                    OfflineVoskSpeechSession(model, recognizer, service)
-                } catch (error: Exception) {
-                    recognizer.close()
-                    throw error
+        suspend fun create(context: Context, modelDirectory: File): OfflineVoskSpeechSession {
+            var createdSession: OfflineVoskSpeechSession? = null
+            return try {
+                val session = withContext(Dispatchers.IO) {
+                    val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                    val memoryInfo = ActivityManager.MemoryInfo().also(activityManager::getMemoryInfo)
+                    val minimumAvailableBytes = 512L * 1024L * 1024L
+                    val minimumTotalBytes = 2L * 1024L * 1024L * 1024L
+                    check(memoryInfo.totalMem >= minimumTotalBytes && memoryInfo.availMem >= minimumAvailableBytes && !memoryInfo.lowMemory) {
+                        "The offline speech model needs about 300 MB of runtime memory. Free memory is too low on this device; close other apps or use the explicitly enabled online fallback."
+                    }
+                    check(OfflineSpeechModelCatalog.isValidModelDirectory(modelDirectory)) {
+                        "The offline speech model is not installed correctly. Reinstall it from Voice settings."
+                    }
+                    val model = try {
+                        Model(modelDirectory.absolutePath)
+                    } catch (error: Exception) {
+                        throw IOException("Could not load the offline speech model: ${error.message ?: "model initialization failed"}", error)
+                    }
+                    try {
+                        val recognizer = Recognizer(model, SAMPLE_RATE)
+                        try {
+                            val service = SpeechService(recognizer, SAMPLE_RATE)
+                            OfflineVoskSpeechSession(model, recognizer, service).also { createdSession = it }
+                        } catch (error: Exception) {
+                            recognizer.close()
+                            throw error
+                        }
+                    } catch (error: Exception) {
+                        model.close()
+                        throw error
+                    }
                 }
+                currentCoroutineContext().ensureActive()
+                session
             } catch (error: Exception) {
-                model.close()
+                createdSession?.cancel()
                 throw error
             }
         }
