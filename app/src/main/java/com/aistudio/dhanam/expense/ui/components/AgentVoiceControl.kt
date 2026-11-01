@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -101,12 +102,12 @@ fun AgentVoiceControl(
         showDialog = false
     }
 
-    fun startListening() {
+    fun startListening(forceSystemProvider: Boolean = false) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             status = "Microphone permission is required. Grant it in Android app permissions and try again."
             return
         }
-        val offlineModel = OfflineSpeechModelCatalog.installedDirectory(context, language)
+        val offlineModel = if (forceSystemProvider) null else OfflineSpeechModelCatalog.installedDirectory(context, language)
         if (offlineModel == null && !SpeechRecognizer.isRecognitionAvailable(context)) {
             status = "No offline model for $language is installed and no Android speech provider is available."
             isListening = false
@@ -138,30 +139,57 @@ fun AgentVoiceControl(
 
                         override fun onFinal(text: String) {
                             offlineSessionRef.compareAndSet(session, null)
-                            transcript = text
-                            isListening = false
-                            isProcessing = false
-                            status = "Transcribed offline. Review and correct the text before sending."
+                            if (text.isBlank() && SpeechRecognitionPolicy.allowNetworkFallback(context)) {
+                                status = "Offline recognition returned no words. Trying the online provider you explicitly allowed."
+                                translationScope.launch {
+                                    delay(500)
+                                    startListening(forceSystemProvider = true)
+                                }
+                            } else {
+                                transcript = text
+                                isListening = false
+                                isProcessing = false
+                                status = if (text.isBlank()) "No speech was recognized. Try again or type your request."
+                                else "Transcribed offline. Review and correct the text before sending."
+                            }
                         }
 
                         override fun onError(message: String) {
                             offlineSessionRef.compareAndSet(session, null)
-                            isListening = false
-                            isProcessing = false
-                            status = message
+                            if (SpeechRecognitionPolicy.allowNetworkFallback(context)) {
+                                status = "Offline recognition failed. Trying the online provider you explicitly allowed."
+                                translationScope.launch {
+                                    delay(500)
+                                    startListening(forceSystemProvider = true)
+                                }
+                            } else {
+                                isListening = false
+                                isProcessing = false
+                                status = message
+                            }
                         }
                     })
                 } catch (error: Exception) {
-                    offlineSessionRef.set(null)
-                    isListening = false
-                    isProcessing = false
-                    status = error.message ?: "Offline speech recognition could not start."
+                    offlineSessionRef.getAndSet(null)?.cancel()
+                    if (SpeechRecognitionPolicy.allowNetworkFallback(context)) {
+                        status = "Offline speech could not start. Trying the online provider you explicitly allowed."
+                        delay(500)
+                        startListening(forceSystemProvider = true)
+                    } else {
+                        isListening = false
+                        isProcessing = false
+                        status = error.message ?: "Offline speech recognition could not start."
+                    }
                 }
             }
             return
         }
         try {
-            val (instance, recognitionRoute) = SpeechRecognitionPolicy.createRecognizer(context)
+            val (instance, recognitionRoute) = if (forceSystemProvider) {
+                SpeechRecognitionPolicy.createSystemRecognizer(context)
+            } else {
+                SpeechRecognitionPolicy.createRecognizer(context)
+            }
             val onDeviceAvailable = recognitionRoute == com.aistudio.dhanam.expense.voice.SpeechRecognitionRoute.ON_DEVICE
             recognizerRef.set(instance)
             instance.setRecognitionListener(object : RecognitionListener {
