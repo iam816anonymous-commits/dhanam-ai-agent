@@ -1,6 +1,7 @@
 package com.aistudio.dhanam.expense.voice
 
 import android.content.Context
+import androidx.annotation.RequiresApi
 import android.os.Build
 import android.speech.SpeechRecognizer
 
@@ -52,7 +53,7 @@ object SpeechRecognitionPolicy {
             SpeechRecognitionRoute.OFFLINE_VOSK_MODEL -> throw IllegalStateException(
                 "Use the installed Vosk model session for offline speech recognition."
             )
-            SpeechRecognitionRoute.ON_DEVICE -> SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+            SpeechRecognitionRoute.ON_DEVICE -> createOnDeviceRecognizer(context)
             SpeechRecognitionRoute.SYSTEM_PROVIDER_NETWORK_CONSENT -> SpeechRecognizer.createSpeechRecognizer(context)
             SpeechRecognitionRoute.BLOCKED -> throw IllegalStateException(
                 "A guaranteed on-device speech recognizer is unavailable on this device. Enable the explicit online speech fallback in Settings, or install a supported offline speech model when available."
@@ -60,6 +61,10 @@ object SpeechRecognitionPolicy {
         }
         return recognizer to route
     }
+
+    @RequiresApi(Build.VERSION_CODES.S)
+    private fun createOnDeviceRecognizer(context: Context): SpeechRecognizer =
+        SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
 
     fun createSystemRecognizer(context: Context): Pair<SpeechRecognizer, SpeechRecognitionRoute> {
         check(allowNetworkFallback(context)) {
